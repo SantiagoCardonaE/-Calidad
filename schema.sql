@@ -1,8 +1,3 @@
--- ═══════════════════════════════════════════════════════════════════════
--- XTENSOR — Esquema de base de datos (Supabase / PostgreSQL)
--- Pega este archivo completo en: Supabase → SQL Editor → New query → Run
--- ═══════════════════════════════════════════════════════════════════════
-
 create extension if not exists "pgcrypto";  -- para gen_random_uuid()
 
 -- ───────────────────────────────────────────────────────────────────────
@@ -208,8 +203,3 @@ alter publication supabase_realtime add table calidad_historico;
 alter publication supabase_realtime add table garantias_solicitudes;
 alter publication supabase_realtime add table garantias_maquinas;
 alter publication supabase_realtime add table garantias_defectos;
-
--- ═══════════════════════════════════════════════════════════════════════
--- Fin del esquema. Siguiente paso: Project Settings → API → copiar
--- "Project URL" y "anon public key" y pegarlos en la app (bloque CONFIG).
--- ═══════════════════════════════════════════════════════════════════════
