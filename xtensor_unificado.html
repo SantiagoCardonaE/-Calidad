@@ -1,0 +1,2361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XTENSOR — Recepción · Calidad · Garantías</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --bg:#0f0f0f;--bg2:#161616;--surface:#1c1c1c;--surface2:#242424;
+  --border:#2e2e2e;--border2:#3a3a3a;
+  --text:#f0f0f0;--text2:#a0a0a0;--text3:#555;
+  --yellow:#f5c518;--yellow-dim:#b88e10;
+  --yellow-bg:rgba(245,197,24,.10);--yellow-border:rgba(245,197,24,.25);
+  --green:#22c55e;--green-bg:rgba(34,197,94,.10);--green-border:rgba(34,197,94,.25);
+  --red:#ef4444;--red-bg:rgba(239,68,68,.10);--red-border:rgba(239,68,68,.25);
+  --r:5px;--sidebar-w:300px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── TOPBAR ── */
+#topbar{height:44px;min-height:44px;display:flex;align-items:center;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 12px;gap:8px;flex-shrink:0;z-index:10}
+.t-brand{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;color:var(--text);text-decoration:none;padding-right:12px;border-right:1px solid var(--border);margin-right:2px;flex-shrink:0}
+.t-brand img{width:18px;height:18px}
+.t-brand i{color:var(--yellow);font-size:16px}
+.db-status{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);padding-right:12px;border-right:1px solid var(--border);margin-right:2px;flex-shrink:0}
+#main-tabs{display:flex;gap:1px;flex-shrink:0}
+.mtab{display:flex;align-items:center;gap:6px;color:var(--text3);text-decoration:none;font-size:12.5px;font-weight:500;padding:6px 12px;border-radius:99px;white-space:nowrap;cursor:pointer;transition:color .12s,background .12s;background:transparent;border:1px solid transparent}
+.mtab:hover{color:var(--text2);background:var(--surface)}
+.mtab.active{color:var(--yellow);background:var(--yellow-bg);border-color:var(--yellow-border)}
+.t-right{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
+.tbr-variant{display:none;align-items:center;gap:8px}
+.tbr-variant.show{display:flex}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+.sdot.stale{background:var(--yellow)}
+#t-updated,#t-countdown{font-size:11px;color:var(--text3)}
+.stat-chip{display:flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:99px;padding:3px 10px;font-size:11px;color:var(--text2)}
+.stat-chip b{color:var(--yellow);font-size:12px}
+.stat-chip.g b{color:var(--green)}
+.stat-chip.r b{color:var(--red)}
+
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surface2);color:var(--text);cursor:pointer;font-size:12px;font-weight:500;transition:.12s;white-space:nowrap;font-family:'Inter',sans-serif}
+.btn:hover{background:var(--surface)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn-y{background:var(--yellow);color:#000;border-color:var(--yellow)}
+.btn-y:hover{background:var(--yellow-dim)}
+.btn-ghost{background:transparent;border-color:transparent}
+.btn-ghost:hover{background:var(--surface2)}
+.btn-sm{padding:4px 9px;font-size:11px}
+
+/* ── APP SECTIONS ── */
+#app-body{flex:1;display:flex;min-height:0;overflow:hidden}
+.app-section{display:none;flex:1;min-height:0;overflow:hidden;flex-direction:column}
+.app-section.active{display:flex}
+
+/* ── SHARED: view-tabs / vtab ── */
+.view-tabs{display:flex;gap:1px;padding:0 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
+.vtab{padding:8px 13px;font-size:12px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;transition:.12s;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.vtab:hover{color:var(--text2)}
+.vtab.active{color:var(--yellow);border-bottom-color:var(--yellow)}
+.vtab .cnt{background:var(--surface2);color:var(--text3);border-radius:99px;font-size:10px;padding:1px 6px}
+.vtab.active .cnt{background:var(--yellow-bg);color:var(--yellow)}
+
+/* ── SHARED: card / form ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.card-title{font-size:13px;font-weight:600;color:var(--text);flex:1}
+.section-lbl{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin:14px 0 8px;border-top:1px solid var(--border);padding-top:12px}
+.section-lbl:first-child{margin-top:0;border-top:none;padding-top:0}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.field label,.field-lbl{display:block;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.field input,.field select,.field textarea,.obs-input{width:100%;padding:7px 9px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:13px;font-family:'Inter',sans-serif;outline:none}
+.field input:focus,.field select:focus,.field textarea:focus,.obs-input:focus{border-color:var(--yellow)}
+.field.full{grid-column:1/-1}
+.field textarea{resize:vertical;min-height:38px}
+.form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+
+/* ── SHARED: table ── */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead th{text-align:left;padding:8px 10px;background:var(--bg2);color:var(--text3);font-weight:600;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;border-bottom:1px solid var(--border)}
+tbody td{padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap;color:var(--text2)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--surface)}
+td.obs{white-space:normal;max-width:240px;color:var(--text3)}
+.badge{font-size:10.5px;padding:2px 8px;border-radius:99px;border:1px solid;font-weight:600;display:inline-flex;align-items:center;gap:3px}
+.b-ok{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.b-no{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+.b-cond{background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-border)}
+.badge-g{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.badge-r{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+.badge-y{background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-border)}
+.badge-gray{background:var(--surface2);color:var(--text2);border-color:var(--border2)}
+.row-del{color:var(--text3);cursor:pointer;background:none;border:none;font-size:14px}
+.row-del:hover{color:var(--red)}
+#empty-row td{text-align:center;color:var(--text3);padding:24px;font-style:italic}
+
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.toolbar .sp{flex:1}
+.toolbar select,.toolbar input{padding:6px 9px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);color:var(--text2);font-size:12px;font-family:'Inter',sans-serif}
+
+/* ── TOAST ── */
+.spin{animation:sp .8s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ══════════════ RECEPCIÓN ══════════════ */
+#rec-content{flex:1;overflow-y:auto;padding:16px}
+#rec-content::-webkit-scrollbar{width:6px}
+#rec-content::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.rec-panel{display:none;max-width:1200px;margin:0 auto}
+.rec-panel.active{display:block}
+
+/* ══════════════ CALIDAD ══════════════ */
+#workspace{display:flex;flex:1;overflow:hidden;min-height:0}
+#sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;transition:width .2s,min-width .2s}
+#sidebar.collapsed{width:0;min-width:0;border-right:none}
+#sb-header{padding:8px 10px 6px;border-bottom:1px solid var(--border);flex-shrink:0}
+#sb-stats{display:flex;gap:6px;margin-bottom:6px}
+.sb-stat{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:4px 6px;text-align:center}
+.sb-stat-n{font-size:15px;font-weight:600;color:var(--yellow)}
+.sb-stat-l{font-size:10px;color:var(--text3);margin-top:1px}
+.sb-search{position:relative}
+.sb-search i{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:13px;color:var(--text3)}
+.sb-search input{width:100%;padding:5px 8px 5px 26px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px;outline:none;font-family:'Inter',sans-serif}
+.sb-search input:focus{border-color:var(--yellow)}
+.sb-search input::placeholder{color:var(--text3)}
+#sb-filters{display:flex;gap:4px;padding:5px 10px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
+.sf{font-size:11px;padding:2px 7px;border-radius:99px;border:1px solid var(--border2);color:var(--text3);cursor:pointer;white-space:nowrap;background:transparent}
+.sf:hover{color:var(--text2);border-color:var(--border2)}
+.sf.active{background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-border)}
+#sb-list{flex:1;overflow-y:auto;padding:4px}
+#sb-list::-webkit-scrollbar{width:4px}
+#sb-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.mrow{padding:7px 8px;border-radius:var(--r);cursor:pointer;border:1px solid transparent;margin-bottom:2px;transition:background .1s,border-color .1s}
+.mrow:hover{background:var(--surface);border-color:var(--border)}
+.mrow.selected{background:var(--yellow-bg);border-color:var(--yellow-border)}
+.mrow.selected .mr-name{color:var(--yellow)}
+.mr-top{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.mr-serial{font-size:10px;font-weight:700;color:var(--yellow);background:var(--yellow-bg);border:1px solid var(--yellow-border);border-radius:3px;padding:1px 5px;flex-shrink:0}
+.mr-code{font-size:10px;color:var(--text3);flex-shrink:0}
+.mr-name{font-size:12px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mr-pct-bar{height:3px;border-radius:2px;background:var(--surface2);overflow:hidden;margin-bottom:3px}
+.mr-pct-fill{height:100%;border-radius:2px;background:var(--yellow);transition:width .3s}
+.mr-pct-fill.g{background:var(--green)}
+.mr-pct-fill.r{background:var(--red)}
+.mr-meta{display:flex;align-items:center;gap:0;flex-wrap:wrap}
+.mr-client{font-size:11px;color:var(--text3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mr-date{font-size:10px;color:var(--text3);white-space:nowrap;margin-left:4px}
+.mr-badges{display:flex;gap:3px;margin-top:3px;flex-wrap:wrap}
+.mrbadge{font-size:10px;padding:1px 5px;border-radius:3px;border:1px solid}
+.mb-pct{background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-border)}
+.mb-pct.hi{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.mb-pct.lo{background:var(--surface2);color:var(--text3);border-color:var(--border)}
+.mb-color{background:var(--surface2);color:var(--text3);border-color:var(--border)}
+.mb-alert{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
+.mb-ok{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+#resize-handle{width:4px;cursor:col-resize;background:transparent;flex-shrink:0;transition:background .15s;position:relative;z-index:5}
+#resize-handle:hover,#resize-handle.dragging{background:var(--yellow-border)}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#mhdr{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;min-height:44px}
+#mhdr.empty{justify-content:center;color:var(--text3);font-size:13px}
+.mh-serial{font-size:11px;font-weight:700;color:var(--yellow);background:var(--yellow-bg);border:1px solid var(--yellow-border);border-radius:3px;padding:2px 7px;flex-shrink:0}
+.mh-code{font-size:11px;color:var(--text3);flex-shrink:0}
+.mh-name{font-size:14px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mh-client{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.mh-date{font-size:11px;color:var(--text3);white-space:nowrap;flex-shrink:0}
+.mh-color{font-size:11px;color:var(--text3);white-space:nowrap;flex-shrink:0}
+.mh-nav{display:flex;gap:3px;flex-shrink:0}
+.kb-hint{font-size:10px;color:var(--text3);padding:1px 4px;border:1px solid var(--border);border-radius:3px;font-family:monospace}
+#cal-content{flex:1;overflow-y:auto;padding:12px 14px}
+#cal-content::-webkit-scrollbar{width:5px}
+#cal-content::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+#empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text3);gap:10px}
+#empty-state i{font-size:40px;opacity:.3}
+.stage-tabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.stage-tab{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surface2);color:var(--text2);cursor:pointer;font-size:12px;font-weight:500;transition:all .12s}
+.stage-tab:hover{background:var(--surface);color:var(--text)}
+.stage-tab.active{background:var(--yellow-bg);color:var(--yellow);border-color:var(--yellow-border)}
+.stage-tab.done{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.insp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.stage-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.stage-hdr-left{font-size:14px;font-weight:600}
+.stage-hdr-right{display:flex;align-items:center;gap:8px}
+.prog-bar{height:4px;border-radius:2px;background:var(--surface2);overflow:hidden;margin-bottom:10px}
+.prog-fill{height:100%;border-radius:2px;background:var(--yellow);transition:width .3s}
+.prog-fill.g{background:var(--green)}
+.prog-fill.r{background:var(--red)}
+.checklist-grid{display:flex;flex-direction:column;gap:0}
+.check-row{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)}
+.check-row:last-child{border-bottom:none}
+.check-circle{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border2);cursor:pointer;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.check-circle.ok{background:var(--green);border-color:var(--green)}
+.check-circle.fail{background:var(--red);border-color:var(--red)}
+.result-select{font-size:11px;padding:2px 6px;border:1px solid var(--border2);border-radius:var(--r);background:var(--surface2);color:var(--text);cursor:pointer}
+.sup-badge{font-size:10px;padding:1px 5px;border-radius:3px;font-weight:600;flex-shrink:0}
+.sup1{background:#1a2e45;color:#5ba3f5}
+.sup2{background:#1a2e1e;color:#4ade80}
+.sup3{background:#2e1f0a;color:#fb923c}
+#bottombar{display:flex;align-items:center;justify-content:space-between;padding:6px 14px;background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0;gap:8px;flex-wrap:wrap}
+.bb-counts{display:flex;gap:6px}
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;text-align:center}
+.metric-num{font-size:22px;font-weight:600}
+.metric-lbl{font-size:11px;color:var(--text2);margin-top:2px}
+.sum-stage{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:6px}
+[data-tip]{position:relative}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);background:#111;color:var(--text);font-size:11px;padding:3px 7px;border-radius:4px;white-space:nowrap;border:1px solid var(--border2);pointer-events:none;z-index:99}
+
+/* ══════════════ GARANTÍAS ══════════════ */
+#gar-content{flex:1;overflow-y:auto;padding:16px}
+#gar-content::-webkit-scrollbar{width:6px}
+#gar-content::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.gar-wrap{max-width:1200px;margin:0 auto}
+.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.sig-box canvas{width:100%;max-width:320px;height:120px;background:#fff;border-radius:var(--r);border:1px solid var(--border2);touch-action:none;cursor:crosshair;display:block;margin:4px 0 6px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;max-width:680px;width:100%;max-height:88vh;overflow-y:auto;padding:20px}
+
+@media(max-width:760px){
+  #main-tabs .mtab span.mtab-lbl{display:none}
+  .t-right .stat-chip{display:none}
+  #sidebar{position:fixed;top:44px;bottom:0;left:0;z-index:50}
+  .form-grid{grid-template-columns:1fr 1fr}
+  .sig-grid{grid-template-columns:1fr}
+  .metrics-grid{grid-template-columns:1fr 1fr}
+}
+
+@media print{
+  body *{visibility:hidden}
+  #gar-modal-overlay,#gar-modal-overlay *{visibility:visible}
+  #gar-modal-overlay{position:absolute;inset:0;background:#fff!important;display:block!important;padding:0}
+  .modal-box{position:absolute;top:0;left:0;right:0;margin:0 auto;max-height:none;overflow:visible;box-shadow:none;border:none;background:#fff}
+  .printable,.printable *{color:#000!important}
+  .printable .badge{background:#fff!important;border:1px solid #000!important;color:#000!important}
+  .no-print{display:none!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ TOPBAR ═══ -->
+<div id="topbar">
+  <div class="t-brand"><i class="ti ti-shield-check"></i> XTENSOR</div>
+  <div class="db-status" id="db-status" data-tip="Estado de conexión con la base de datos">
+    <span class="sdot" id="db-status-dot"></span>
+    <span id="db-status-txt">Conectando…</span>
+  </div>
+  <div id="main-tabs">
+    <div class="mtab active" data-sec="recepcion" onclick="switchSection('recepcion')"><i class="ti ti-truck-delivery"></i> <span class="mtab-lbl">Recepción</span></div>
+    <div class="mtab" data-sec="calidad" onclick="switchSection('calidad')"><i class="ti ti-clipboard-check"></i> <span class="mtab-lbl">Calidad</span></div>
+    <div class="mtab" data-sec="garantias" onclick="switchSection('garantias')"><i class="ti ti-tools"></i> <span class="mtab-lbl">Garantías</span></div>
+  </div>
+
+  <div class="t-right">
+    <!-- Recepción widgets -->
+    <div class="tbr-variant show" data-sec="recepcion">
+      <div class="stat-chip"><b id="rec-st-total">0</b> inspecciones</div>
+      <div class="stat-chip g"><b id="rec-st-ok">0%</b> aprobado</div>
+      <div class="stat-chip r"><b id="rec-st-no">0</b> rechazados</div>
+    </div>
+    <!-- Calidad widgets -->
+    <div class="tbr-variant" data-sec="calidad">
+      <span class="sdot" id="sdot"></span>
+      <span id="t-updated">–</span>
+      <span id="t-countdown"></span>
+      <button class="btn" id="btn-refresh" onclick="requestRefresh()" data-tip="Actualizar lista de producción">
+        <i class="ti ti-refresh"></i> Actualizar
+      </button>
+      <button class="btn btn-ghost" onclick="document.getElementById('admin-file-input').click()" data-tip="Cargar un HTML o CSV guardado del admin, sin internet">
+        <i class="ti ti-upload"></i>
+      </button>
+      <input type="file" id="admin-file-input" accept=".html,.htm,.csv" style="display:none" onchange="handleAdminFileUpload(event)">
+      <button class="btn btn-ghost" onclick="toggleSidebar()" data-tip="Colapsar panel (B)">
+        <i class="ti ti-layout-sidebar-left-collapse" id="sb-icon"></i>
+      </button>
+    </div>
+    <!-- Garantías widgets -->
+    <div class="tbr-variant" data-sec="garantias">
+      <div class="stat-chip"><b id="gar-st-total">0</b> solicitudes</div>
+      <div class="stat-chip"><b id="gar-st-pend">0</b> pendientes</div>
+      <div class="stat-chip g"><b id="gar-st-res">0</b> resueltas</div>
+      <div class="stat-chip r"><b id="gar-st-crit">0</b> defectos críticos sin corregir</div>
+    </div>
+  </div>
+</div>
+
+<div id="app-body">
+  <!-- ═══════════════ SECCIÓN RECEPCIÓN ═══════════════ -->
+  <div id="sec-recepcion" class="app-section active">
+    <div class="view-tabs" id="rec-view-tabs"></div>
+    <div id="rec-content"></div>
+  </div>
+
+  <!-- ═══════════════ SECCIÓN CALIDAD ═══════════════ -->
+  <div id="sec-calidad" class="app-section">
+    <div id="workspace">
+
+      <!-- SIDEBAR -->
+      <div id="sidebar">
+        <div id="sb-header">
+          <div id="sb-stats">
+            <div class="sb-stat"><div class="sb-stat-n" id="sb-total">0</div><div class="sb-stat-l">Máquinas</div></div>
+            <div class="sb-stat"><div class="sb-stat-n" id="sb-insp" style="color:var(--green)">0</div><div class="sb-stat-l">Inspecc.</div></div>
+            <div class="sb-stat"><div class="sb-stat-n" id="sb-pend" style="color:var(--text3)">0</div><div class="sb-stat-l">Pendiente</div></div>
+          </div>
+          <div class="sb-search">
+            <i class="ti ti-search"></i>
+            <input id="sb-q" type="text" placeholder="Buscar serial, código, máquina…" oninput="filterMachines(this.value)" autocomplete="off">
+          </div>
+        </div>
+        <div id="sb-filters">
+          <span class="sf" onclick="calSetFilter('all',this)">Todos</span>
+          <span class="sf" onclick="calSetFilter('pending',this)">Pendientes</span>
+          <span class="sf" onclick="calSetFilter('progress',this)">En curso</span>
+          <span class="sf" onclick="calSetFilter('done',this)">Completos</span>
+        </div>
+        <div id="sb-list"></div>
+      </div>
+
+      <!-- RESIZE -->
+      <div id="resize-handle"></div>
+
+      <!-- MAIN -->
+      <div id="main">
+
+        <!-- MACHINE HEADER -->
+        <div id="mhdr" class="empty">
+          <i class="ti ti-arrow-left" style="font-size:16px"></i>
+          Selecciona una máquina del panel izquierdo
+        </div>
+
+        <!-- VIEW TABS -->
+        <div class="view-tabs" style="display:none" id="cal-view-tabs">
+          <div class="vtab active" onclick="setView('checklist',this)" id="vtab-checklist">
+            <i class="ti ti-clipboard-check"></i> Inspección
+          </div>
+          <div class="vtab" onclick="setView('summary',this)" id="vtab-summary">
+            <i class="ti ti-chart-bar"></i> Resumen
+          </div>
+          <div class="vtab" onclick="setView('historico',this)" id="vtab-historico" style="margin-left:auto;border-left:1px solid var(--border);padding-left:12px">
+            <i class="ti ti-history"></i> Histórico <span id="historico-count" style="background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-border);border-radius:99px;padding:0 5px;font-size:10px;margin-left:2px">0</span>
+          </div>
+        </div>
+
+        <!-- CONTENT -->
+        <div id="cal-content">
+          <div id="empty-state">
+            <i class="ti ti-shield-check"></i>
+            <div style="font-size:13px">Control de calidad XTENSOR</div>
+            <div style="font-size:12px">Selecciona una máquina para iniciar la inspección</div>
+            <div style="font-size:11px;margin-top:6px">
+              <span class="kb-hint">↑↓</span> navegar &nbsp;
+              <span class="kb-hint">Enter</span> seleccionar &nbsp;
+              <span class="kb-hint">B</span> sidebar
+            </div>
+          </div>
+
+          <!-- CHECKLIST VIEW -->
+          <div id="view-checklist" style="display:none">
+            <div class="stage-tabs" id="stage-tabs"></div>
+            <div class="card" style="margin-bottom:10px">
+              <div class="stage-hdr">
+                <div class="stage-hdr-left" id="stage-title"></div>
+                <div class="stage-hdr-right">
+                  <span id="stage-pl" style="font-size:12px;color:var(--text2)"></span>
+                  <span id="stage-pct" style="font-size:13px;font-weight:600;color:var(--yellow)"></span>
+                </div>
+              </div>
+              <div class="prog-bar"><div id="stage-bar" class="prog-fill" style="width:0%"></div></div>
+              <div class="insp-grid">
+                <div><label class="field-lbl">Inspector</label><input id="field-inspector" type="text" class="obs-input" placeholder="Nombre inspector"></div>
+                <div><label class="field-lbl">Responsable</label><input id="field-responsable" type="text" class="obs-input" placeholder="Armador / pintor…"></div>
+              </div>
+              <div id="checklist-items"></div>
+              <div style="margin-top:10px">
+                <label class="field-lbl">Observaciones</label>
+                <textarea id="stage-obs" class="obs-input" rows="2" placeholder="Anotaciones adicionales…" style="resize:vertical"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- HISTORICO VIEW -->
+          <div id="view-historico" style="display:none">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+              <div>
+                <div style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px">
+                  <i class="ti ti-history" style="color:var(--yellow)"></i> Histórico de calidad
+                </div>
+                <div style="font-size:12px;color:var(--text2);margin-top:2px">Inspecciones completadas al 100% en las 4 etapas</div>
+              </div>
+              <button class="btn btn-ghost" onclick="exportHistorico()" style="font-size:12px">
+                <i class="ti ti-download"></i> Exportar histórico
+              </button>
+            </div>
+            <div id="historico-list"></div>
+          </div>
+
+          <!-- SUMMARY VIEW -->
+          <div id="view-summary" style="display:none">
+            <div id="sum-machine" class="card" style="margin-bottom:10px"></div>
+            <div id="sum-metrics" class="metrics-grid"></div>
+            <div id="sum-stages"></div>
+            <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+              <button class="btn" style="background:var(--red-bg);border-color:var(--red-border);color:var(--red)" onclick="sendToNC()">
+                <i class="ti ti-alert-triangle"></i> No conformidades
+              </button>
+              <button class="btn" onclick="exportSummary()"><i class="ti ti-download"></i> Exportar</button>
+              <button class="btn btn-y" onclick="garCreateFromMachine(currentSerial)"><i class="ti ti-tools"></i> Generar garantía</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTTOM BAR -->
+        <div id="bottombar">
+          <div class="bb-counts" id="bb-counts"></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;color:var(--text3)">
+              <span class="kb-hint">←→</span> máq. anterior/siguiente &nbsp;
+              <span class="kb-hint">1-4</span> etapa
+            </span>
+            <div style="display:flex;gap:3px">
+              <button class="btn btn-ghost" onclick="prevMachine()" data-tip="Máquina anterior (←)"><i class="ti ti-chevron-left"></i></button>
+              <span id="bb-pos" style="font-size:11px;color:var(--text3);padding:4px 6px;align-self:center"></span>
+              <button class="btn btn-ghost" onclick="nextMachine()" data-tip="Siguiente máquina (→)"><i class="ti ti-chevron-right"></i></button>
+            </div>
+            <button class="btn btn-y" onclick="nextStageOrFinish()" id="btn-next" style="display:none">
+              Siguiente etapa <i class="ti ti-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+
+      </div><!-- /main -->
+    </div><!-- /workspace -->
+  </div>
+
+  <!-- ═══════════════ SECCIÓN GARANTÍAS ═══════════════ -->
+  <div id="sec-garantias" class="app-section">
+    <div id="gar-content">
+      <div class="gar-wrap">
+
+        <div class="card">
+          <div class="card-hdr">
+            <div class="card-title"><i class="ti ti-tools"></i> Formato solicitud de garantías <span id="gar-numero-preview" style="color:var(--text3);font-weight:400"></span></div>
+            <span id="gar-linked-badge" class="badge badge-y" style="display:none;gap:6px"></span>
+          </div>
+          <form id="gar-form">
+
+            <div class="section-lbl">Información del cliente</div>
+            <div class="form-grid">
+              <div class="field"><label>Nombre del cliente</label><input id="gf-cliente" type="text" required></div>
+              <div class="field"><label>Celular</label><input id="gf-celular" type="text"></div>
+              <div class="field full"><label>Dirección</label><input id="gf-direccion" type="text"></div>
+              <div class="field"><label>Fecha de visita técnica</label><input id="gf-fechaVisita" type="date"></div>
+              <div class="field"><label>Técnico Xtensor</label><input id="gf-tecnico" type="text"></div>
+            </div>
+
+            <div class="section-lbl">Información de la máquina</div>
+            <div class="form-grid">
+              <div class="field"><label>Factura N°</label><input id="gf-factura" type="text"></div>
+              <div class="field"><label>Fecha de compra</label><input id="gf-fechaCompra" type="date"></div>
+              <div class="field"><label>Código Xtensor</label><input id="gf-codigo" type="text"></div>
+              <div class="field"><label>Descripción</label><input id="gf-descMaquina" type="text"></div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px">
+              <button type="button" class="btn btn-sm" onclick="garAddMachine()"><i class="ti ti-plus"></i> Agregar máquina a la solicitud</button>
+            </div>
+            <div class="tbl-wrap" id="gar-machines-wrap" style="display:none;margin-top:8px">
+              <table>
+                <thead><tr><th>Factura N°</th><th>Fecha compra</th><th>Código</th><th>Descripción</th><th></th></tr></thead>
+                <tbody id="gar-machines-tbody"></tbody>
+              </table>
+            </div>
+
+            <div class="section-lbl">Defectos encontrados <span style="text-transform:none;font-weight:400;color:var(--text3)">— qué hay que corregir</span></div>
+            <div class="form-grid">
+              <div class="field"><label>Proceso</label>
+                <select id="gf-defProceso" onchange="garProcesoChanged()"></select>
+              </div>
+              <div class="field" id="gf-defItemSelect-wrap"><label>Ítem del checklist</label>
+                <select id="gf-defItemSelect" onchange="garItemChanged()"><option value="">Selecciona un proceso primero…</option></select>
+              </div>
+              <div class="field" id="gf-defItemText-wrap" style="display:none"><label>Ítem / defecto</label>
+                <input id="gf-defItemText" type="text" placeholder="Describe el ítem o defecto">
+              </div>
+              <div class="field full"><label>Criterio de aceptación</label>
+                <input id="gf-defCriterio" type="text" placeholder="Se completa solo al elegir un ítem del checklist (editable)">
+              </div>
+              <div class="field full"><label>Resultado encontrado / evidencia</label>
+                <input id="gf-defResultado" type="text" placeholder="¿Qué se encontró exactamente?">
+              </div>
+              <div class="field"><label>Severidad</label>
+                <select id="gf-defSeveridad"><option>Leve</option><option selected>Media</option><option>Crítica</option></select>
+              </div>
+              <div class="field"><label>Causa posible</label>
+                <select id="gf-defCausa">
+                  <option value="">Selecciona…</option>
+                  <option>Proveedor</option>
+                  <option>Daño por manipulación</option>
+                  <option>Falla de proceso</option>
+                  <option>Plano / especificación confusa</option>
+                  <option>Material defectuoso</option>
+                  <option>Descuido del operario</option>
+                  <option>Falta de capacitación</option>
+                  <option>Herramienta inadecuada</option>
+                  <option>Medición incorrecta</option>
+                  <option>Error de método</option>
+                  <option>Falta de inspección anterior</option>
+                  <option>Otra</option>
+                </select>
+              </div>
+              <div class="field full"><label>Acción / reproceso propuesto</label>
+                <input id="gf-defAccion" type="text" placeholder="Ej: lijar zona afectada, limpiar y resoldar">
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px">
+              <button type="button" class="btn btn-sm" onclick="garAddDefecto()"><i class="ti ti-plus"></i> Agregar defecto</button>
+            </div>
+            <div class="tbl-wrap" id="gar-defectos-wrap" style="display:none;margin-top:8px">
+              <table>
+                <thead><tr><th>Proceso</th><th>Ítem</th><th>Severidad</th><th>Causa posible</th><th>Acción propuesta</th><th></th></tr></thead>
+                <tbody id="gar-defectos-tbody"></tbody>
+              </table>
+            </div>
+
+            <div class="section-lbl">Descripción de la garantía</div>
+            <div class="field full"><textarea id="gf-descGarantia" rows="3" placeholder="Describe la falla o el motivo de la garantía…"></textarea></div>
+
+            <div class="section-lbl">Observaciones</div>
+            <div class="field full"><textarea id="gf-obs" rows="2"></textarea></div>
+
+            <div class="form-grid" style="margin-top:10px">
+              <div class="field">
+                <label>Estado de la solicitud</label>
+                <select id="gf-estado">
+                  <option>Pendiente</option>
+                  <option>En revisión</option>
+                  <option>Aprobada</option>
+                  <option>Rechazada</option>
+                  <option>Resuelta</option>
+                </select>
+              </div>
+              <div class="field"><label>Responsable del reproceso</label><input id="gf-responsable" type="text" placeholder="Ej: Supervisor 2"></div>
+              <div class="field"><label>Fecha compromiso</label><input id="gf-fechaCompromiso" type="date"></div>
+            </div>
+
+            <div class="section-lbl">Constancia de visita</div>
+            <div class="sig-grid">
+              <div class="sig-box">
+                <label class="field-lbl">Firma del cliente</label>
+                <canvas id="gf-sigCliente" width="320" height="120"></canvas>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="garClearSig('gf-sigCliente')"><i class="ti ti-eraser"></i> Limpiar firma</button>
+              </div>
+              <div class="sig-box">
+                <label class="field-lbl">Firma del técnico Xtensor</label>
+                <canvas id="gf-sigTecnico" width="320" height="120"></canvas>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="garClearSig('gf-sigTecnico')"><i class="ti ti-eraser"></i> Limpiar firma</button>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="garResetForm()">Limpiar todo</button>
+              <button type="submit" class="btn btn-y btn-sm"><i class="ti ti-device-floppy"></i> Guardar solicitud</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="toolbar">
+          <select id="gar-filter-estado" onchange="garSetFilter(this.value)">
+            <option value="">Todos los estados</option>
+            <option>Pendiente</option>
+            <option>En revisión</option>
+            <option>Aprobada</option>
+            <option>Rechazada</option>
+            <option>Resuelta</option>
+          </select>
+          <input id="gar-search" type="text" placeholder="Buscar cliente, código, factura…" oninput="garSearch(this.value)" style="min-width:220px">
+          <div class="sp"></div>
+          <button class="btn btn-sm" onclick="garExportCSV()"><i class="ti ti-download"></i> Exportar CSV</button>
+        </div>
+
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>N°</th><th>Fecha visita</th><th>Cliente</th><th>Máquinas</th><th>Defectos</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="gar-tbody"></tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MODAL DETALLE / IMPRESIÓN -->
+    <div id="gar-modal-overlay" class="modal-overlay" style="display:none" onclick="if(event.target===this) garCloseModal()">
+      <div class="modal-box" id="gar-modal-box"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Banner de configuración — se muestra solo si falta configurar Supabase -->
+<div id="setup-banner" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="max-width:560px;background:var(--surface);border:1px solid var(--yellow-border);border-radius:8px;padding:24px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <i class="ti ti-database-cog" style="color:var(--yellow);font-size:22px"></i>
+      <div style="font-size:16px;font-weight:700">Falta conectar la base de datos</div>
+    </div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.6">
+      Esta app necesita un proyecto de <b>Supabase</b> para guardar la información de forma permanente y compartida entre dispositivos.
+      <ol style="margin:10px 0 10px 18px;padding:0">
+        <li>Crea un proyecto gratis en <span style="color:var(--yellow)">supabase.com</span></li>
+        <li>Abre <b>SQL Editor</b> → pega el contenido de <code>schema.sql</code> → Run</li>
+        <li>Ve a <b>Project Settings → API</b> y copia <b>Project URL</b> y <b>anon public key</b></li>
+        <li>Pégalos al inicio del archivo HTML, en el bloque <code>SUPABASE CONFIG</code> (busca <code>SUPABASE_URL</code>)</li>
+        <li>Guarda el archivo y vuelve a abrirlo</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════ SUPABASE CONFIG ══════════════
+// ← Reemplaza estos dos valores con los de tu proyecto Supabase
+// (Project Settings → API → Project URL / anon public key)
+const SUPABASE_URL = 'https://vjmfaegzvrktaeubqcxy.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_qlkyePfVQp_6sr-4nE7zOw_jGclG-Wo';
+
+const SUPABASE_CONFIGURED = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_ANON_KEY.includes('YOUR-ANON');
+const sb = SUPABASE_CONFIGURED ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+if(!SUPABASE_CONFIGURED){
+  document.getElementById('setup-banner').style.display='flex';
+}
+
+function setDbStatus(online){
+  const dot=document.getElementById('db-status-dot');
+  const txt=document.getElementById('db-status-txt');
+  if(dot) dot.className='sdot'+(online?'':' stale');
+  if(txt) txt.textContent = online? 'Conectado' : 'Sin conexión';
+}
+
+// Envuelve toda llamada a Supabase: reporta estado de conexión y muestra
+// un toast homogéneo en caso de error, sin detener el resto de la app.
+async function sbCall(promiseFn){
+  if(!SUPABASE_CONFIGURED){ setDbStatus(false); throw new Error('Supabase no configurado'); }
+  try{
+    const res = await promiseFn();
+    if(res && res.error) throw res.error;
+    setDbStatus(true);
+    return res ? res.data : undefined;
+  }catch(e){
+    setDbStatus(false);
+    showToast('Error de conexión con la base de datos: '+(e.message||e),'red');
+    throw e;
+  }
+}
+</script>
+
+<script>
+// ══════════════ SHARED HELPERS ══════════════
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function showToast(msg,type='green'){
+  const t=document.createElement('div');
+  t.style.cssText=`position:fixed;bottom:20px;right:20px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:500;border:1px solid;
+    background:${type==='green'?'var(--green-bg)':type==='red'?'var(--red-bg)':'var(--yellow-bg)'};
+    color:${type==='green'?'var(--green)':type==='red'?'var(--red)':'var(--yellow)'};
+    border-color:${type==='green'?'var(--green-border)':type==='red'?'var(--red-border)':'var(--yellow-border)'};`;
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+function switchSection(sec){
+  document.querySelectorAll('.app-section').forEach(el=>el.classList.toggle('active', el.id==='sec-'+sec));
+  document.querySelectorAll('.mtab').forEach(el=>el.classList.toggle('active', el.dataset.sec===sec));
+  document.querySelectorAll('.tbr-variant').forEach(el=>el.classList.toggle('show', el.dataset.sec===sec));
+  try{ localStorage.setItem('xtensor_app_lastsection', sec); }catch(e){}
+}
+</script>
+
+<script>
+// ══════════════ RECEPCIÓN — DEFINICIÓN DE CATEGORÍAS ══════════════
+const REC_CATS = [
+  {
+    key:'material', label:'Material', icon:'ti-pipe',
+    fields:[
+      {id:'proveedor',label:'Proveedor',type:'text'},
+      {id:'oc',label:'OC / Remisión',type:'text'},
+      {id:'tipo',label:'Tipo de material',type:'select',opts:['Tubería','Lámina','Varilla','Platina','Perfil','Barra maciza']},
+      {id:'medida',label:'Medida / Espesor',type:'text'},
+      {id:'cantidad',label:'Cantidad',type:'number'},
+      {id:'estado',label:'Estado superficial',type:'select',opts:['Bueno','Golpes','Óxido','Rayones','Deformado']},
+      {id:'dimensiones',label:'Dimensiones OK',type:'select',opts:['Sí','No']},
+      {id:'obs',label:'Observaciones',type:'textarea',full:true},
+      {id:'resultado',label:'Resultado',type:'select',opts:['Aprobado','Condicional','Rechazado'],result:true},
+    ],
+    cols:['fecha','proveedor','oc','tipo','medida','cantidad','estado','dimensiones','obs','resultado']
+  },
+  {
+    key:'dobladas', label:'Piezas Dobladas', icon:'ti-angle',
+    fields:[
+      {id:'proveedor',label:'Proveedor',type:'text'},
+      {id:'plano',label:'Pieza / Plano',type:'text'},
+      {id:'cantidad',label:'Cantidad',type:'number'},
+      {id:'cumplePlano',label:'Cumple plano',type:'select',opts:['Sí','No']},
+      {id:'acabado',label:'Acabado',type:'select',opts:['Bueno','Rebabas','Grietas','Quemaduras','Deformado']},
+      {id:'obs',label:'Observaciones',type:'textarea',full:true},
+      {id:'resultado',label:'Resultado',type:'select',opts:['Aprobado','Condicional','Rechazado'],result:true},
+    ],
+    cols:['fecha','proveedor','plano','cantidad','cumplePlano','acabado','obs','resultado']
+  },
+  {
+    key:'inyectadas', label:'Piezas Inyectadas', icon:'ti-mold',
+    fields:[
+      {id:'proveedor',label:'Proveedor',type:'text'},
+      {id:'referencia',label:'Referencia',type:'text'},
+      {id:'color',label:'Color',type:'text'},
+      {id:'cantidad',label:'Cantidad',type:'number'},
+      {id:'defecto',label:'Defecto',type:'select',opts:['Ninguno','Rebabas','Hundimientos','Poros','Deformación','Color irregular']},
+      {id:'obs',label:'Observaciones',type:'textarea',full:true},
+      {id:'resultado',label:'Resultado',type:'select',opts:['Aprobado','Condicional','Rechazado'],result:true},
+    ],
+    cols:['fecha','proveedor','referencia','color','cantidad','defecto','obs','resultado']
+  },
+  {
+    key:'cojines', label:'Cojines', icon:'ti-armchair-2',
+    fields:[
+      {id:'proveedor',label:'Proveedor',type:'text'},
+      {id:'referencia',label:'Referencia',type:'text'},
+      {id:'color',label:'Color',type:'text'},
+      {id:'cantidad',label:'Cantidad',type:'number'},
+      {id:'defecto',label:'Defecto',type:'select',opts:['Ninguno','Costura irregular','Mancha','Espuma irregular','Medida incorrecta','Grapado visible']},
+      {id:'obs',label:'Observaciones',type:'textarea',full:true},
+      {id:'resultado',label:'Resultado',type:'select',opts:['Aprobado','Condicional','Rechazado'],result:true},
+    ],
+    cols:['fecha','proveedor','referencia','color','cantidad','defecto','obs','resultado']
+  },
+];
+
+const REC_COL_LABELS = {
+  fecha:'Fecha',proveedor:'Proveedor',oc:'OC/Remisión',tipo:'Tipo',medida:'Medida',cantidad:'Cant.',
+  estado:'Estado',dimensiones:'Dimensiones',obs:'Observaciones',resultado:'Resultado',
+  plano:'Pieza/Plano',cumplePlano:'Cumple plano',acabado:'Acabado',
+  referencia:'Referencia',color:'Color',defecto:'Defecto'
+};
+
+// RecData[cat.key] = array de registros, cada uno con { id, fecha, resultado, ...campos } — más reciente primero.
+let RecData = {}; REC_CATS.forEach(c=>RecData[c.key]=[]);
+let recActiveCat = REC_CATS[0].key;
+let recActiveFilter = {}; // por categoría, filtro de resultado
+let recLoaded = false;
+
+// ── CAPA DE DATOS (Supabase) ──
+async function recFetchAll(){
+  const rows = await sbCall(()=>sb.from('rec_registros').select('*').order('created_at',{ascending:false}));
+  REC_CATS.forEach(c=>RecData[c.key]=[]);
+  (rows||[]).forEach(row=>{
+    const rec = Object.assign({id:row.id, fecha:row.fecha, resultado:row.resultado}, row.campos||{});
+    if(RecData[row.categoria]) RecData[row.categoria].push(rec);
+  });
+}
+
+async function recInsertRow(catKey, record){
+  const {fecha, resultado, ...campos} = record;
+  const row = await sbCall(()=>sb.from('rec_registros').insert({categoria:catKey, fecha, resultado, campos}).select().single());
+  return row;
+}
+
+async function recDeleteRow(catKey, id){
+  if(!confirm('¿Eliminar este registro?')) return;
+  try{
+    await sbCall(()=>sb.from('rec_registros').delete().eq('id',id));
+    RecData[catKey] = RecData[catKey].filter(r=>r.id!==id);
+    recRenderTabs();
+    document.getElementById(`tbody-${catKey}`).innerHTML = recRenderRows(REC_CATS.find(c=>c.key===catKey));
+    recUpdateStats();
+  }catch(e){ /* sbCall ya mostró el toast de error */ }
+}
+
+// ── RENDER TABS ──
+function recRenderTabs(){
+  const wrap = document.getElementById('rec-view-tabs');
+  wrap.innerHTML = REC_CATS.map(c=>`
+    <div class="vtab ${c.key===recActiveCat?'active':''}" onclick="recSwitchCat('${c.key}')">
+      <i class="ti ${c.icon}"></i> ${c.label} <span class="cnt">${(RecData[c.key]||[]).length}</span>
+    </div>`).join('');
+}
+function recSwitchCat(key){ recActiveCat = key; recRenderTabs(); recRenderContent(); }
+
+// ── RENDER CONTENT ──
+function recRenderContent(){
+  const wrap = document.getElementById('rec-content');
+  if(!recLoaded){
+    wrap.innerHTML = `<div style="text-align:center;padding:60px;color:var(--text3)"><i class="ti ti-loader-2 spin" style="font-size:26px"></i><div style="margin-top:8px;font-size:13px">Cargando información…</div></div>`;
+    return;
+  }
+  wrap.innerHTML = REC_CATS.map(c=>recRenderPanel(c)).join('');
+  REC_CATS.forEach(c=>{ if(c.key===recActiveCat) recAttachFormHandlers(c); });
+  recUpdateStats();
+}
+
+// Actualiza solo las tablas/contadores sin tocar el formulario (usado en sincronización en vivo,
+// para no perder lo que el usuario esté escribiendo en ese momento).
+function recRefreshTablesOnly(){
+  recRenderTabs();
+  REC_CATS.forEach(c=>{
+    const tbody=document.getElementById(`tbody-${c.key}`);
+    if(tbody) tbody.innerHTML = recRenderRows(c);
+  });
+  recUpdateStats();
+}
+
+function recRenderPanel(cat){
+  const isActive = cat.key===recActiveCat;
+  return `<div class="rec-panel ${isActive?'active':''}" data-cat="${cat.key}">
+    <div class="card">
+      <div class="card-hdr"><div class="card-title"><i class="ti ${cat.icon}"></i> Nuevo registro — ${cat.label}</div></div>
+      <form id="form-${cat.key}">
+        <div class="form-grid">
+          ${cat.fields.map(f=>recRenderField(cat.key,f)).join('')}
+        </div>
+        <div class="form-actions">
+          <button type="reset" class="btn btn-ghost btn-sm">Limpiar</button>
+          <button type="submit" class="btn btn-y btn-sm"><i class="ti ti-plus"></i> Registrar</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="toolbar">
+      <select onchange="recSetFilter('${cat.key}',this.value)">
+        <option value="">Todos los resultados</option>
+        <option value="Aprobado">Aprobado</option>
+        <option value="Condicional">Condicional</option>
+        <option value="Rechazado">Rechazado</option>
+      </select>
+      <div class="sp"></div>
+      <button class="btn btn-sm" onclick="recExportCSV('${cat.key}')"><i class="ti ti-download"></i> Exportar CSV</button>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          ${cat.cols.map(c=>`<th>${REC_COL_LABELS[c]}</th>`).join('')}
+          <th></th>
+        </tr></thead>
+        <tbody id="tbody-${cat.key}">
+          ${recRenderRows(cat)}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function recRenderField(catKey,f){
+  const id = `f-${catKey}-${f.id}`;
+  let input;
+  if(f.type==='select'){
+    input = `<select id="${id}">${f.opts.map(o=>`<option value="${o}">${o}</option>`).join('')}</select>`;
+  } else if(f.type==='textarea'){
+    input = `<textarea id="${id}" rows="1"></textarea>`;
+  } else {
+    input = `<input id="${id}" type="${f.type}" ${f.type==='number'?'min="0"':''}>`;
+  }
+  return `<div class="field ${f.full?'full':''}"><label>${f.label}</label>${input}</div>`;
+}
+
+function recRenderRows(cat){
+  const filter = recActiveFilter[cat.key];
+  let rows = RecData[cat.key]||[];   // ya vienen ordenados más-reciente-primero desde la BD
+  if(filter) rows = rows.filter(r=>r.resultado===filter);
+  if(!rows.length) return `<tr id="empty-row"><td colspan="${cat.cols.length+1}">Sin registros todavía</td></tr>`;
+  return rows.map(r=>{
+    return `<tr>${cat.cols.map(c=>{
+      if(c==='resultado') return `<td>${recBadge(r.resultado)}</td>`;
+      if(c==='obs') return `<td class="obs">${escapeHtml(r.obs||'')}</td>`;
+      return `<td>${escapeHtml(r[c]!==undefined?r[c]:'')}</td>`;
+    }).join('')}
+    <td><button class="row-del" onclick="recDeleteRow('${cat.key}','${r.id}')" title="Eliminar"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  }).join('');
+}
+
+function recBadge(res){
+  if(res==='Aprobado') return `<span class="badge b-ok">Aprobado</span>`;
+  if(res==='Rechazado') return `<span class="badge b-no">Rechazado</span>`;
+  return `<span class="badge b-cond">Condicional</span>`;
+}
+
+function recSetFilter(catKey,val){
+  recActiveFilter[catKey]=val;
+  document.getElementById(`tbody-${catKey}`).innerHTML = recRenderRows(REC_CATS.find(c=>c.key===catKey));
+}
+
+function recAttachFormHandlers(cat){
+  const form = document.getElementById(`form-${cat.key}`);
+  if(!form || form.dataset.bound) return;
+  form.dataset.bound='1';
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const record = { fecha: new Date().toISOString().slice(0,10) };
+    cat.fields.forEach(f=>{
+      const el = document.getElementById(`f-${cat.key}-${f.id}`);
+      record[f.id] = el.value.trim();
+    });
+    if(!record.resultado){ record.resultado='Condicional'; }
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try{
+      const row = await recInsertRow(cat.key, record);
+      const rec = Object.assign({id: row.id}, record);
+      RecData[cat.key].unshift(rec);
+      form.reset();
+      recRenderTabs();
+      document.getElementById(`tbody-${cat.key}`).innerHTML = recRenderRows(cat);
+      recUpdateStats();
+      showToast('Registro guardado','green');
+    }catch(err){
+      // sbCall ya mostró el toast de error; el usuario puede reintentar sin perder lo escrito
+    }finally{
+      submitBtn.disabled = false;
+    }
+  });
+}
+
+function recExportCSV(catKey){
+  const cat = REC_CATS.find(c=>c.key===catKey);
+  const rows = RecData[catKey]||[];
+  if(!rows.length){ showToast('No hay registros para exportar.','red'); return; }
+  const header = cat.cols.map(c=>REC_COL_LABELS[c]).join(',');
+  const lines = rows.map(r=>cat.cols.map(c=>`"${String(r[c]||'').replace(/"/g,'""')}"`).join(','));
+  const csv = [header,...lines].join('\n');
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`recepcion_${catKey}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function recUpdateStats(){
+  let total=0, ok=0, no=0;
+  REC_CATS.forEach(c=>{
+    (RecData[c.key]||[]).forEach(r=>{
+      total++;
+      if(r.resultado==='Aprobado') ok++;
+      if(r.resultado==='Rechazado') no++;
+    });
+  });
+  document.getElementById('rec-st-total').textContent = total;
+  document.getElementById('rec-st-ok').textContent = total? Math.round(ok/total*100)+'%' : '0%';
+  document.getElementById('rec-st-no').textContent = no;
+}
+
+// ── SINCRONIZACIÓN EN VIVO — otros dispositivos ven los cambios sin recargar ──
+function recSubscribeRealtime(){
+  if(!SUPABASE_CONFIGURED) return;
+  sb.channel('rec_registros_rt')
+    .on('postgres_changes', {event:'*', schema:'public', table:'rec_registros'}, async ()=>{
+      await recFetchAll();
+      recRefreshTablesOnly();
+    })
+    .subscribe();
+}
+
+// ── INIT RECEPCIÓN (llamado desde el bloque de init general) ──
+async function recInit(){
+  recRenderTabs();
+  recRenderContent();
+  try{
+    await recFetchAll();
+  }catch(e){ /* ya se mostró el toast */ }
+  recLoaded = true;
+  recRenderTabs();
+  recRenderContent();
+  recSubscribeRealtime();
+}
+</script>
+
+<script>
+// ══════════════ CALIDAD — DATA ══════════════
+let MACHINES=[
+  {serial:"6",  code:"XM185",name:"Sentadilla hack up 3.0",                              client:"Andrés Felipe Blandón López",                        color:"Negro y Azul",         prometido:"30 jun 2026",pct:90},
+  {serial:"28", code:"XM114",name:"Crossover Compacto, en V.",                            client:"Xtensor S.AS",                                       color:"—",                    prometido:"14 jul 2026",pct:30},
+  {serial:"32", code:"XM120",name:"Flexo Extensor",                                       client:"Andrés Felipe Blandón López",                        color:"Negro y Azul",         prometido:"16 jul 2026",pct:80},
+  {serial:"30", code:"XM184",name:"Prensa Atletica 3.0 lineal",                           client:"Xtensor S.AS",                                       color:"—",                    prometido:"14 jul 2026",pct:50},
+  {serial:"33", code:"XM108",name:"Banco olímpico plano",                                 client:"Xtensor S.AS",                                       color:"—",                    prometido:"14 jul 2026",pct:40},
+  {serial:"31", code:"XM105",name:"Banco Multifunción",                                   client:"Xtensor S.AS",                                       color:"—",                    prometido:"28 jul 2026",pct:20},
+  {serial:"53", code:"FB422",name:"EMAS Los Cedros Eliptica",                             client:"EMAS Los Cedros",                                    color:"Rojo y Verde",         prometido:"23 jul 2026",pct:80},
+  {serial:"54", code:"FB425",name:"EMAS Los Cedros ESQUI",                                client:"EMAS Los Cedros",                                    color:"Rojo y Verde",         prometido:"23 jul 2026",pct:90},
+  {serial:"55", code:"FB431",name:"EMAS Los Cedros Pony",                                 client:"EMAS Los Cedros",                                    color:"Rojo y Verde",         prometido:"23 jul 2026",pct:80},
+  {serial:"39", code:"XB456",name:"Circuito de calistenia #2",                            client:"CONSORCIO PROYECTOS DEPORTIVOS 2026",                color:"Naranja y Amarillo",   prometido:"21 jul 2026",pct:20},
+  {serial:"40", code:"XB449",name:"Halon de espalda con discos",                          client:"CONSORCIO PROYECTOS DEPORTIVOS 2026",                color:"Naranja y Amarillo",   prometido:"21 jul 2026",pct:20},
+  {serial:"41", code:"XB442",name:"Sentadilla con discos",                                client:"CONSORCIO PROYECTOS DEPORTIVOS 2026",                color:"Naranja y Amarillo",   prometido:"21 jul 2026",pct:20},
+  {serial:"42", code:"XB437",name:"Press de pecho con discos",                            client:"CONSORCIO PROYECTOS DEPORTIVOS 2026",                color:"Naranja y Amarillo",   prometido:"21 jul 2026",pct:20},
+  {serial:"44", code:"XB456",name:"Circuito de calistenia #2",                            client:"CONSORCIO PROYECTOS DEPORTIVOS 2026",                color:"Naranja y Amarillo",   prometido:"21 jul 2026",pct:0},
+  {serial:"45", code:"XB456",name:"Circuito de calistenia #2",                            client:"CONSORCIO LUNA PEREIRA",                             color:"Naranja y Amarillo",   prometido:"28 jul 2026",pct:0},
+  {serial:"47", code:"FC402",name:"EMAS Granjas y viviendas Banco Abdominal doble",       client:"EMAS Granjas y viviendas",                           color:"Rojo y Verde",         prometido:"27 jul 2026",pct:0},
+  {serial:"48", code:"FC422",name:"EMAS Granjas y viviendas Eliptica",                    client:"EMAS Granjas y viviendas",                           color:"Rojo y Verde",         prometido:"27 jul 2026",pct:0},
+  {serial:"49", code:"FC425",name:"EMAS Granjas y viviendas ESQUI",                       client:"EMAS Granjas y viviendas",                           color:"Rojo y Verde",         prometido:"27 jul 2026",pct:0},
+  {serial:"50", code:"FC445",name:"EMAS Granjas y viviendas Vaiven",                      client:"EMAS Granjas y viviendas",                           color:"Rojo y Verde",         prometido:"27 jul 2026",pct:0},
+  {serial:"51", code:"FC423",name:"EMAS Granjas y viviendas Escalador Doble",             client:"EMAS Granjas y viviendas",                           color:"Rojo y Verde",         prometido:"27 jul 2026",pct:0},
+  {serial:"52", code:"FC431",name:"EMAS Granjas y viviendas Pony",                        client:"EMAS Granjas y viviendas",                           color:"Rojo y Verde",         prometido:"27 jul 2026",pct:0},
+  {serial:"46", code:"FC432",name:"EMAS Granjas y viviendas Prensa de pierna doble",      client:"EMAS Granjas y viviendas",                           color:"Rojo y Verde",         prometido:"28 jul 2026",pct:0},
+  {serial:"56", code:"XB553",name:"Sube y baja Doble",                                    client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Naranja y Verde",      prometido:"31 jul 2026",pct:0},
+  {serial:"58", code:"XB553",name:"Sube y baja Doble",                                    client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Naranja y Verde",      prometido:"31 jul 2026",pct:0},
+  {serial:"57", code:"XB553",name:"Sube y baja Doble",                                    client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Naranja y Verde",      prometido:"31 jul 2026",pct:0},
+  {serial:"59", code:"XB553",name:"Sube y baja Doble",                                    client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Naranja y Verde",      prometido:"31 jul 2026",pct:0},
+  {serial:"60", code:"XB553",name:"Sube y baja Doble",                                    client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Naranja y Verde",      prometido:"31 jul 2026",pct:0},
+  {serial:"61", code:"XJ503",name:"Parque Infantil #1",                                   client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Gris y Azul y Amarillo",prometido:"31 jul 2026",pct:0},
+  {serial:"63", code:"XJ503",name:"Parque Infantil #1",                                   client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Gris y Azul y Amarillo",prometido:"31 jul 2026",pct:0},
+  {serial:"62", code:"XJ503",name:"Parque Infantil #1",                                   client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Gris y Azul y Amarillo",prometido:"31 jul 2026",pct:0},
+  {serial:"64", code:"XJ504",name:"Columpio doble",                                       client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Verde y Rojo",         prometido:"31 jul 2026",pct:0},
+  {serial:"65", code:"XJ504",name:"Columpio doble",                                       client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Verde y Rojo",         prometido:"31 jul 2026",pct:0},
+  {serial:"66", code:"XJ504",name:"Columpio doble",                                       client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Verde y Rojo",         prometido:"31 jul 2026",pct:0},
+  {serial:"67", code:"XJ504",name:"Columpio doble",                                       client:"JESUS MARIA RAMIREZ GOMEZ - NIT 10267830-1",         color:"Verde y Rojo",         prometido:"31 jul 2026",pct:0},
+];
+
+const STAGES=[
+  {key:"armado",label:"Armado",icon:"ti-tool",items:[
+    {id:"a1",item:"Bujes percutores / cajitas",criterio:"Longitud del buje según corresponda",herramienta:"Calibrador digital",ideal:"25 mm",sup:"1"},
+    {id:"a2",item:"Percutores",criterio:"Punta sobresaliente del percutor de 3 a 5 mm",herramienta:"Calibrador digital",ideal:"4 mm",sup:"1"},
+    {id:"a3",item:"Tamaño de cajas",criterio:"Dimensiones según plano ± 1 mm",herramienta:"Calibrador digital",ideal:"",sup:"1"},
+    {id:"a4",item:"Movimiento de articulaciones",criterio:"Movimiento libre sin ruido ni fricción excesiva",herramienta:"Prueba manual",ideal:"",sup:"3"},
+    {id:"a5",item:"Holguras articulaciones",criterio:"Holgura funcional 0,2 – 0,5 mm",herramienta:"Galgas",ideal:"~0,5 mm pintado",sup:"1"},
+    {id:"a6",item:"Soldaduras completas",criterio:"Cordón continuo, sin porosidad ni grietas, buen acabado",herramienta:"Visual",ideal:"",sup:"2"},
+    {id:"a7",item:"Filos, puntas y rebabas",criterio:"No deben existir aristas cortantes",herramienta:"Tacto-Visual",ideal:"",sup:"2"},
+    {id:"a8",item:"Diagonales",criterio:"Diferencia entre diagonales ≤ 2 mm",herramienta:"Flexómetro",ideal:"",sup:"1"},
+    {id:"a9",item:"Dimensiones críticas y escuadras",criterio:"Ángulo 90° ± 0,5° y desviación ≤ 1 mm por metro",herramienta:"Goniómetro / Escuadra / Nivel / Flexómetro",ideal:"",sup:"1"},
+    {id:"a10",item:"Alineación general",criterio:"Desalineación ≤ 1 mm en 1 m",herramienta:"Láser / Nivel / Visual",ideal:"",sup:"1"},
+  ]},
+  {key:"pintado",label:"Pintado",icon:"ti-droplet",items:[
+    {id:"p1",item:"Superficie limpia antes de pintar",criterio:"Libre de grasa, polvo, humedad y óxido",herramienta:"Visual",ideal:"Sin grasa/óxido visible",sup:"2"},
+    {id:"p2",item:"Cobertura uniforme",criterio:"Sin zonas descubiertas, chorreadas ni acumulación de pintura",herramienta:"Visual",ideal:"Sin zonas descubiertas",sup:"2"},
+    {id:"p3",item:"Espesor adecuado",criterio:"Espesor uniforme según especificación",herramienta:"Medidor de espesor",ideal:"Uniforme",sup:"1"},
+    {id:"p4",item:"Pulido excesivo",criterio:"Muy marcado / irregular",herramienta:"Tacto-Visual",ideal:"Acabado liso",sup:"2"},
+    {id:"p5",item:"Curado correcto",criterio:"Sin descascarado, ampollas, desprendimiento ni pintura blanda",herramienta:"Prueba manual",ideal:"Sin desprendimiento",sup:"2"},
+  ]},
+  {key:"ensamble",label:"Ensamble",icon:"ti-settings",items:[
+    {id:"e1",item:"Ejes, articulaciones, rieles alineados",criterio:"Movimiento libre sin fricción ni roce lateral",herramienta:"Prueba manual",ideal:"Movimiento suave",sup:"3"},
+    {id:"e2",item:"Cable correctamente instalado",criterio:"Sin cruce, torsión, pellizcos ni recorrido incorrecto",herramienta:"Visual",ideal:"Cable en ruta",sup:"3"},
+    {id:"e3",item:"Placas de peso alineadas",criterio:"Deslizamiento suave y estable durante el recorrido",herramienta:"Prueba funcional",ideal:"Deslizamiento suave",sup:"3"},
+    {id:"e4",item:"Componentes ergonómicos firmes",criterio:"Sin holguras, piezas flojas o ajuste deficiente",herramienta:"Llave dinamométrica",ideal:"Componentes firmes",sup:"3"},
+    {id:"e5",item:"Prueba funcional completa",criterio:"Movimiento fluido, estable y sin ruidos anormales",herramienta:"Prueba funcional",ideal:"Funcionamiento fluido",sup:"3"},
+    {id:"e6",item:"Daños durante el proceso",criterio:"Sumidos, rallones",herramienta:"Tacto-Visual",ideal:"Superficies homogéneas",sup:"2"},
+    {id:"e7",item:"Longitud de ejes",criterio:"Según plano ± 0,10 mm",herramienta:"Calibrador digital",ideal:"",sup:"1"},
+    {id:"e8",item:"Cojines",criterio:"Cojines torcidos, superficie irregular, zonas descubiertas",herramienta:"Tacto-Visual",ideal:"Lisos, simétricos, forrado completo",sup:"2"},
+  ]},
+  {key:"empacado",label:"Empacado",icon:"ti-package",items:[
+    {id:"em1",item:"Protección de partes sensibles",criterio:"Espuma, cartón o protección instalada en puntos críticos",herramienta:"Visual",ideal:"Producto protegido",sup:"3"},
+    {id:"em2",item:"Accesorios completos",criterio:"Manual, tornillería y accesorios requeridos incluidos",herramienta:"Checklist",ideal:"Kit completo",sup:"3"},
+    {id:"em3",item:"Etiquetado correcto",criterio:"Modelo, destinatario",herramienta:"Visual",ideal:"Etiqueta legible",sup:"2"},
+    {id:"em4",item:"Caja en buen estado",criterio:"Sin daños estructurales, roturas, humedad o deformaciones",herramienta:"Visual",ideal:"Caja íntegra",sup:"2"},
+  ]},
+];
+
+// ── STATE (persistido en Supabase) ──
+let inspData={};
+let historico=[];
+let currentSerial=null;
+let currentView='checklist';
+let filteredList=[];
+let activeFilter='all';
+let lastUpdate=null;
+let countdownSec=120;
+let countdownInterval=null;
+let sidebarOpen=true;
+let calLoaded=false;
+
+async function calFetchAll(){
+  const insp = await sbCall(()=>sb.from('calidad_inspecciones').select('*'));
+  inspData={};
+  (insp||[]).forEach(row=>{ inspData[row.serial]=row.data; });
+
+  const hist = await sbCall(()=>sb.from('calidad_historico').select('*').order('created_at',{ascending:false}));
+  historico = (hist||[]).map(h=>({
+    _dbId:h.id, serial:h.serial, code:h.code, name:h.name, client:h.client, prometido:h.prometido, color:h.color,
+    fechaInsp:h.fecha_insp, conformes:h.conformes, noConformes:h.no_conformes, total:h.total, pct:h.pct,
+    inspectors:h.inspectors, stageData:h.stage_data||{}
+  }));
+}
+
+async function calUpsertInsp(serial){
+  const d=getInsp(serial);
+  try{
+    await sbCall(()=>sb.from('calidad_inspecciones').upsert({serial, data:d, updated_at:new Date().toISOString()}));
+  }catch(e){ /* sbCall ya avisó; el cambio queda en memoria para reintentar en la próxima acción */ }
+}
+
+async function calInsertHistorico(entry){
+  try{
+    const row = await sbCall(()=>sb.from('calidad_historico').insert({
+      serial:entry.serial, code:entry.code, name:entry.name, client:entry.client, prometido:entry.prometido, color:entry.color,
+      fecha_insp:entry.fechaInsp, conformes:entry.conformes, no_conformes:entry.noConformes, total:entry.total, pct:entry.pct,
+      inspectors:entry.inspectors, stage_data:entry.stageData
+    }).select().single());
+    entry._dbId = row.id;
+  }catch(e){ /* ya se mostró el toast */ }
+}
+
+function getInsp(serial){
+  if(!inspData[serial]){
+    const sd={};STAGES.forEach(s=>{sd[s.key]={};});
+    inspData[serial]={stageData:sd,inspectors:{},responsables:{},stageObs:{},currentStageIdx:0};
+  }
+  return inspData[serial];
+}
+
+// ── SIDEBAR ──
+function toggleSidebar(){
+  sidebarOpen=!sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('collapsed',!sidebarOpen);
+  document.getElementById('sb-icon').className=sidebarOpen?'ti ti-layout-sidebar-left-collapse':'ti ti-layout-sidebar-left-expand';
+}
+
+// ── FILTER / RENDER LIST ──
+let activeFilterEl=null;
+function calSetFilter(type,el){
+  activeFilter=type;
+  if(activeFilterEl) activeFilterEl.classList.remove('active');
+  el.classList.add('active');
+  activeFilterEl=el;
+  filterMachines(document.getElementById('sb-q').value);
+}
+
+function getInspPct(serial){
+  const d=getInsp(serial);
+  let tot=0,ok=0;
+  STAGES.forEach(s=>{tot+=s.items.length;ok+=Object.values(d.stageData[s.key]||{}).filter(v=>v==='ok').length;});
+  return tot>0?Math.round(ok/tot*100):0;
+}
+function getInspFails(serial){
+  const d=getInsp(serial);
+  let f=0;STAGES.forEach(s=>{f+=Object.values(d.stageData[s.key]||{}).filter(v=>v==='fail').length;});
+  return f;
+}
+function getInspDone(serial){
+  const d=getInsp(serial);
+  let tot=0,done=0;
+  STAGES.forEach(s=>{const items=s.items.length;tot+=items;done+=Object.values(d.stageData[s.key]||{}).filter(v=>v!=='').length;});
+  return tot>0?done===tot:'pending';
+}
+
+function filterMachines(q){
+  let list=MACHINES;
+  if(q.trim()) list=list.filter(m=>
+    m.serial.includes(q)||m.code.toLowerCase().includes(q.toLowerCase())||
+    m.name.toLowerCase().includes(q.toLowerCase())||m.client.toLowerCase().includes(q.toLowerCase())
+  );
+  if(activeFilter==='pending') list=list.filter(m=>getInspPct(m.serial)===0);
+  else if(activeFilter==='progress') list=list.filter(m=>{const p=getInspPct(m.serial);return p>0&&p<100;});
+  else if(activeFilter==='done') list=list.filter(m=>getInspPct(m.serial)===100);
+  filteredList=list;
+  renderList();
+  updateSbStats();
+}
+
+function renderList(){
+  const el=document.getElementById('sb-list');
+  if(!filteredList.length){el.innerHTML=`<div style="text-align:center;padding:20px;font-size:12px;color:var(--text3)">Sin resultados</div>`;return;}
+  el.innerHTML=filteredList.map(m=>{
+    const ip=getInspPct(m.serial),fails=getInspFails(m.serial);
+    const pctCls=m.pct>=70?'hi':m.pct>=30?'':'lo';
+    const fillCls=ip>=100?'g':fails>0?'r':'';
+    const sel=m.serial===currentSerial?'selected':'';
+    return`<div class="mrow ${sel}" data-serial="${m.serial}" onclick="selectMachine('${m.serial}')">
+      <div class="mr-top">
+        <span class="mr-serial">#${m.serial}</span>
+        <span class="mr-code">${m.code}</span>
+        <span class="mr-name">${m.name}</span>
+      </div>
+      <div class="mr-pct-bar"><div class="mr-pct-fill ${fillCls}" style="width:${ip}%"></div></div>
+      <div class="mr-meta">
+        <span class="mr-client">${m.client}</span>
+        <span class="mr-date">${m.prometido}</span>
+      </div>
+      <div class="mr-badges">
+        <span class="mrbadge mb-pct ${pctCls}">${m.pct}% prod.</span>
+        ${ip>0?`<span class="mrbadge ${ip>=100?'mb-ok':'mb-color'}">${ip}% insp.</span>`:''}
+        ${fails>0?`<span class="mrbadge mb-alert"><i class="ti ti-alert-triangle" style="font-size:9px"></i>${fails} NC</span>`:''}
+        ${m.color&&m.color!=='—'?`<span class="mrbadge mb-color">${m.color}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateSbStats(){
+  document.getElementById('sb-total').textContent=MACHINES.length;
+  document.getElementById('sb-insp').textContent=MACHINES.filter(m=>getInspPct(m.serial)===100).length;
+  document.getElementById('sb-pend').textContent=MACHINES.filter(m=>getInspPct(m.serial)===0).length;
+}
+
+// ── SELECT MACHINE ──
+function selectMachine(serial,skipSave){
+  if(currentSerial&&!skipSave) saveCurrentStage();
+  currentSerial=serial;
+  const m=MACHINES.find(x=>x.serial===serial);
+  const d=getInsp(serial);
+  // Header
+  const hdr=document.getElementById('mhdr');
+  hdr.className='';
+  hdr.innerHTML=`
+    <span class="mh-serial">#${m.serial}</span>
+    <span class="mh-code">${m.code}</span>
+    <span class="mh-name">${m.name}</span>
+    <span class="mh-client">${m.client}</span>
+    ${m.color&&m.color!=='—'?`<span class="mh-color"><i class="ti ti-palette" style="font-size:11px"></i> ${m.color}</span>`:''}
+    <span class="mh-date"><i class="ti ti-calendar" style="font-size:11px"></i> ${m.prometido}</span>
+    <button class="btn btn-sm" style="margin-left:6px" onclick="garCreateFromMachine('${m.serial}')" data-tip="Crear solicitud de garantía prellenada con esta máquina">
+      <i class="ti ti-tools"></i> Generar garantía
+    </button>
+    <div class="mh-nav">
+      <button class="btn btn-ghost" style="padding:3px 7px" onclick="prevMachine()" data-tip="Anterior (←)"><i class="ti ti-chevron-left"></i></button>
+      <button class="btn btn-ghost" style="padding:3px 7px" onclick="nextMachine()" data-tip="Siguiente (→)"><i class="ti ti-chevron-right"></i></button>
+    </div>`;
+  document.getElementById('cal-view-tabs').style.display='flex';
+  document.getElementById('empty-state').style.display='none';
+  document.getElementById('btn-next').style.display='inline-flex';
+  renderList();
+  setView(currentView);
+  updateBBPos();
+}
+
+// ── HISTÓRICO ──
+async function checkAndArchive(serial){
+  if(historico.find(h=>h.serial===serial)) return;
+  const d=getInsp(serial);
+  let totalItems=0,totalDone=0;
+  STAGES.forEach(s=>{
+    totalItems+=s.items.length;
+    totalDone+=Object.values(d.stageData[s.key]||{}).filter(v=>v!=='').length;
+  });
+  if(totalDone===totalItems&&totalItems>0){
+    const m=MACHINES.find(x=>x.serial===serial);
+    if(!m) return;
+    let tok=0,tof=0;
+    STAGES.forEach(s=>{const dd=d.stageData[s.key]||{};tok+=Object.values(dd).filter(v=>v==='ok').length;tof+=Object.values(dd).filter(v=>v==='fail').length;});
+    const entry={
+      serial,code:m.code,name:m.name,client:m.client,prometido:m.prometido,color:m.color,
+      fechaInsp:new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
+      conformes:tok,noConformes:tof,total:totalItems,
+      pct:Math.round(tok/totalItems*100),
+      inspectors:Object.values(d.inspectors).filter(Boolean).join(', ')||'—',
+      stageData:JSON.parse(JSON.stringify(d.stageData)),
+    };
+    historico.unshift(entry);
+    updateHistoricoCount();
+    showToast(`#${serial} ${m.name} archivado en histórico`,'yellow');
+    await calInsertHistorico(entry);
+  }
+}
+
+function updateHistoricoCount(){
+  document.getElementById('historico-count').textContent=historico.length;
+}
+
+function renderHistorico(){
+  const el=document.getElementById('historico-list');
+  if(!historico.length){
+    el.innerHTML=`<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">
+      <i class="ti ti-clipboard-x" style="font-size:32px;display:block;margin-bottom:8px;opacity:.3"></i>
+      Aún no hay inspecciones completadas.<br>
+      <span style="font-size:12px">Cuando completes una inspección al 100% aparecerá aquí.</span>
+    </div>`;
+    return;
+  }
+  el.innerHTML=historico.map((h,i)=>{
+    const pctCls=h.pct>=90?'hi':h.pct>=70?'':'lo';
+    return`<div class="card" style="margin-bottom:8px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
+            <span class="mh-serial">#${h.serial}</span>
+            <span class="badge badge-y" style="font-size:10px">${h.code}</span>
+            <span class="mrbadge ${h.noConformes>0?'mb-alert':'mb-ok'}">${h.pct}% calidad</span>
+          </div>
+          <div style="font-size:13px;font-weight:600">${h.name}</div>
+          <div style="font-size:12px;color:var(--text2)">${h.client}</div>
+          ${h.inspectors!=='—'?`<div style="font-size:11px;color:var(--text3);margin-top:2px"><i class="ti ti-user" style="font-size:10px"></i> ${h.inspectors}</div>`:''}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:10px;color:var(--text3)">INSPECCIONADO</div>
+          <div style="font-size:12px;font-weight:500">${h.fechaInsp}</div>
+          <div style="font-size:11px;color:var(--text3)">Prometido: ${h.prometido}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
+        ${STAGES.map(s=>{
+          const dd=h.stageData[s.key]||{};
+          const ok=Object.values(dd).filter(v=>v==='ok').length;
+          const fail=Object.values(dd).filter(v=>v==='fail').length;
+          const p=s.items.length>0?Math.round(ok/s.items.length*100):0;
+          return`<div style="flex:1;min-width:60px">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:2px">${s.label}</div>
+            <div class="prog-bar"><div class="prog-fill ${fail>0?'r':p===100?'g':''}" style="width:${p}%"></div></div>
+            <div style="font-size:10px;color:${fail>0?'var(--red)':p===100?'var(--green)':'var(--text3)'};margin-top:1px">${p}%${fail>0?` · ${fail} NC`:''}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap">
+        <span class="badge badge-g"><i class="ti ti-check"></i>${h.conformes} conformes</span>
+        ${h.noConformes>0?`<span class="badge badge-r"><i class="ti ti-x"></i>${h.noConformes} no conformes</span>`:''}
+        <span class="badge badge-gray">${h.total} ítems</span>
+        ${h.color&&h.color!=='—'?`<span class="badge badge-gray"><i class="ti ti-palette"></i>${h.color}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function exportHistorico(){
+  if(!historico.length){showToast('Sin registros en el histórico','red');return;}
+  const lines=historico.map(h=>`#${h.serial} | ${h.code} | ${h.name} | ${h.client} | Inspeccionado: ${h.fechaInsp} | Calidad: ${h.pct}% | Conformes: ${h.conformes} | NC: ${h.noConformes}`);
+  if(typeof sendPrompt==='function')
+    sendPrompt(`Genera un reporte de histórico de calidad Xtensor con estas inspecciones completadas:\n${lines.join('\n')}\nPresentalo como tabla organizada lista para compartir.`);
+  else showToast('Exportar solo disponible en el chat de Claude','yellow');
+}
+
+// ── VIEW ──
+function setView(view, el){
+  currentView=view;
+  ['checklist','summary','historico'].forEach(v=>{
+    document.getElementById('view-'+v).style.display=v===view?'block':'none';
+    document.getElementById('vtab-'+v)?.classList.toggle('active',v===view);
+  });
+  if(view==='checklist') renderInspection();
+  else if(view==='summary') renderSummary();
+  else if(view==='historico') renderHistorico();
+}
+
+// ── INSPECTION ──
+function renderInspection(){
+  if(!currentSerial) return;
+  const d=getInsp(currentSerial);
+  const si=d.currentStageIdx;
+  const stage=STAGES[si];
+  document.getElementById('stage-title').textContent=stage.label;
+  document.getElementById('field-inspector').value=d.inspectors[stage.key]||'';
+  document.getElementById('field-responsable').value=d.responsables[stage.key]||'';
+  document.getElementById('stage-obs').value=d.stageObs[stage.key]||'';
+  document.getElementById('stage-tabs').innerHTML=STAGES.map((s,i)=>{
+    const cls=i===si?'active':i<si?'done':'';
+    return`<div class="stage-tab ${cls}" onclick="jumpStage(${i})"><i class="ti ${s.icon}"></i>${s.label}</div>`;
+  }).join('');
+  renderChecklist(stage,d);
+  updateProgress(stage,d);
+  const isLast=si===STAGES.length-1;
+  const btn=document.getElementById('btn-next');
+  btn.innerHTML=isLast?'Ver resumen <i class="ti ti-check"></i>':'Siguiente etapa <i class="ti ti-arrow-right"></i>';
+}
+
+function renderChecklist(stage,d){
+  document.getElementById('checklist-items').innerHTML=stage.items.map(it=>{
+    const val=(d.stageData[stage.key]||{})[it.id]||'';
+    return`<div class="check-row">
+      <div class="check-circle ${val}" onclick="toggleItem('${stage.key}','${it.id}',this)">
+        ${val==='ok'?'<i class="ti ti-check" style="font-size:11px;color:#fff"></i>':val==='fail'?'<i class="ti ti-x" style="font-size:11px;color:#fff"></i>':''}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:500">${it.item}</span>
+          <span class="sup-badge sup${it.sup}">Sup ${it.sup}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text2);margin-top:1px">${it.criterio}</div>
+        ${it.ideal?`<div style="font-size:11px;color:var(--text3)">Ideal: ${it.ideal}</div>`:''}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--text3)"><i class="ti ti-tool" style="font-size:10px"></i> ${it.herramienta}</span>
+          <select class="result-select" onchange="selectResult('${stage.key}','${it.id}',this.value)">
+            <option value="">Resultado…</option>
+            <option value="ok" ${val==='ok'?'selected':''}>✓ Cumple</option>
+            <option value="fail" ${val==='fail'?'selected':''}>✗ No cumple</option>
+          </select>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleItem(sk,id,el){
+  const d=getInsp(currentSerial);
+  const cur=(d.stageData[sk]||{})[id]||'';
+  const next=cur===''?'ok':cur==='ok'?'fail':'';
+  d.stageData[sk][id]=next;
+  el.className='check-circle '+next;
+  el.innerHTML=next==='ok'?'<i class="ti ti-check" style="font-size:11px;color:#fff"></i>':next==='fail'?'<i class="ti ti-x" style="font-size:11px;color:#fff"></i>':'';
+  el.parentElement.querySelector('.result-select').value=next;
+  updateProgress(STAGES[d.currentStageIdx],d);
+  renderList();
+  checkAndArchive(currentSerial);
+  calUpsertInsp(currentSerial);
+}
+
+function selectResult(sk,id,val){
+  const d=getInsp(currentSerial);
+  d.stageData[sk][id]=val;
+  renderChecklist(STAGES[d.currentStageIdx],d);
+  updateProgress(STAGES[d.currentStageIdx],d);
+  renderList();
+  checkAndArchive(currentSerial);
+  calUpsertInsp(currentSerial);
+}
+
+function updateProgress(stage,d){
+  const sd=d.stageData[stage.key]||{};
+  const total=stage.items.length,done=Object.values(sd).filter(v=>v!=='').length,fail=Object.values(sd).filter(v=>v==='fail').length;
+  const pct=total>0?Math.round(done/total*100):0;
+  const bar=document.getElementById('stage-bar');
+  bar.style.width=pct+'%';bar.className='prog-fill '+(fail>0?'r':pct===100?'g':'');
+  document.getElementById('stage-pl').textContent=`${done}/${total} revisados`;
+  document.getElementById('stage-pct').textContent=pct+'%';
+  let tok=0,tof=0;
+  STAGES.forEach(s=>{const dd=d.stageData[s.key]||{};tok+=Object.values(dd).filter(v=>v==='ok').length;tof+=Object.values(dd).filter(v=>v==='fail').length;});
+  document.getElementById('bb-counts').innerHTML=
+    `<span class="badge badge-g"><i class="ti ti-check"></i>${tok} conformes</span>`+
+    (tof>0?`<span class="badge badge-r"><i class="ti ti-x"></i>${tof} no conformes</span>`:'');
+}
+
+function saveCurrentStage(){
+  if(!currentSerial) return;
+  const d=getInsp(currentSerial);
+  const s=STAGES[d.currentStageIdx];
+  const fi=document.getElementById('field-inspector');
+  const fr=document.getElementById('field-responsable');
+  const fo=document.getElementById('stage-obs');
+  if(fi) d.inspectors[s.key]=fi.value;
+  if(fr) d.responsables[s.key]=fr.value;
+  if(fo) d.stageObs[s.key]=fo.value;
+  calUpsertInsp(currentSerial);
+}
+
+function jumpStage(idx){
+  saveCurrentStage();
+  getInsp(currentSerial).currentStageIdx=idx;
+  renderInspection();
+}
+
+function nextStageOrFinish(){
+  if(!currentSerial) return;
+  saveCurrentStage();
+  const d=getInsp(currentSerial);
+  if(d.currentStageIdx<STAGES.length-1){
+    d.currentStageIdx++;
+    if(currentView!=='checklist') setView('checklist');
+    else renderInspection();
+  } else {
+    checkAndArchive(currentSerial);
+    setView('summary');
+    document.getElementById('vtab-summary').click();
+  }
+  calUpsertInsp(currentSerial);
+}
+
+// ── SUMMARY ──
+function renderSummary(){
+  if(!currentSerial) return;
+  const m=MACHINES.find(x=>x.serial===currentSerial);
+  const d=getInsp(currentSerial);
+  const pctCls=m.pct>=70?'hi':m.pct>=30?'':'lo';
+  document.getElementById('sum-machine').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;flex-wrap:wrap">
+          <span class="mh-serial">#${m.serial}</span>
+          <span class="badge badge-y">${m.code}</span>
+          <span class="mrbadge mb-pct ${pctCls}">${m.pct}% producción</span>
+        </div>
+        <div style="font-size:15px;font-weight:600">${m.name}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${m.client}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:10px;color:var(--text3)">PROMETIDO</div>
+        <div style="font-weight:600">${m.prometido}</div>
+        ${m.color&&m.color!=='—'?`<div style="font-size:11px;color:var(--text3)">${m.color}</div>`:''}
+      </div>
+    </div>`;
+  let ti=0,tok=0,tof=0;
+  STAGES.forEach(s=>{ti+=s.items.length;const dd=d.stageData[s.key]||{};tok+=Object.values(dd).filter(v=>v==='ok').length;tof+=Object.values(dd).filter(v=>v==='fail').length;});
+  const pct=ti>0?Math.round(tok/ti*100):0;
+  document.getElementById('sum-metrics').innerHTML=`
+    <div class="metric-card"><div class="metric-num">${ti}</div><div class="metric-lbl">Total ítems</div></div>
+    <div class="metric-card"><div class="metric-num" style="color:var(--green)">${tok}</div><div class="metric-lbl">Conformes</div></div>
+    <div class="metric-card"><div class="metric-num" style="color:var(--red)">${tof}</div><div class="metric-lbl">No conformes</div></div>
+    <div class="metric-card"><div class="metric-num" style="color:var(--yellow)">${pct}%</div><div class="metric-lbl">Cumplimiento</div></div>`;
+  document.getElementById('sum-stages').innerHTML=STAGES.map(s=>{
+    const dd=d.stageData[s.key]||{};
+    const ok=Object.values(dd).filter(v=>v==='ok').length,fail=Object.values(dd).filter(v=>v==='fail').length,pend=s.items.length-ok-fail;
+    const p=s.items.length>0?Math.round(ok/s.items.length*100):0;
+    const fails=s.items.filter(it=>(dd[it.id]||'')==='fail');
+    return`<div class="sum-stage">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:7px">
+          <i class="ti ${s.icon}" style="color:var(--text2);font-size:13px"></i>
+          <span style="font-weight:600;font-size:13px">${s.label}</span>
+          ${d.inspectors[s.key]?`<span style="font-size:11px;color:var(--text3)">${d.inspectors[s.key]}</span>`:''}
+        </div>
+        <span style="font-weight:600;font-size:13px;color:${fail>0?'var(--red)':p===100?'var(--green)':'var(--yellow)'}">${p}%</span>
+      </div>
+      <div class="prog-bar" style="margin-bottom:7px"><div class="prog-fill ${fail>0?'r':p===100?'g':''}" style="width:${p}%"></div></div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <span class="badge badge-g"><i class="ti ti-check"></i>${ok} conformes</span>
+        ${fail>0?`<span class="badge badge-r"><i class="ti ti-x"></i>${fail} no conformes</span>`:''}
+        ${pend>0?`<span class="badge badge-gray">${pend} pendientes</span>`:''}
+      </div>
+      ${fails.length>0?`<div style="margin-top:7px;padding:7px;background:var(--red-bg);border:1px solid var(--red-border);border-radius:var(--r)">
+        <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:3px"><i class="ti ti-alert-triangle"></i> Ítems fallidos:</div>
+        ${fails.map(it=>`<div style="font-size:11px;color:var(--red);margin:1px 0">• ${it.item} — ${it.criterio}</div>`).join('')}
+      </div>`:''}
+      ${d.stageObs[s.key]?`<div style="font-size:11px;color:var(--text2);margin-top:6px"><i class="ti ti-notes"></i> ${d.stageObs[s.key]}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ── NAVIGATION ──
+function prevMachine(){
+  const idx=filteredList.findIndex(m=>m.serial===currentSerial);
+  if(idx>0) selectMachine(filteredList[idx-1].serial);
+}
+function nextMachine(){
+  const idx=filteredList.findIndex(m=>m.serial===currentSerial);
+  if(idx<filteredList.length-1) selectMachine(filteredList[idx+1].serial);
+}
+function updateBBPos(){
+  const idx=filteredList.findIndex(m=>m.serial===currentSerial);
+  document.getElementById('bb-pos').textContent=idx>=0?`${idx+1}/${filteredList.length}`:'';
+}
+
+// ── KEYBOARD ── (solo activo cuando la sección Calidad está visible)
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('sec-calidad').classList.contains('active')) return;
+  const tag=document.activeElement.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
+  if(e.key==='ArrowLeft') prevMachine();
+  else if(e.key==='ArrowRight') nextMachine();
+  else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    const idx=filteredList.findIndex(m=>m.serial===currentSerial);
+    if(idx>0) selectMachine(filteredList[idx-1].serial);
+  }
+  else if(e.key==='ArrowDown'){
+    e.preventDefault();
+    const idx=filteredList.findIndex(m=>m.serial===currentSerial);
+    if(idx<filteredList.length-1) selectMachine(filteredList[idx+1].serial);
+  }
+  else if(e.key==='b'||e.key==='B') toggleSidebar();
+  else if(e.key>='1'&&e.key<='4'&&currentSerial){
+    jumpStage(parseInt(e.key)-1);
+    setView('checklist');
+  }
+  else if(e.key==='Enter'&&currentSerial) nextStageOrFinish();
+});
+
+// ── NC / EXPORT ──
+function sendToNC(){
+  if(!currentSerial) return;
+  const m=MACHINES.find(x=>x.serial===currentSerial),fails=[];
+  const d=getInsp(currentSerial);
+  STAGES.forEach(s=>{const dd=d.stageData[s.key]||{};s.items.forEach(it=>{if((dd[it.id]||'')==='fail')fails.push(`[${s.label}] ${it.item}`);});});
+  if(!fails.length){alert('Sin no conformidades registradas');return;}
+  if(typeof sendPrompt==='function')
+    sendPrompt(`Registrar no conformidades para Serial #${m.serial} - ${m.code} - ${m.name} (Cliente: ${m.client}):\n${fails.map((f,i)=>`${i+1}. ${f}`).join('\n')}\nPrepara los registros para el REGISTRO de no conformidades con fecha de hoy.`);
+}
+function exportSummary(){
+  if(!currentSerial) return;
+  const m=MACHINES.find(x=>x.serial===currentSerial),lines=[];
+  const d=getInsp(currentSerial);
+  STAGES.forEach(s=>{const dd=d.stageData[s.key]||{};s.items.forEach(it=>{const v=(dd[it.id]||'');if(v)lines.push(`[${s.label}] ${it.item}: ${v==='ok'?'CUMPLE':'NO CUMPLE'}`);});});
+  if(typeof sendPrompt==='function')
+    sendPrompt(`Genera un reporte de inspección de calidad para exportar del Serial #${m.serial} (${m.code} - ${m.name}, Cliente: ${m.client}, Prometido: ${m.prometido}).\nResultados:\n${lines.join('\n')}\nPresentalo como documento listo para imprimir o compartir.`);
+}
+
+// ── REFRESH — trae producción desde el panel admin ──
+window.loadMachines=function(json){
+  try{
+    const data=typeof json==='string'?JSON.parse(json):json;
+    if(!Array.isArray(data)||!data.length) throw new Error('Sin datos');
+    MACHINES=data;
+    lastUpdate=new Date();
+    setStatus(true);
+    filterMachines(document.getElementById('sb-q').value||'');
+    startCountdown();
+    showToast(`${data.length} máquinas cargadas`,'green');
+  }catch(e){
+    showToast('Error al cargar: '+e.message,'red');
+  }
+};
+
+async function requestRefresh(){
+  const btn=document.getElementById('btn-refresh');
+  btn.innerHTML='<i class="ti ti-refresh spin"></i> Cargando…';
+  btn.disabled=true;
+  clearInterval(countdownInterval);
+  document.getElementById('t-countdown').textContent='';
+
+  const ADMIN_URL='https://xtensor-one.vercel.app/admin';
+
+  try{
+    const html = await fetchAdminHtml(ADMIN_URL);
+    const machines = parseMachinesFromHtml(html);
+    if(!machines.length) throw new Error('No se encontraron filas en la tabla del admin');
+    window.loadMachines(machines);
+  }catch(e){
+    const isLocalFile = location.protocol==='file:';
+    showToast(
+      isLocalFile
+        ? 'No se pudo conectar (archivo abierto local). Usa el botón de subir archivo o aloja la app en un servidor.'
+        : 'Error al actualizar: '+e.message,
+      'red'
+    );
+  }finally{
+    btn.innerHTML='<i class="ti ti-refresh"></i> Actualizar';
+    btn.disabled=false;
+    startCountdown();
+  }
+}
+
+// ── CARGA MANUAL (sin red) — HTML o CSV guardado del admin ──
+function parseMachinesFromCsv(text){
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length);
+  if(lines.length<2) return [];
+  const splitLine=l=>l.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+  const header=splitLine(lines[0]).map(h=>normKey(h));
+  const order=['serial','code','name','client','color','prometido','pct'];
+  const fieldAliases={
+    serial:['serial','serie','sn'],
+    code:['codigo','code','cod'],
+    name:['maquina','nombre','equipo','producto'],
+    client:['cliente','client'],
+    color:['color'],
+    prometido:['prometido','fecha','entrega'],
+    pct:['%','avance','progreso','pct']
+  };
+  const colIndex={};
+  header.forEach((h,i)=>{
+    for(const [field,aliases] of Object.entries(fieldAliases)){
+      if(colIndex[field]!==undefined) continue;
+      if(aliases.some(a=>h.includes(a))) colIndex[field]=i;
+    }
+  });
+  const machines=[];
+  lines.slice(1).forEach(line=>{
+    const cells=splitLine(line);
+    const obj={};
+    order.forEach(field=>{
+      const idx=colIndex[field];
+      obj[field]= idx!==undefined && cells[idx]!==undefined ? cells[idx] : '';
+    });
+    const pctNum=parseFloat(String(obj.pct).replace(/[^\d.]/g,''));
+    obj.pct=isNaN(pctNum)?0:pctNum;
+    if(obj.serial||obj.name) machines.push(obj);
+  });
+  return machines;
+}
+
+function handleAdminFileUpload(event){
+  const file=event.target.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const text=reader.result;
+      const isCsv=/\.csv$/i.test(file.name);
+      const machines = isCsv ? parseMachinesFromCsv(text) : parseMachinesFromHtml(text);
+      if(!machines.length) throw new Error('No se encontraron máquinas en el archivo');
+      window.loadMachines(machines);
+    }catch(e){
+      showToast('Error al leer el archivo: '+e.message,'red');
+    }
+  };
+  reader.onerror=()=>showToast('No se pudo leer el archivo','red');
+  reader.readAsText(file);
+  event.target.value='';
+}
+
+async function fetchAdminHtml(url){
+  try{
+    const r=await fetch(url,{cache:'no-store'});
+    if(r.ok) return await r.text();
+    throw new Error('HTTP '+r.status);
+  }catch(directErr){
+    const proxied='https://api.allorigins.win/raw?url='+encodeURIComponent(url);
+    const r2=await fetch(proxied,{cache:'no-store'});
+    if(!r2.ok) throw new Error('No se pudo acceder a la página del admin (directo ni por proxy)');
+    return await r2.text();
+  }
+}
+
+function normKey(s){
+  return (s||'').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+
+function parseMachinesFromHtml(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const table=doc.querySelector('table');
+  if(!table) throw new Error('No se encontró ninguna tabla en la página');
+
+  const rows=Array.from(table.querySelectorAll('tr'));
+  if(!rows.length) return [];
+
+  const order=['serial','code','name','client','color','prometido','pct'];
+  const fieldAliases={
+    serial:['serial','serie','sn'],
+    code:['codigo','code','cod'],
+    name:['maquina','nombre','equipo','producto'],
+    client:['cliente','client'],
+    color:['color'],
+    prometido:['prometido','fecha','entrega'],
+    pct:['%','avance','progreso','pct']
+  };
+
+  const headerCells=Array.from(rows[0].querySelectorAll('th,td')).map(c=>normKey(c.textContent));
+  const colIndex={};
+  headerCells.forEach((h,i)=>{
+    for(const [field,aliases] of Object.entries(fieldAliases)){
+      if(colIndex[field]!==undefined) continue;
+      if(aliases.some(a=>h.includes(a))) colIndex[field]=i;
+    }
+  });
+  const hasHeaderMap=Object.keys(colIndex).length>=5;
+  const dataRows=hasHeaderMap?rows.slice(1):rows;
+
+  const machines=[];
+  dataRows.forEach(tr=>{
+    const cells=Array.from(tr.querySelectorAll('td'));
+    if(!cells.length) return;
+    const obj={};
+    order.forEach((field,i)=>{
+      const idx=hasHeaderMap?colIndex[field]:i;
+      const cell=idx!==undefined?cells[idx]:undefined;
+      obj[field]=cell?cell.textContent.trim():'';
+    });
+    const pctNum=parseFloat(String(obj.pct).replace(/[^\d.]/g,''));
+    obj.pct=isNaN(pctNum)?0:pctNum;
+    if(obj.serial||obj.name) machines.push(obj);
+  });
+  return machines;
+}
+
+function setStatus(live){
+  document.getElementById('sdot').className='sdot'+(live?'':' stale');
+  document.getElementById('t-updated').textContent=lastUpdate
+    ?`${lastUpdate.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}`:'–';
+}
+function startCountdown(){
+  clearInterval(countdownInterval);countdownSec=120;updateCountdown();
+  countdownInterval=setInterval(()=>{
+    countdownSec--;updateCountdown();
+    if(countdownSec<=0) requestRefresh();
+  },1000);
+}
+function updateCountdown(){
+  const m=Math.floor(countdownSec/60),s=countdownSec%60;
+  document.getElementById('t-countdown').textContent=`(${m}:${String(s).padStart(2,'0')})`;
+}
+
+// ── RESIZE HANDLE ──
+(function(){
+  const handle=document.getElementById('resize-handle');
+  const sidebar=document.getElementById('sidebar');
+  let dragging=false,startX=0,startW=0;
+  handle.addEventListener('mousedown',e=>{
+    if(!sidebarOpen) return;
+    dragging=true;startX=e.clientX;startW=sidebar.offsetWidth;
+    handle.classList.add('dragging');document.body.style.cursor='col-resize';document.body.style.userSelect='none';
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging) return;
+    const w=Math.max(180,Math.min(480,startW+(e.clientX-startX)));
+    document.documentElement.style.setProperty('--sidebar-w',w+'px');
+  });
+  document.addEventListener('mouseup',()=>{
+    dragging=false;handle.classList.remove('dragging');document.body.style.cursor='';document.body.style.userSelect='';
+  });
+})();
+
+// ── SINCRONIZACIÓN EN VIVO — otros dispositivos ven avances/histórico sin recargar ──
+function calSubscribeRealtime(){
+  if(!SUPABASE_CONFIGURED) return;
+  sb.channel('calidad_inspecciones_rt')
+    .on('postgres_changes', {event:'*', schema:'public', table:'calidad_inspecciones'}, payload=>{
+      const changedSerial = payload.new && payload.new.serial;
+      // No pisamos la máquina que el usuario tiene abierta ahora mismo (evita perder texto sin guardar)
+      if(changedSerial && changedSerial!==currentSerial) inspData[changedSerial]=payload.new.data;
+      renderList();
+      updateSbStats();
+    })
+    .subscribe();
+  sb.channel('calidad_historico_rt')
+    .on('postgres_changes', {event:'*', schema:'public', table:'calidad_historico'}, async ()=>{
+      const hist = await sbCall(()=>sb.from('calidad_historico').select('*').order('created_at',{ascending:false}));
+      historico = (hist||[]).map(h=>({
+        _dbId:h.id, serial:h.serial, code:h.code, name:h.name, client:h.client, prometido:h.prometido, color:h.color,
+        fechaInsp:h.fecha_insp, conformes:h.conformes, noConformes:h.no_conformes, total:h.total, pct:h.pct,
+        inspectors:h.inspectors, stageData:h.stage_data||{}
+      }));
+      updateHistoricoCount();
+      if(currentView==='historico') renderHistorico();
+      renderList();
+      updateSbStats();
+    })
+    .subscribe();
+}
+
+// ── INIT CALIDAD (llamado desde el bloque de init general) ──
+async function calInit(){
+  filterMachines('');
+  document.querySelector('#sb-filters .sf').classList.add('active');
+  activeFilterEl=document.querySelector('#sb-filters .sf');
+  try{
+    await calFetchAll();
+  }catch(e){ /* ya se mostró el toast */ }
+  calLoaded=true;
+  setStatus(true); lastUpdate=lastUpdate||new Date();
+  filterMachines(document.getElementById('sb-q').value||'');
+  updateHistoricoCount();
+  startCountdown();
+  calSubscribeRealtime();
+}
+</script>
+
+<script>
+// ══════════════ GARANTÍAS ══════════════
+let GAR_DATA = [];
+let garTempMachines = [];
+let garTempDefectos = [];
+let garFilterEstado='';
+let garSearchQ='';
+let garLoaded=false;
+let garModalOpenId=null;
+let garLinkedSerial=null; // serial de la máquina de Calidad desde la que se generó la solicitud en curso (trazabilidad)
+const garSigState={};
+
+// ── MAPEO fila de Supabase → objeto que usa la UI ──
+function garMapRow(row){
+  return {
+    id: row.id,
+    numero: row.numero!=null ? String(row.numero).padStart(4,'0') : '----',
+    cliente: row.cliente,
+    celular: row.celular,
+    direccion: row.direccion,
+    fechaVisita: row.fecha_visita,
+    tecnico: row.tecnico,
+    serialMaquina: row.serial_maquina,
+    maquinas: (row.maquinas||[]).map(m=>({id:m.id, factura:m.factura, fechaCompra:m.fecha_compra, codigo:m.codigo, desc:m.descripcion})),
+    defectos: (row.defectos||[]).map(d=>({id:d.id, proceso:d.proceso, item:d.item, criterio:d.criterio, resultado:d.resultado, severidad:d.severidad, causa:d.causa, accion:d.accion, corregido:d.corregido, fechaCorreccion:d.fecha_correccion})),
+    descGarantia: row.desc_garantia,
+    obs: row.obs,
+    estado: row.estado,
+    responsable: row.responsable,
+    fechaCompromiso: row.fecha_compromiso,
+    firmaCliente: row.firma_cliente,
+    firmaTecnico: row.firma_tecnico,
+    fechaRegistro: row.fecha_registro,
+  };
+}
+
+// ── CAPA DE DATOS (Supabase) ──
+async function garFetchAll(){
+  const rows = await sbCall(()=>sb.from('garantias_solicitudes')
+    .select('*, maquinas:garantias_maquinas(*), defectos:garantias_defectos(*)')
+    .order('created_at',{ascending:false}));
+  GAR_DATA = (rows||[]).map(garMapRow);
+}
+
+function garFmtDate(iso){
+  if(!iso) return '';
+  const parts=iso.split('-');
+  if(parts.length!==3) return iso;
+  const [y,m,d]=parts;
+  return `${d}/${m}/${y}`;
+}
+
+// ── MÁQUINAS DE LA SOLICITUD (en construcción, antes de guardar) ──
+function garAddMachine(){
+  const factura=document.getElementById('gf-factura').value.trim();
+  const fechaCompra=document.getElementById('gf-fechaCompra').value;
+  const codigo=document.getElementById('gf-codigo').value.trim();
+  const desc=document.getElementById('gf-descMaquina').value.trim();
+  if(!codigo && !desc){ showToast('Ingresa al menos el código o la descripción de la máquina','red'); return; }
+  garTempMachines.push({factura,fechaCompra,codigo,desc});
+  ['gf-factura','gf-fechaCompra','gf-codigo','gf-descMaquina'].forEach(id=>document.getElementById(id).value='');
+  garRenderMachinesTable();
+}
+function garRemoveMachine(idx){
+  garTempMachines.splice(idx,1);
+  garRenderMachinesTable();
+}
+function garRenderMachinesTable(){
+  const wrap=document.getElementById('gar-machines-wrap');
+  const tbody=document.getElementById('gar-machines-tbody');
+  if(!garTempMachines.length){ wrap.style.display='none'; tbody.innerHTML=''; return; }
+  wrap.style.display='block';
+  tbody.innerHTML=garTempMachines.map((m,i)=>`<tr>
+    <td>${escapeHtml(m.factura||'—')}</td>
+    <td>${escapeHtml(garFmtDate(m.fechaCompra)||'—')}</td>
+    <td>${escapeHtml(m.codigo||'—')}</td>
+    <td class="obs">${escapeHtml(m.desc||'—')}</td>
+    <td><button type="button" class="row-del" onclick="garRemoveMachine(${i})" title="Quitar"><i class="ti ti-trash"></i></button></td>
+  </tr>`).join('');
+}
+
+// ── DEFECTOS (en construcción — usa el mismo catálogo de ítems que el módulo Calidad: STAGES) ──
+function garPopulateProcesoSelect(){
+  const sel=document.getElementById('gf-defProceso');
+  sel.innerHTML = '<option value="">Selecciona…</option>'
+    + STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('')
+    + '<option value="otro">Otro / no listado</option>';
+}
+function garProcesoChanged(){
+  const proc=document.getElementById('gf-defProceso').value;
+  const selWrap=document.getElementById('gf-defItemSelect-wrap');
+  const txtWrap=document.getElementById('gf-defItemText-wrap');
+  const sel=document.getElementById('gf-defItemSelect');
+  document.getElementById('gf-defCriterio').value='';
+  if(proc==='otro'){
+    selWrap.style.display='none';
+    txtWrap.style.display='block';
+    return;
+  }
+  selWrap.style.display='block';
+  txtWrap.style.display='none';
+  const stage=STAGES.find(s=>s.key===proc);
+  if(!stage){ sel.innerHTML='<option value="">Selecciona un proceso primero…</option>'; return; }
+  sel.innerHTML='<option value="">Selecciona ítem…</option>'+stage.items.map(it=>`<option value="${it.id}">${it.item}</option>`).join('');
+}
+function garItemChanged(){
+  const proc=document.getElementById('gf-defProceso').value;
+  const itemId=document.getElementById('gf-defItemSelect').value;
+  const stage=STAGES.find(s=>s.key===proc);
+  const item=stage? stage.items.find(i=>i.id===itemId) : null;
+  document.getElementById('gf-defCriterio').value = item? item.criterio : '';
+}
+function garAddDefecto(){
+  const procKey=document.getElementById('gf-defProceso').value;
+  const stage=STAGES.find(s=>s.key===procKey);
+  const procesoLabel = stage? stage.label : (procKey==='otro'? 'Otro' : '');
+  let itemLabel;
+  if(procKey==='otro'){
+    itemLabel=document.getElementById('gf-defItemText').value.trim();
+  }else{
+    const sel=document.getElementById('gf-defItemSelect');
+    itemLabel=sel.options[sel.selectedIndex]? sel.options[sel.selectedIndex].text : '';
+    if(!sel.value) itemLabel='';
+  }
+  if(!procesoLabel || !itemLabel){ showToast('Selecciona el proceso y el ítem del defecto','red'); return; }
+  const resultado=document.getElementById('gf-defResultado').value.trim();
+  const severidad=document.getElementById('gf-defSeveridad').value;
+  const causa=document.getElementById('gf-defCausa').value;
+  const accion=document.getElementById('gf-defAccion').value.trim();
+  const criterio=document.getElementById('gf-defCriterio').value.trim();
+  garTempDefectos.push({proceso:procesoLabel,item:itemLabel,criterio,resultado,severidad,causa,accion,corregido:false,fechaCorreccion:''});
+  ['gf-defItemText','gf-defCriterio','gf-defResultado','gf-defAccion'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('gf-defProceso').value='';
+  document.getElementById('gf-defCausa').value='';
+  document.getElementById('gf-defSeveridad').value='Media';
+  garProcesoChanged();
+  garRenderDefectosTable();
+}
+function garRemoveDefecto(idx){
+  garTempDefectos.splice(idx,1);
+  garRenderDefectosTable();
+}
+function garSeveridadBadge(sev){
+  const map={'Crítica':'b-no','Media':'b-cond','Leve':'badge-gray'};
+  return `<span class="badge ${map[sev]||'badge-gray'}">${escapeHtml(sev||'—')}</span>`;
+}
+function garRenderDefectosTable(){
+  const wrap=document.getElementById('gar-defectos-wrap');
+  const tbody=document.getElementById('gar-defectos-tbody');
+  if(!garTempDefectos.length){ wrap.style.display='none'; tbody.innerHTML=''; return; }
+  wrap.style.display='block';
+  tbody.innerHTML=garTempDefectos.map((d,i)=>`<tr>
+    <td>${escapeHtml(d.proceso)}</td>
+    <td class="obs">${escapeHtml(d.item)}${d.resultado?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${escapeHtml(d.resultado)}</div>`:''}</td>
+    <td>${garSeveridadBadge(d.severidad)}</td>
+    <td>${escapeHtml(d.causa||'—')}</td>
+    <td class="obs">${escapeHtml(d.accion||'—')}</td>
+    <td><button type="button" class="row-del" onclick="garRemoveDefecto(${i})" title="Quitar"><i class="ti ti-trash"></i></button></td>
+  </tr>`).join('');
+}
+
+// ── FIRMA (canvas) ──
+function garInitSig(canvasId){
+  const canvas=document.getElementById(canvasId);
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle='#111'; ctx.lineWidth=2.2; ctx.lineCap='round'; ctx.lineJoin='round';
+  let drawing=false,last=null;
+  function pos(e){
+    const r=canvas.getBoundingClientRect();
+    const cx=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+    const cy=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
+    return {x:cx*canvas.width/r.width, y:cy*canvas.height/r.height};
+  }
+  function start(e){ e.preventDefault(); drawing=true; last=pos(e); }
+  function move(e){
+    if(!drawing) return; e.preventDefault();
+    const p=pos(e);
+    ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();
+    last=p; garSigState[canvasId]=true;
+  }
+  function end(){ drawing=false; }
+  canvas.addEventListener('mousedown',start);
+  canvas.addEventListener('mousemove',move);
+  window.addEventListener('mouseup',end);
+  canvas.addEventListener('touchstart',start,{passive:false});
+  canvas.addEventListener('touchmove',move,{passive:false});
+  canvas.addEventListener('touchend',end);
+}
+function garClearSig(canvasId){
+  const canvas=document.getElementById(canvasId);
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  garSigState[canvasId]=false;
+}
+
+function garResetForm(){
+  document.getElementById('gar-form').reset();
+  garTempMachines=[]; garRenderMachinesTable();
+  garTempDefectos=[]; garRenderDefectosTable(); garProcesoChanged();
+  garClearSig('gf-sigCliente'); garClearSig('gf-sigTecnico');
+  document.getElementById('gf-fechaVisita').valueAsDate=new Date();
+  garLinkedSerial=null; garUpdateLinkedBadge();
+}
+
+// ── GENERAR GARANTÍA DESDE UNA MÁQUINA DE CALIDAD ──
+// Evita la doble digitación: trae los datos de la máquina y sus no conformidades
+// ya diligenciados, y deja la solicitud vinculada al serial de origen.
+function garCreateFromMachine(serial){
+  const m = MACHINES.find(x=>String(x.serial)===String(serial));
+  if(!m){ showToast('No se encontró la máquina','red'); return; }
+
+  switchSection('garantias');
+  garResetForm();
+  garLinkedSerial = String(serial);
+
+  // Cliente (si existe) y datos de la máquina
+  document.getElementById('gf-cliente').value = m.client && m.client!=='—' ? m.client : '';
+  garTempMachines.push({factura:'', fechaCompra:'', codigo:m.code||'', desc:`${m.name||''}${m.color&&m.color!=='—'?` — ${m.color}`:''}`.trim()});
+  garRenderMachinesTable();
+
+  // Trae automáticamente las no conformidades ya registradas en la inspección, como defectos base
+  const d = getInsp(serial);
+  STAGES.forEach(s=>{
+    const dd = d.stageData[s.key] || {};
+    s.items.forEach(it=>{
+      if((dd[it.id]||'')==='fail'){
+        garTempDefectos.push({
+          proceso:s.label, item:it.item, criterio:it.criterio||'',
+          resultado:'', severidad:'Media', causa:'', accion:'',
+          corregido:false, fechaCorreccion:''
+        });
+      }
+    });
+  });
+  garRenderDefectosTable();
+
+  // Nota de trazabilidad en observaciones
+  document.getElementById('gf-obs').value = `Garantía generada automáticamente desde Calidad — Serial #${m.serial} · ${m.code} · ${m.name}${m.prometido?` (entrega prometida: ${m.prometido})`:''}.`;
+
+  garUpdateLinkedBadge();
+  showToast(`Formulario prellenado con la máquina #${m.serial}`,'yellow');
+  document.getElementById('gf-cliente').focus();
+}
+
+function garUpdateLinkedBadge(){
+  const el = document.getElementById('gar-linked-badge');
+  if(!el) return;
+  if(garLinkedSerial){
+    const m = MACHINES.find(x=>String(x.serial)===String(garLinkedSerial));
+    el.style.display='inline-flex';
+    el.innerHTML = `<i class="ti ti-link"></i> Vinculada a Calidad — Serial #${escapeHtml(garLinkedSerial)}${m?` · ${escapeHtml(m.code)}`:''}
+      <button type="button" onclick="garUnlinkMachine()" title="Quitar vínculo" style="background:none;border:none;color:inherit;cursor:pointer;padding:0 0 0 4px;line-height:1"><i class="ti ti-x"></i></button>`;
+  }else{
+    el.style.display='none'; el.innerHTML='';
+  }
+}
+function garUnlinkMachine(){ garLinkedSerial=null; garUpdateLinkedBadge(); }
+
+// ── GUARDAR (inserta solicitud + máquinas + defectos en una sola transacción vía RPC) ──
+async function garSubmit(e){
+  e.preventDefault();
+  if(garTempMachines.length===0){
+    const codigo=document.getElementById('gf-codigo').value.trim();
+    const desc=document.getElementById('gf-descMaquina').value.trim();
+    const factura=document.getElementById('gf-factura').value.trim();
+    const fechaCompra=document.getElementById('gf-fechaCompra').value;
+    if(codigo||desc) garTempMachines.push({factura,fechaCompra,codigo,desc});
+  }
+  const cliente=document.getElementById('gf-cliente').value.trim();
+  if(!cliente){ showToast('Ingresa el nombre del cliente','red'); return; }
+  if(garTempMachines.length===0){ showToast('Agrega al menos una máquina a la solicitud','red'); return; }
+
+  const payload = {
+    cliente,
+    celular: document.getElementById('gf-celular').value.trim(),
+    direccion: document.getElementById('gf-direccion').value.trim(),
+    fechaVisita: document.getElementById('gf-fechaVisita').value,
+    tecnico: document.getElementById('gf-tecnico').value.trim(),
+    serialMaquina: garLinkedSerial || null,
+    maquinas: garTempMachines,
+    defectos: garTempDefectos,
+    descGarantia: document.getElementById('gf-descGarantia').value.trim(),
+    obs: document.getElementById('gf-obs').value.trim(),
+    estado: document.getElementById('gf-estado').value,
+    responsable: document.getElementById('gf-responsable').value.trim(),
+    fechaCompromiso: document.getElementById('gf-fechaCompromiso').value,
+    firmaCliente: garSigState['gf-sigCliente']? document.getElementById('gf-sigCliente').toDataURL('image/png'):'',
+    firmaTecnico: garSigState['gf-sigTecnico']? document.getElementById('gf-sigTecnico').toDataURL('image/png'):'',
+  };
+
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  try{
+    await sbCall(()=>sb.rpc('crear_garantia', {payload}));
+    await garFetchAll();
+    garResetForm();
+    garRenderTable();
+    garUpdateStats();
+    showToast('Solicitud guardada','green');
+  }catch(err){
+    // sbCall ya mostró el toast; nada se guardó a medias gracias a la transacción
+  }finally{
+    submitBtn.disabled = false;
+  }
+}
+
+// ── LISTA / FILTROS ──
+function garSetFilter(v){ garFilterEstado=v; garRenderTable(); }
+function garSearch(v){ garSearchQ=v.toLowerCase(); garRenderTable(); }
+
+function garDefectosSummary(defectos){
+  defectos = defectos||[];
+  if(!defectos.length) return '<span style="color:var(--text3)">—</span>';
+  const pend = defectos.filter(d=>!d.corregido).length;
+  const crit = defectos.filter(d=>d.severidad==='Crítica' && !d.corregido).length;
+  let html = `<span class="badge badge-gray">${defectos.length} defecto${defectos.length!==1?'s':''}</span>`;
+  if(crit>0) html += ` <span class="badge b-no">${crit} crítico${crit!==1?'s':''}</span>`;
+  else if(pend>0) html += ` <span class="badge b-cond">${pend} pendiente${pend!==1?'s':''}</span>`;
+  else html += ` <span class="badge b-ok">corregidos</span>`;
+  return html;
+}
+
+function garRenderTable(){
+  const tbody=document.getElementById('gar-tbody');
+  if(!garLoaded){
+    tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px"><i class="ti ti-loader-2 spin"></i> Cargando información…</td></tr>`;
+    return;
+  }
+  let rows=GAR_DATA.slice();
+  if(garFilterEstado) rows=rows.filter(r=>r.estado===garFilterEstado);
+  if(garSearchQ) rows=rows.filter(r=>
+    r.cliente.toLowerCase().includes(garSearchQ)||
+    (r.maquinas||[]).some(m=>(m.codigo||'').toLowerCase().includes(garSearchQ)||(m.factura||'').toLowerCase().includes(garSearchQ))||
+    (r.defectos||[]).some(d=>(d.item||'').toLowerCase().includes(garSearchQ)||(d.proceso||'').toLowerCase().includes(garSearchQ))
+  );
+  if(!rows.length){ tbody.innerHTML=`<tr id="gar-empty"><td colspan="7" style="text-align:center;color:var(--text3);padding:24px;font-style:italic">Sin solicitudes todavía</td></tr>`; return; }
+  tbody.innerHTML=rows.map(r=>{
+    const codes=(r.maquinas||[]).map(m=>m.codigo||m.desc||'—').join(', ');
+    return `<tr>
+      <td>#${escapeHtml(r.numero)}</td>
+      <td>${escapeHtml(garFmtDate(r.fechaVisita)||'—')}</td>
+      <td>${escapeHtml(r.cliente)}${r.serialMaquina?` <i class="ti ti-link" title="Vinculada a Calidad — Serial #${escapeHtml(r.serialMaquina)}" style="color:var(--yellow);cursor:pointer;font-size:12px" onclick="garGoToMachine('${escapeHtml(r.serialMaquina)}')"></i>`:''}</td>
+      <td class="obs">${escapeHtml(codes||'—')}</td>
+      <td>${garDefectosSummary(r.defectos)}</td>
+      <td>${garEstadoBadge(r.estado)}</td>
+      <td style="white-space:nowrap">
+        <button class="row-del" onclick="garOpenModal('${r.id}')" title="Ver / imprimir"><i class="ti ti-eye"></i></button>
+        <button class="row-del" onclick="garDelete('${r.id}')" title="Eliminar"><i class="ti ti-trash"></i></button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function garGoToMachine(serial){
+  const m = MACHINES.find(x=>String(x.serial)===String(serial));
+  if(!m){ showToast('Esa máquina ya no está en la lista de Calidad','red'); return; }
+  switchSection('calidad');
+  selectMachine(String(serial));
+}
+
+function garEstadoBadge(estado){
+  const map={'Pendiente':'b-cond','En revisión':'b-cond','Aprobada':'b-ok','Resuelta':'b-ok','Rechazada':'b-no'};
+  return `<span class="badge ${map[estado]||'b-cond'}">${estado||'Pendiente'}</span>`;
+}
+
+async function garDelete(id){
+  if(!confirm('¿Eliminar esta solicitud de garantía?')) return;
+  try{
+    await sbCall(()=>sb.from('garantias_solicitudes').delete().eq('id',id));
+    GAR_DATA = GAR_DATA.filter(r=>r.id!==id);
+    garRenderTable(); garUpdateStats();
+  }catch(e){ /* ya se mostró el toast */ }
+}
+
+async function garToggleDefecto(recId,defectoId,checked){
+  const r=GAR_DATA.find(x=>x.id===recId);
+  const def = r && (r.defectos||[]).find(d=>d.id===defectoId);
+  if(!def) return;
+  const prevCorregido=def.corregido, prevFecha=def.fechaCorreccion;
+  const fechaCorreccion = checked? new Date().toISOString().slice(0,10) : null;
+  def.corregido=checked; def.fechaCorreccion=fechaCorreccion||'';
+  garRenderTable(); garUpdateStats(); garOpenModal(recId);
+  try{
+    await sbCall(()=>sb.from('garantias_defectos').update({corregido:checked, fecha_correccion:fechaCorreccion}).eq('id',defectoId));
+  }catch(e){
+    def.corregido=prevCorregido; def.fechaCorreccion=prevFecha; // revertir si no se pudo guardar
+    garRenderTable(); garUpdateStats(); garOpenModal(recId);
+  }
+}
+
+// ── DETALLE / IMPRESIÓN ──
+function garOpenModal(id){
+  const r=GAR_DATA.find(x=>x.id===id);
+  if(!r) return;
+  garModalOpenId=id;
+  const box=document.getElementById('gar-modal-box');
+  box.innerHTML=`
+    <div class="printable">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:15px;font-weight:700">Solicitud de garantía N° ${escapeHtml(r.numero)}</div>
+          <div style="font-size:12px;color:var(--text2)">Fecha de visita técnica: ${escapeHtml(garFmtDate(r.fechaVisita))||'—'}</div>
+          ${r.serialMaquina?`<div style="font-size:11px;color:var(--yellow);margin-top:2px"><i class="ti ti-link"></i> Vinculada a Calidad — Serial #${escapeHtml(r.serialMaquina)}</div>`:''}
+        </div>
+        ${garEstadoBadge(r.estado)}
+      </div>
+
+      <div class="section-lbl" style="margin-top:8px">Cliente</div>
+      <div style="font-size:13px;font-weight:500">${escapeHtml(r.cliente)}${r.celular?' · '+escapeHtml(r.celular):''}</div>
+      <div style="font-size:12px;color:var(--text2)">${escapeHtml(r.direccion||'—')}</div>
+      ${r.tecnico?`<div style="font-size:12px;color:var(--text2);margin-top:2px">Técnico Xtensor: ${escapeHtml(r.tecnico)}</div>`:''}
+
+      <div class="section-lbl">Máquinas</div>
+      <div class="tbl-wrap"><table><thead><tr><th>Factura</th><th>Fecha compra</th><th>Código</th><th>Descripción</th></tr></thead>
+      <tbody>${(r.maquinas||[]).map(m=>`<tr><td>${escapeHtml(m.factura||'—')}</td><td>${escapeHtml(garFmtDate(m.fechaCompra)||'—')}</td><td>${escapeHtml(m.codigo||'—')}</td><td>${escapeHtml(m.desc||'—')}</td></tr>`).join('')}</tbody></table></div>
+
+      <div class="section-lbl">Defectos encontrados ${r.defectos&&r.defectos.length?`<span style="text-transform:none;font-weight:400;color:var(--text3)">— marca los que ya se corrigieron</span>`:''}</div>
+      ${(r.defectos&&r.defectos.length)?`
+      <div class="tbl-wrap"><table><thead><tr><th>Proceso</th><th>Ítem</th><th>Severidad</th><th>Causa</th><th>Acción</th><th class="no-print">Corregido</th></tr></thead>
+      <tbody>${r.defectos.map(d=>`<tr>
+        <td>${escapeHtml(d.proceso)}</td>
+        <td class="obs">${escapeHtml(d.item)}${d.criterio?`<div style="font-size:11px;color:var(--text3);margin-top:2px">Criterio: ${escapeHtml(d.criterio)}</div>`:''}${d.resultado?`<div style="font-size:11px;color:var(--text3)">Encontrado: ${escapeHtml(d.resultado)}</div>`:''}</td>
+        <td>${garSeveridadBadge(d.severidad)}</td>
+        <td>${escapeHtml(d.causa||'—')}</td>
+        <td class="obs">${escapeHtml(d.accion||'—')}</td>
+        <td class="no-print" style="text-align:center">
+          <input type="checkbox" ${d.corregido?'checked':''} onchange="garToggleDefecto('${r.id}','${d.id}',this.checked)" style="width:16px;height:16px;cursor:pointer">
+          ${d.corregido&&d.fechaCorreccion?`<div style="font-size:10px;color:var(--text3)">${escapeHtml(d.fechaCorreccion)}</div>`:''}
+        </td>
+      </tr>`).join('')}</tbody></table></div>`:`<div style="font-size:12px;color:var(--text3)">Sin defectos registrados</div>`}
+      ${(r.responsable||r.fechaCompromiso)?`<div style="font-size:12px;color:var(--text2);margin-top:6px">
+        ${r.responsable?`Responsable del reproceso: ${escapeHtml(r.responsable)}`:''}${r.responsable&&r.fechaCompromiso?' · ':''}${r.fechaCompromiso?`Fecha compromiso: ${escapeHtml(garFmtDate(r.fechaCompromiso))}`:''}
+      </div>`:''}
+
+      <div class="section-lbl">Descripción de la garantía</div>
+      <div style="font-size:13px;color:var(--text2);white-space:pre-wrap">${escapeHtml(r.descGarantia||'—')}</div>
+
+      ${r.obs?`<div class="section-lbl">Observaciones</div><div style="font-size:13px;color:var(--text2);white-space:pre-wrap">${escapeHtml(r.obs)}</div>`:''}
+
+      <div class="section-lbl">Constancia de visita</div>
+      <div class="sig-grid">
+        <div class="sig-box">
+          <label class="field-lbl">Firma del cliente</label>
+          ${r.firmaCliente?`<img src="${r.firmaCliente}" style="width:100%;max-width:320px;border:1px solid var(--border2);border-radius:var(--r);background:#fff">`:`<div style="font-size:12px;color:var(--text3)">Sin firma registrada</div>`}
+        </div>
+        <div class="sig-box">
+          <label class="field-lbl">Firma del técnico Xtensor</label>
+          ${r.firmaTecnico?`<img src="${r.firmaTecnico}" style="width:100%;max-width:320px;border:1px solid var(--border2);border-radius:var(--r);background:#fff">`:`<div style="font-size:12px;color:var(--text3)">Sin firma registrada</div>`}
+        </div>
+      </div>
+    </div>
+    <div class="form-actions no-print" style="margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="garCloseModal()">Cerrar</button>
+      <button class="btn btn-y btn-sm" onclick="window.print()"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>`;
+  document.getElementById('gar-modal-overlay').style.display='flex';
+}
+function garCloseModal(){ document.getElementById('gar-modal-overlay').style.display='none'; garModalOpenId=null; }
+
+// ── EXPORT ──
+function garExportCSV(){
+  if(!GAR_DATA.length){ showToast('No hay registros para exportar','red'); return; }
+  const header=['N°','Fecha visita','Cliente','Celular','Dirección','Técnico','Máquinas','Defectos','Descripción garantía','Observaciones','Estado','Responsable reproceso','Fecha compromiso','Fecha registro'].join(',');
+  const lines=GAR_DATA.map(r=>{
+    const maquinasStr=(r.maquinas||[]).map(m=>`${m.codigo||''} (${m.desc||''})`).join(' | ');
+    const defectosStr=(r.defectos||[]).map(d=>`[${d.proceso}] ${d.item} - ${d.severidad}${d.corregido?' (corregido)':' (pendiente)'}`).join(' | ');
+    return [r.numero,garFmtDate(r.fechaVisita),r.cliente,r.celular,r.direccion,r.tecnico,maquinasStr,defectosStr,r.descGarantia,r.obs,r.estado,r.responsable,garFmtDate(r.fechaCompromiso),r.fechaRegistro]
+      .map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',');
+  });
+  const csv=[header,...lines].join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=`garantias_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function garUpdateStats(){
+  const total=GAR_DATA.length;
+  const pend=GAR_DATA.filter(r=>r.estado==='Pendiente'||r.estado==='En revisión').length;
+  const res=GAR_DATA.filter(r=>r.estado==='Resuelta'||r.estado==='Aprobada').length;
+  let crit=0;
+  GAR_DATA.forEach(r=>(r.defectos||[]).forEach(d=>{ if(d.severidad==='Crítica' && !d.corregido) crit++; }));
+  document.getElementById('gar-st-total').textContent=total;
+  document.getElementById('gar-st-pend').textContent=pend;
+  document.getElementById('gar-st-res').textContent=res;
+  document.getElementById('gar-st-crit').textContent=crit;
+}
+
+// ── SINCRONIZACIÓN EN VIVO — otros dispositivos ven altas/bajas/cambios sin recargar ──
+function garSubscribeRealtime(){
+  if(!SUPABASE_CONFIGURED) return;
+  ['garantias_solicitudes','garantias_maquinas','garantias_defectos'].forEach(table=>{
+    sb.channel(table+'_rt')
+      .on('postgres_changes', {event:'*', schema:'public', table}, async ()=>{
+        await garFetchAll();
+        garRenderTable();
+        garUpdateStats();
+        if(garModalOpenId){
+          const still = GAR_DATA.find(r=>r.id===garModalOpenId);
+          if(still) garOpenModal(garModalOpenId); else garCloseModal();
+        }
+      })
+      .subscribe();
+  });
+}
+
+// ── INIT GARANTÍAS (llamado desde el bloque de init general) ──
+async function garInit(){
+  document.getElementById('gar-form').addEventListener('submit', garSubmit);
+  document.getElementById('gf-fechaVisita').valueAsDate=new Date();
+  garInitSig('gf-sigCliente');
+  garInitSig('gf-sigTecnico');
+  garPopulateProcesoSelect();
+  garProcesoChanged();
+  document.getElementById('gar-numero-preview').textContent='(el N° se asigna automáticamente al guardar)';
+  garRenderTable();
+  try{
+    await garFetchAll();
+  }catch(e){ /* ya se mostró el toast */ }
+  garLoaded=true;
+  garRenderTable();
+  garUpdateStats();
+  garSubscribeRealtime();
+}
+</script>
+
+
+<script>
+// ══════════════ INIT ══════════════
+let __initSec='recepcion';
+try{ const s=localStorage.getItem('xtensor_app_lastsection'); if(s) __initSec=s; }catch(e){}
+switchSection(__initSec);
+
+(async function(){
+  if(!SUPABASE_CONFIGURED) return; // el banner de configuración ya está visible
+  await Promise.allSettled([ recInit(), calInit(), garInit() ]);
+})();
+</script>
+</body>
+</html>
