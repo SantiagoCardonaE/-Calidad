@@ -52,41 +52,6 @@ create index if not exists idx_cal_historico_created on calidad_historico(create
 create index if not exists idx_cal_historico_serial  on calidad_historico(serial);
 
 -- ───────────────────────────────────────────────────────────────────────
--- SINCRONIZACIÓN DE CALIDAD CON PRODUCCIÓN + TERMINADOS
--- Guarda el último éxito de sincronización y el estado persistente de las
--- máquinas terminadas/pedientes, para que una actualización no pueda hacer
--- desaparecer una máquina que todavía debe ser inspeccionada.
--- ───────────────────────────────────────────────────────────────────────
-create table if not exists calidad_sync_estado (
-  id                  integer primary key default 1 check (id=1),
-  last_success_at     timestamptz,
-  status              text not null default 'never'
-                      check (status in ('never','ok','error')),
-  last_error          text,
-  production_count    integer not null default 0,
-  terminated_count    integer not null default 0,
-  total_count         integer not null default 0,
-  updated_at          timestamptz not null default now()
-);
-
-create table if not exists calidad_maquinas_estado (
-  serial              text primary key,
-  code                text,
-  name                text,
-  client              text,
-  color               text,
-  prometido           text,
-  source_state        text not null default 'produccion'
-                      check (source_state in ('produccion','terminados','pendiente','no_encontrada')),
-  pending_inspection  boolean not null default false,
-  first_terminated_at timestamptz,
-  machine_data        jsonb not null default '{}'::jsonb,
-  updated_at          timestamptz not null default now()
-);
-create index if not exists idx_cal_maquinas_estado_pending on calidad_maquinas_estado(pending_inspection);
-create index if not exists idx_cal_maquinas_estado_source on calidad_maquinas_estado(source_state);
-
--- ───────────────────────────────────────────────────────────────────────
 -- GARANTÍAS
 -- ───────────────────────────────────────────────────────────────────────
 create table if not exists garantias_solicitudes (
@@ -434,8 +399,6 @@ $$;
 alter table rec_registros         enable row level security;
 alter table calidad_inspecciones  enable row level security;
 alter table calidad_historico     enable row level security;
-alter table calidad_sync_estado    enable row level security;
-alter table calidad_maquinas_estado enable row level security;
 alter table garantias_solicitudes enable row level security;
 alter table garantias_maquinas    enable row level security;
 alter table garantias_defectos    enable row level security;
@@ -448,12 +411,6 @@ create policy anon_all on calidad_inspecciones for all using (true) with check (
 
 drop policy if exists anon_all on calidad_historico;
 create policy anon_all on calidad_historico for all using (true) with check (true);
-
-drop policy if exists anon_all on calidad_sync_estado;
-create policy anon_all on calidad_sync_estado for all using (true) with check (true);
-
-drop policy if exists anon_all on calidad_maquinas_estado;
-create policy anon_all on calidad_maquinas_estado for all using (true) with check (true);
 
 drop policy if exists anon_all on garantias_solicitudes;
 create policy anon_all on garantias_solicitudes for all using (true) with check (true);
@@ -477,7 +434,7 @@ declare
   t text;
 begin
   foreach t in array array[
-    'rec_registros','calidad_inspecciones','calidad_historico','calidad_sync_estado','calidad_maquinas_estado',
+    'rec_registros','calidad_inspecciones','calidad_historico',
     'garantias_solicitudes','garantias_maquinas','garantias_defectos','app_settings'
   ]
   loop

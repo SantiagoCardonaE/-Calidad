@@ -164,6 +164,9 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 .rec-panel.active{display:block}
 
 /* ══════════════ CALIDAD ══════════════ */
+.cal-group-badge{font-size:10px;font-weight:600;padding:2px 6px;border-radius:99px;border:1px solid var(--border2);color:var(--text2);background:var(--surface2);white-space:nowrap}
+.cal-group-unknown{color:var(--red);border-color:var(--red-border);background:var(--red-bg)}
+
 #workspace{display:flex;flex:1;overflow:hidden;min-height:0}
 #sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;transition:width .2s,min-width .2s}
 #sidebar.collapsed{width:0;min-width:0;border-right:none}
@@ -177,6 +180,7 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 .sb-search input{width:100%;padding:5px 8px 5px 26px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:12px;outline:none;font-family:'Inter',sans-serif}
 .sb-search input:focus{border-color:var(--yellow)}
 .sb-search input::placeholder{color:var(--text3)}
+.sb-search-count{font-size:11px;color:var(--text3);padding:4px 2px 0;min-height:16px}.sb-search-count strong{color:var(--text2);font-weight:700}
 #sb-filters{display:flex;gap:4px;padding:5px 10px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
 .sf{font-size:12.5px;font-weight:600;padding:4px 9px;border-radius:99px;border:1px solid var(--border2);color:var(--text2);cursor:pointer;white-space:nowrap;background:transparent}
 .sf:hover{color:var(--text2);border-color:var(--border2)}
@@ -207,15 +211,6 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 .mb-color{background:var(--surface2);color:var(--text3);border-color:var(--border)}
 .mb-alert{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
 .mb-ok{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
-.sync-age{font-size:11px;color:var(--text2);white-space:nowrap}
-.sync-age.ok{color:var(--green)}
-.sync-age.warn{color:var(--yellow)}
-.sync-age.err{color:var(--red)}
-.mrow.status-terminados{background:rgba(245,158,11,.10);border-color:rgba(245,158,11,.38)}
-.mrow.status-terminados:hover{background:rgba(245,158,11,.16)}
-.mrow.status-pending{box-shadow:inset 3px 0 0 var(--yellow)}
-.mrbadge.mb-terminated{background:rgba(245,158,11,.14);color:var(--yellow);border-color:rgba(245,158,11,.45)}
-.mrbadge.mb-production{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
 #resize-handle{width:4px;cursor:col-resize;background:transparent;flex-shrink:0;transition:background .15s;position:relative;z-index:5}
 #resize-handle:hover,#resize-handle.dragging{background:var(--yellow-border)}
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
@@ -325,8 +320,9 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
     <!-- Calidad widgets -->
     <div class="tbr-variant" data-sec="calidad">
       <span class="sdot" id="sdot"></span>
-      <span id="t-updated" class="sync-age">Sin actualización exitosa</span>
-      <button class="btn" id="btn-refresh" onclick="requestRefresh()" data-tip="Sincronizar Producción + Terminados">
+      <span id="t-updated">–</span>
+      <span id="t-countdown"></span>
+      <button class="btn" id="btn-refresh" onclick="requestRefresh()" data-tip="Actualizar lista de producción">
         <i class="ti ti-refresh"></i> Actualizar
       </button>
       <button class="btn btn-ghost" onclick="document.getElementById('admin-file-input').click()" data-tip="Cargar un HTML o CSV guardado del admin, sin internet">
@@ -370,6 +366,7 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
             <i class="ti ti-search"></i>
             <input id="sb-q" type="text" placeholder="Buscar serial, código, máquina…" oninput="filterMachines(this.value)" autocomplete="off">
           </div>
+          <div id="sb-search-count" class="sb-search-count">Mostrando <strong>0</strong> resultados</div>
         </div>
         <div id="sb-filters">
           <span class="sf" onclick="calSetFilter('all',this)">Todos</span>
@@ -1182,57 +1179,298 @@ async function recInit(){
 // loadMachinesFromCache()/saveMachinesCache() más abajo.
 let MACHINES=[];
 
-const STAGES=[
-  {key:"armado",label:"Armado",icon:"ti-tool",items:[
-    {id:"a1",item:"Bujes percutores / cajitas",criterio:"Longitud del buje según corresponda",herramienta:"Calibrador digital",ideal:"25 mm",sup:"1"},
-    {id:"a2",item:"Percutores",criterio:"Punta sobresaliente del percutor de 3 a 5 mm",herramienta:"Calibrador digital",ideal:"4 mm",sup:"1"},
-    {id:"a3",item:"Tamaño de cajas",criterio:"Dimensiones según plano ± 1 mm",herramienta:"Calibrador digital",ideal:"",sup:"1"},
-    {id:"a4",item:"Movimiento de articulaciones",criterio:"Movimiento libre sin ruido ni fricción excesiva",herramienta:"Prueba manual",ideal:"",sup:"3"},
-    {id:"a5",item:"Holguras articulaciones",criterio:"Holgura funcional 0,2 – 0,5 mm",herramienta:"Galgas",ideal:"~0,5 mm pintado",sup:"1"},
-    {id:"a6",item:"Soldaduras completas",criterio:"Cordón continuo, sin porosidad ni grietas, buen acabado",herramienta:"Visual",ideal:"",sup:"2"},
-    {id:"a7",item:"Filos, puntas y rebabas",criterio:"No deben existir aristas cortantes",herramienta:"Tacto-Visual",ideal:"",sup:"2"},
-    {id:"a8",item:"Diagonales",criterio:"Diferencia entre diagonales ≤ 2 mm",herramienta:"Flexómetro",ideal:"",sup:"1"},
-    {id:"a9",item:"Dimensiones críticas y escuadras",criterio:"Ángulo 90° ± 0,5° y desviación ≤ 1 mm por metro",herramienta:"Goniómetro / Escuadra / Nivel / Flexómetro",ideal:"",sup:"1"},
-    {id:"a10",item:"Alineación general",criterio:"Desalineación ≤ 1 mm en 1 m",herramienta:"Láser / Nivel / Visual",ideal:"",sup:"1"},
-  ]},
-  {key:"resoldado",label:"Resoldado",icon:"ti-flame",items:[
-    {id:"r1",item:"Cordones repasados",criterio:"Sin porosidad, sin grietas, sin socavado",herramienta:"Visual",ideal:"Cordón continuo y uniforme",sup:"2"},
-    {id:"r2",item:"Puntos de soldadura completos",criterio:"Todos los puntos indicados en plano quedan soldados",herramienta:"Visual / Plano",ideal:"Sin puntos faltantes",sup:"1"},
-    {id:"r3",item:"Deformación por calor",criterio:"Sin alabeo ni deformación visible en piezas resoldadas",herramienta:"Visual / Escuadra",ideal:"Pieza recta, sin pandeo",sup:"2"},
-    {id:"r4",item:"Salpicaduras y rebabas de soldadura",criterio:"Superficie libre de salpicaduras y rebabas de soldadura",herramienta:"Tacto-Visual",ideal:"Superficie limpia",sup:"2"},
-    {id:"r5",item:"Resistencia del punto resoldado",criterio:"Sin fractura ni movimiento al aplicar fuerza moderada",herramienta:"Prueba manual",ideal:"Punto firme",sup:"1"},
-  ]},
-  {key:"pulido",label:"Pulido",icon:"ti-wand",items:[
-    {id:"pu1",item:"Superficie libre de rebabas",criterio:"Sin bordes cortantes ni rebabas metálicas",herramienta:"Tacto-Visual",ideal:"Sin filos",sup:"2"},
-    {id:"pu2",item:"Cordones de soldadura a ras",criterio:"Cordones pulidos a ras, sin sobreespesor visible",herramienta:"Visual / Tacto",ideal:"Superficie a ras",sup:"2"},
-    {id:"pu3",item:"Superficie lisa y uniforme",criterio:"Sin marcas profundas de esmeril ni rayones irregulares",herramienta:"Visual",ideal:"Acabado uniforme",sup:"2"},
-    {id:"pu4",item:"Esquinas y uniones pulidas",criterio:"Transición suave entre piezas unidas, sin escalones",herramienta:"Tacto-Visual",ideal:"Transición suave",sup:"2"},
-    {id:"pu5",item:"Libre de óxido antes de pintar",criterio:"Superficie metálica limpia, sin óxido ni residuos",herramienta:"Visual",ideal:"Metal limpio",sup:"1"},
-  ]},
-  {key:"pintado",label:"Pintado",icon:"ti-droplet",items:[
-    {id:"p1",item:"Superficie limpia antes de pintar",criterio:"Libre de grasa, polvo, humedad y óxido",herramienta:"Visual",ideal:"Sin grasa/óxido visible",sup:"2"},
-    {id:"p2",item:"Cobertura uniforme",criterio:"Sin zonas descubiertas, chorreadas ni acumulación de pintura",herramienta:"Visual",ideal:"Sin zonas descubiertas",sup:"2"},
-    {id:"p3",item:"Espesor adecuado",criterio:"Espesor uniforme según especificación",herramienta:"Medidor de espesor",ideal:"Uniforme",sup:"1"},
-    {id:"p4",item:"Pulido excesivo",criterio:"Muy marcado / irregular",herramienta:"Tacto-Visual",ideal:"Acabado liso",sup:"2"},
-    {id:"p5",item:"Curado correcto",criterio:"Sin descascarado, ampollas, desprendimiento ni pintura blanda",herramienta:"Prueba manual",ideal:"Sin desprendimiento",sup:"2"},
-  ]},
-  {key:"ensamble",label:"Ensamble",icon:"ti-settings",items:[
-    {id:"e1",item:"Ejes, articulaciones, rieles alineados",criterio:"Movimiento libre sin fricción ni roce lateral",herramienta:"Prueba manual",ideal:"Movimiento suave",sup:"3"},
-    {id:"e2",item:"Cable correctamente instalado",criterio:"Sin cruce, torsión, pellizcos ni recorrido incorrecto",herramienta:"Visual",ideal:"Cable en ruta",sup:"3"},
-    {id:"e3",item:"Placas de peso alineadas",criterio:"Deslizamiento suave y estable durante el recorrido",herramienta:"Prueba funcional",ideal:"Deslizamiento suave",sup:"3"},
-    {id:"e4",item:"Componentes ergonómicos firmes",criterio:"Sin holguras, piezas flojas o ajuste deficiente",herramienta:"Llave dinamométrica",ideal:"Componentes firmes",sup:"3"},
-    {id:"e5",item:"Prueba funcional completa",criterio:"Movimiento fluido, estable y sin ruidos anormales",herramienta:"Prueba funcional",ideal:"Funcionamiento fluido",sup:"3"},
-    {id:"e6",item:"Daños durante el proceso",criterio:"Sumidos, rallones",herramienta:"Tacto-Visual",ideal:"Superficies homogéneas",sup:"2"},
-    {id:"e7",item:"Longitud de ejes",criterio:"Según plano ± 0,10 mm",herramienta:"Calibrador digital",ideal:"",sup:"1"},
-    {id:"e8",item:"Cojines",criterio:"Cojines torcidos, superficie irregular, zonas descubiertas",herramienta:"Tacto-Visual",ideal:"Lisos, simétricos, forrado completo",sup:"2"},
-  ]},
-  {key:"empacado",label:"Empacado",icon:"ti-package",items:[
-    {id:"em1",item:"Protección de partes sensibles",criterio:"Espuma, cartón o protección instalada en puntos críticos",herramienta:"Visual",ideal:"Producto protegido",sup:"3"},
-    {id:"em2",item:"Accesorios completos",criterio:"Manual, tornillería y accesorios requeridos incluidos",herramienta:"Checklist",ideal:"Kit completo",sup:"3"},
-    {id:"em3",item:"Etiquetado correcto",criterio:"Modelo, destinatario",herramienta:"Visual",ideal:"Etiqueta legible",sup:"2"},
-    {id:"em4",item:"Caja en buen estado",criterio:"Sin daños estructurales, roturas, humedad o deformaciones",herramienta:"Visual",ideal:"Caja íntegra",sup:"2"},
-  ]},
+// ══════════════ CATÁLOGO Y CHECKLISTS POR GRUPO ══════════════
+const QUALITY_GROUPS={
+  PLACAS:'Musculación con placas',
+  DISCOS:'Musculación con discos',
+  BIO:'Bioparques',
+  CIRCUITOS:'Circuitos',
+  PARQUES:'Parques infantiles',
+  SERVICIOS:'Servicios'
+};
+
+// Catálogo construido a partir del ZIP de costeos/BOM entregado para Calidad.
+// Se mantiene local como respaldo y puede ser sobreescrito/actualizado desde
+// la tabla calidad_productos de Supabase.
+const PRODUCT_CATALOG_FALLBACK={"XM100":{"code":"XM100","name":"Abductor Aductor","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM103":{"code":"XM103","name":"Banco abdominal","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM104":{"code":"XM104","name":"Banco hombro peso libre","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"XM105":{"code":"XM105","name":"Banco Multifunción","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM106":{"code":"XM106","name":"Banco olímpico declinado","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM107":{"code":"XM107","name":"Banco olímpico inclinado","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM108":{"code":"XM108","name":"Banco olímpico plano","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM109":{"code":"XM109","name":"Banco plano peso libre","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"XM110":{"code":"XM110","name":"Banco Predicador con placas","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM111":{"code":"XM111","name":"Banco Predicador Libre","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM112":{"code":"XM112","name":"Constructor glúteo","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM113":{"code":"XM113","name":"Crossover clásica","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM114":{"code":"XM114","name":"Crossover Compacto, en V.","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM115":{"code":"XM115","name":"Dominadas y fondos.","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM116":{"code":"XM116","name":"Elevador de pelvis","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM119":{"code":"XM119","name":"Extensor","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM120":{"code":"XM120","name":"Flexo Extensor","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":false,"laser":false}},"XM121":{"code":"XM121","name":"Flexor","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM122":{"code":"XM122","name":"Flexor de Pie","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM125":{"code":"XM125","name":"Hammer de Espalda","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM126":{"code":"XM126","name":"Hammer de Hombro","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM127":{"code":"XM127","name":"Hammer pecho declinado","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM128":{"code":"XM128","name":"Hammer pecho inclinado","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM129":{"code":"XM129","name":"Hammer pecho plano","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":false,"laser":false}},"XM130":{"code":"XM130","name":"Hammer remo","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM131":{"code":"XM131","name":"Hammer tibia","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM132":{"code":"XM132","name":"Hiperextensor Horizontal","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"XM133":{"code":"XM133","name":"Hiperextensor Inclinado","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM138":{"code":"XM138","name":"Multifuerza 4 estaciones","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM139":{"code":"XM139","name":"Multifuerza 8 estaciones","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM140":{"code":"XM140","name":"Pantorrillero","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM143":{"code":"XM143","name":"Patada gluteo peso libre","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM145":{"code":"XM145","name":"Peck Deck Doble función","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM148":{"code":"XM148","name":"Polea Alta","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM151":{"code":"XM151","name":"Polea Baja 2.0","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM153":{"code":"XM153","name":"Portadiscos","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM156":{"code":"XM156","name":"Prensa 90","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM161":{"code":"XM161","name":"Rack Sentadilla","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM162":{"code":"XM162","name":"Remo en punta","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM165":{"code":"XM165","name":"Sentadilla Búlgara","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM166":{"code":"XM166","name":"Sentadilla combinada","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM169":{"code":"XM169","name":"Sentadilla Sissy","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"XM170":{"code":"XM170","name":"Sentadilla Smith 2.0 (clasica)","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":true,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM172":{"code":"XM172","name":"Torre auxiliar","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM176":{"code":"XM176","name":"Sentadilla con pantorrillero","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM178":{"code":"XM178","name":"Hammer isolateral vuelos","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM181":{"code":"XM181","name":"Jaula de Potencia con poleas","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":true,"cushion":false,"bearing":true,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM184":{"code":"XM184","name":"prensa atlética 3.0 lineal","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM185":{"code":"XM185","name":"Sentadilla hack up 3.0","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM186":{"code":"XM186","name":"Dominadas y fondos asistido","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":true,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM187":{"code":"XM187","name":"Sentadilla Smith con poleas 3.0","group":"Musculación con placas","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":true,"cable":true,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM188":{"code":"XM188","name":"Fondos Triceps Peso libre","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM906":{"code":"XM906","name":"Rack para mancuernas 3 niveles","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM908":{"code":"XM908","name":"Rack para mancuernas 2 niveles","group":"Musculación con discos","source":"BASE COSTEOS MAQUINAS MUSC_BIO","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB400":{"code":"XB400","name":"Banco Abdominal Inclinado","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB414":{"code":"XB414","name":"Barras Paralelas","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB416":{"code":"XB416","name":"Bicicleta","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB420":{"code":"XB420","name":"Dominadas y Fondos Doble","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB422":{"code":"XB422","name":"Eliptica","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB425":{"code":"XB425","name":"Esqui","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB431":{"code":"XB431","name":"Pony","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB432":{"code":"XB432","name":"Prensa de pierna doble","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB434":{"code":"XB434","name":"Press de espalda doble","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB437":{"code":"XB437","name":"Press de pecho con discos","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB438":{"code":"XB438","name":"Press de pecho Doble","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB442":{"code":"XB442","name":"Sentadilla con discos","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB440":{"code":"XB440","name":"Press de pierna con discos","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB444":{"code":"XB444","name":"Twister","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB445":{"code":"XB445","name":"Vai Ven","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB447":{"code":"XB447","name":"Volante de Mano","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB449":{"code":"XB449","name":"Halon de espalda con discos","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB402":{"code":"XB402","name":"Banco Abdominal doble","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":false,"laser":false}},"XB423":{"code":"XB423","name":"Escalador doble","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":false,"laser":false}},"XB426":{"code":"XB426","name":"Extensor BIO","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":false,"laser":false}},"XB443":{"code":"XB443","name":"Timón","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":false,"laser":false}},"BAL-01":{"code":"BAL-01","name":"Balancin mixto movilidad reducida","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"XB451":{"code":"XB451","name":"Columpio mixto movilidad reducida","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"XB452":{"code":"XB452","name":"Carrusel Mixto movilidad reducida","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB460":{"code":"XB460","name":"Sube y baja mixto movilidad reducida","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"VOL-01":{"code":"VOL-01","name":"Volante de mano mixto movilidad reducida","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"HIP-1":{"code":"HIP-1","name":"HIPEREXTENSOR HORIZONTAL BIO","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"BAN-1":{"code":"BAN-1","name":"BANCO PLANO P LIBRE BIO","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"XB463":{"code":"XB463","name":"Banco Hombro bio","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"XB462":{"code":"XB462","name":"Banco inclinado Bio","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"ARE-1":{"code":"ARE-1","name":"AREA 90  BIO","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"RAC-1":{"code":"RAC-1","name":"RACK SENTADILLA BIO","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"BAN-2":{"code":"BAN-2","name":"BANCO MULTIFUNCION 2","group":"Bioparques","source":"Costeo Bioparques","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"XB456":{"code":"XB456","name":"CIRCUITO DE CALISTENIA #2","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"CIRC-1":{"code":"CIRC-1","name":"CIRCUITO DE CALISTENIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XB455":{"code":"XB455","name":"CIRCUITO DE CALISTENIA #1","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"CIRC-2":{"code":"CIRC-2","name":"CIRCUITO DE CALISTENIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"CIRC-3":{"code":"CIRC-3","name":"CIRCUITO DE CALISTENIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"CIRC-4":{"code":"CIRC-4","name":"CIRCUITO DE CALISTENIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"CIRC-5":{"code":"CIRC-5","name":"CIRCUITO DE CALISTENIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"CIRC-6":{"code":"CIRC-6","name":"CIRCUITO DE CALISTENIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"CIRC-7":{"code":"CIRC-7","name":"CIRCUITO DE CALISTENIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"CIRC-8":{"code":"CIRC-8","name":"CIRCUITO DE CALISTENIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"CIRC-9":{"code":"CIRC-9","name":"CIRCUITO DE CALISTENIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"JAU-1":{"code":"JAU-1","name":"JAULA DE POTENCIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"JAU-2":{"code":"JAU-2","name":"JAULA DE POTENCIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"JAU-3":{"code":"JAU-3","name":"JAULA DE POTENCIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"JAU-4":{"code":"JAU-4","name":"JAULA DE POTENCIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"JAU-5":{"code":"JAU-5","name":"JAULA DE POTENCIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"JAU-6":{"code":"JAU-6","name":"JAULA DE POTENCIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"ESC-1":{"code":"ESC-1","name":"ESCALERA SUECA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"JAU-7":{"code":"JAU-7","name":"JAULA DE POTENCIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"JAU-8":{"code":"JAU-8","name":"JAULA DE POTENCIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"JAU-9":{"code":"JAU-9","name":"JAULA DE POTENCIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"JAU-10":{"code":"JAU-10","name":"JAULA DE POTENCIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":false,"laser":false}},"JAU-11":{"code":"JAU-11","name":"JAULA PARA CROSFIT","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"BAC-1":{"code":"BAC-1","name":"BANCA ABDOMINAL CALISTENIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"FON-1":{"code":"FON-1","name":"FONDOS JAULA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"PIV-1":{"code":"PIV-1","name":"PIVOTE JAULA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"BAR-1":{"code":"BAR-1","name":"BARRAS GIMNASIA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"BAR-2":{"code":"BAR-2","name":"BARRAS PARALELAS","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"BAR-3":{"code":"BAR-3","name":"BARRA DOMINADAS CLASICA","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"BAR-4":{"code":"BAR-4","name":"BARRA MONKEY","group":"Circuitos","source":"Costeo Circuitos_Jaulas","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":true,"laser":false}},"XM911":{"code":"XM911","name":"Rack para barras olimpicas","group":"Musculación con discos","source":"BOM MUSCULACION","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM193":{"code":"XM193","name":"Hammer isolateral vuelos con placas","group":"Musculación con placas","source":"BOM MUSCULACION","features":{"plates":true,"cable":true,"cushion":true,"bearing":true,"shaft":true,"pulley":false,"portapeso":false,"tube":true,"laser":true}},"XM189":{"code":"XM189","name":"smith con polea sin placas","group":"Musculación con discos","source":"BOM MUSCULACION","features":{"plates":false,"cable":false,"cushion":false,"bearing":false,"shaft":false,"pulley":false,"portapeso":false,"tube":false,"laser":false}}};
+let PRODUCT_CATALOG={...PRODUCT_CATALOG_FALLBACK};
+let CURRENT_PROFILE=null;
+
+function normProductText(v){
+  return String(v||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+}
+function inferGroupByCode(code){
+  const c=String(code||'').trim().toUpperCase();
+  if(/^XS/.test(c)) return QUALITY_GROUPS.SERVICIOS;
+  if(/^XJ/.test(c)) return QUALITY_GROUPS.PARQUES;
+  if(/^XM\d+/.test(c)) return QUALITY_GROUPS.DISCOS;
+  if(/^XB\d+/.test(c)) return QUALITY_GROUPS.BIO;
+  if(/^(CIRC|JAU|BAR|BAC|FON|PIV|ESC)-?/.test(c)) return QUALITY_GROUPS.CIRCUITOS;
+  return '';
+}
+function resolveProductProfile(m){
+  const code=String(m?.code||'').trim().toUpperCase();
+  const name=normProductText(m?.name);
+  // En el ZIP hay dos archivos XM121; la base maestra identifica Flexor de Pie como XM122.
+  if(code==='XM121' && name.includes('pie')){
+    const p=PRODUCT_CATALOG.XM122;
+    if(p) return {...p,code:code,source:(p.source||'')+' · alias BOM XM121'};
+  }
+  if(PRODUCT_CATALOG[code]) return PRODUCT_CATALOG[code];
+  const byName=Object.values(PRODUCT_CATALOG).find(p=>normProductText(p.name)===name);
+  if(byName) return byName;
+  const inferred=inferGroupByCode(code);
+  return {code:code,name:m?.name||'Producto sin catálogo',group:inferred||'Sin clasificar',source:'inferido por código',features:{}};
+}
+
+const COMMON_STAGE_ITEMS={
+  armado:[
+    {id:'a6',item:'Soldaduras completas',criterio:'Cordón continuo, sin porosidad ni grietas, buen acabado',herramienta:'Visual',ideal:'',sup:'2'},
+    {id:'a7',item:'Filos, puntas y rebabas',criterio:'No deben existir aristas cortantes',herramienta:'Tacto-Visual',ideal:'',sup:'2'},
+    {id:'a8',item:'Diagonales',criterio:'Diferencia entre diagonales ≤ 2 mm',herramienta:'Flexómetro',ideal:'',sup:'1'},
+    {id:'a9',item:'Dimensiones críticas y escuadras',criterio:'Según plano vigente; ángulos y dimensiones dentro de tolerancia especificada',herramienta:'Goniómetro / Escuadra / Nivel / Flexómetro',ideal:'Según plano',sup:'1'},
+    {id:'a10',item:'Alineación general',criterio:'Desalineación dentro de la tolerancia definida en plano',herramienta:'Láser / Nivel / Visual',ideal:'Según plano',sup:'1'}
+  ],
+  resoldado:[
+    {id:'r1',item:'Cordones repasados',criterio:'Sin porosidad, sin grietas, sin socavado',herramienta:'Visual',ideal:'Cordón continuo y uniforme',sup:'2'},
+    {id:'r2',item:'Puntos de soldadura completos',criterio:'Todos los puntos indicados en plano quedan soldados',herramienta:'Visual / Plano',ideal:'Sin puntos faltantes',sup:'1'},
+    {id:'r3',item:'Deformación por calor',criterio:'Sin alabeo ni deformación visible en piezas resoldadas',herramienta:'Visual / Escuadra',ideal:'Pieza recta, sin pandeo',sup:'2'},
+    {id:'r4',item:'Salpicaduras y rebabas de soldadura',criterio:'Superficie libre de salpicaduras y rebabas de soldadura',herramienta:'Tacto-Visual',ideal:'Superficie limpia',sup:'2'},
+    {id:'r5',item:'Resistencia del punto resoldado',criterio:'Sin fractura ni movimiento al aplicar fuerza moderada',herramienta:'Prueba manual',ideal:'Punto firme',sup:'1'}
+  ],
+  pulido:[
+    {id:'pu1',item:'Superficie libre de rebabas',criterio:'Sin bordes cortantes ni rebabas metálicas',herramienta:'Tacto-Visual',ideal:'Sin filos',sup:'2'},
+    {id:'pu2',item:'Cordones de soldadura a ras',criterio:'Cordones pulidos a ras, sin sobreespesor visible',herramienta:'Visual / Tacto',ideal:'Superficie a ras',sup:'2'},
+    {id:'pu3',item:'Superficie lisa y uniforme',criterio:'Sin marcas profundas de esmeril ni rayones irregulares',herramienta:'Visual',ideal:'Acabado uniforme',sup:'2'},
+    {id:'pu4',item:'Esquinas y uniones pulidas',criterio:'Transición suave entre piezas unidas, sin escalones',herramienta:'Tacto-Visual',ideal:'Transición suave',sup:'2'},
+    {id:'pu5',item:'Libre de óxido antes de pintar',criterio:'Superficie metálica limpia, sin óxido ni residuos',herramienta:'Visual',ideal:'Metal limpio',sup:'1'}
+  ],
+  pintado:[
+    {id:'p1',item:'Superficie limpia antes de pintar',criterio:'Libre de grasa, polvo, humedad y óxido',herramienta:'Visual',ideal:'Sin grasa/óxido visible',sup:'2'},
+    {id:'p2',item:'Cobertura uniforme',criterio:'Sin zonas descubiertas, chorreadas ni acumulación de pintura',herramienta:'Visual',ideal:'Sin zonas descubiertas',sup:'2'},
+    {id:'p3',item:'Espesor adecuado',criterio:'Espesor uniforme según especificación vigente',herramienta:'Medidor de espesor',ideal:'Según especificación',sup:'1'},
+    {id:'p4',item:'Acabado superficial',criterio:'Sin marcas profundas, defectos visibles o irregularidades de acabado',herramienta:'Tacto-Visual',ideal:'Acabado uniforme',sup:'2'},
+    {id:'p5',item:'Curado correcto',criterio:'Sin descascarado, ampollas, desprendimiento ni pintura blanda',herramienta:'Prueba manual',ideal:'Sin desprendimiento',sup:'2'}
+  ],
+  ensamble:[
+    {id:'e1',item:'Ejes, articulaciones, rieles alineados',criterio:'Movimiento libre sin fricción ni roce lateral',herramienta:'Prueba manual',ideal:'Movimiento suave',sup:'3'},
+    {id:'e4',item:'Componentes ergonómicos firmes',criterio:'Sin holguras, piezas flojas o ajuste deficiente',herramienta:'Llave dinamométrica',ideal:'Componentes firmes',sup:'3'},
+    {id:'e5',item:'Prueba funcional completa',criterio:'Movimiento fluido, estable y sin ruidos anormales',herramienta:'Prueba funcional',ideal:'Funcionamiento fluido',sup:'3'},
+    {id:'e6',item:'Daños durante el proceso',criterio:'Sin hundidos, rayones ni daños visibles',herramienta:'Tacto-Visual',ideal:'Superficies homogéneas',sup:'2'},
+    {id:'e7',item:'Longitud de ejes',criterio:'Según plano y tolerancia vigente',herramienta:'Calibrador digital',ideal:'Según plano',sup:'1'},
+    {id:'e8',item:'Cojines',criterio:'Cojines rectos, superficie uniforme y forrado completo cuando aplique',herramienta:'Tacto-Visual',ideal:'Lisos, simétricos, forrado completo',sup:'2'}
+  ],
+  empacado:[
+    {id:'em1',item:'Protección de partes sensibles',criterio:'Espuma, cartón o protección instalada en puntos críticos',herramienta:'Visual',ideal:'Producto protegido',sup:'3'},
+    {id:'em2',item:'Accesorios completos',criterio:'Manual, tornillería y accesorios requeridos incluidos',herramienta:'Checklist',ideal:'Kit completo',sup:'3'},
+    {id:'em3',item:'Etiquetado correcto',criterio:'Código/modelo, destinatario y demás identificación requerida',herramienta:'Visual',ideal:'Etiqueta legible',sup:'2'},
+    {id:'em4',item:'Caja o protección exterior en buen estado',criterio:'Sin daños estructurales, roturas, humedad o deformaciones',herramienta:'Visual',ideal:'Protección íntegra',sup:'2'}
+  ]
+};
+
+const GROUP_STAGE_ITEMS={
+  [QUALITY_GROUPS.PLACAS]:{
+    armado:[
+      {id:'gp-a1',item:'Estructura y soportes del sistema de placas',criterio:'Soportes firmes, sin deformación y conforme al plano/BOM',herramienta:'Visual / Escuadra / BOM',ideal:'Según plano/BOM',sup:'2'},
+      {id:'gp-a2',item:'Guías y flauta del paquete de placas',criterio:'Guías alineadas y sin interferencias durante el recorrido',herramienta:'Visual / Prueba manual',ideal:'Desplazamiento libre',sup:'2'},
+      {id:'gp-a3',item:'Puntos de fijación del mecanismo',criterio:'Tornillería y uniones completas, sin holguras',herramienta:'Visual / Llave',ideal:'Fijación firme',sup:'2'}
+    ],
+    ensamble:[
+      {id:'gp-e1',item:'Paquete de placas y placa guía',criterio:'Cantidad y montaje conforme a BOM/plano; desplazamiento sin trabas',herramienta:'Visual / Prueba funcional / BOM',ideal:'Según BOM',sup:'3'},
+      {id:'gp-e2',item:'Pin selector de placas',criterio:'Inserta y retira correctamente y queda retenido durante el uso',herramienta:'Prueba manual',ideal:'Retención firme',sup:'3'},
+      {id:'gp-e3',item:'Guayas y terminales',criterio:'Ruta correcta, sin torsión, aplastamiento, hilos rotos ni interferencias',herramienta:'Visual / Prueba funcional',ideal:'Ruta libre',sup:'3'},
+      {id:'gp-e4',item:'Sistema de poleas y recorridos',criterio:'Poleas y recorridos trabajan sin roce, trabas ni interferencias anormales',herramienta:'Prueba funcional',ideal:'Giro y recorrido suaves',sup:'3'}
+    ]
+  },
+  [QUALITY_GROUPS.DISCOS]:{
+    armado:[
+      {id:'gd-a1',item:'Portapesos y soportes de carga',criterio:'Firmes, alineados y soldados según plano/BOM',herramienta:'Visual / Escuadra / BOM',ideal:'Según plano/BOM',sup:'3'},
+      {id:'gd-a2',item:'Estructura de carga',criterio:'Sin deformaciones y con uniones completas',herramienta:'Visual / Escuadra',ideal:'Sin deformación',sup:'2'},
+      {id:'gd-a3',item:'Puntos de apoyo y bases',criterio:'Apoyos completos, estables y correctamente ubicados',herramienta:'Nivel / Visual',ideal:'Estabilidad total',sup:'2'}
+    ],
+    ensamble:[
+      {id:'gd-e1',item:'Retención de discos',criterio:'Elementos de retención instalados y firmes donde corresponda',herramienta:'Visual / Prueba manual',ideal:'Retención segura',sup:'3'},
+      {id:'gd-e2',item:'Ejes, bujes y rodamientos',criterio:'Montaje correcto, sin juego anormal ni ruido',herramienta:'Prueba manual / Visual',ideal:'Movimiento suave',sup:'3'},
+      {id:'gd-e3',item:'Movimiento bajo carga',criterio:'Recorrido estable y sin interferencias con los soportes o discos',herramienta:'Prueba funcional',ideal:'Recorrido estable',sup:'3'}
+    ]
+  },
+  [QUALITY_GROUPS.BIO]:{
+    armado:[
+      {id:'gb-a1',item:'Bases y puntos de anclaje',criterio:'Ubicación, soldadura y geometría conforme al plano',herramienta:'Visual / Flexómetro / Escuadra',ideal:'Según plano',sup:'3'},
+      {id:'gb-a2',item:'Geometría de elementos de uso exterior',criterio:'Sin deformaciones, torsiones ni desalineaciones visibles',herramienta:'Nivel / Escuadra / Visual',ideal:'Geometría uniforme',sup:'2'},
+      {id:'gb-a3',item:'Elementos móviles',criterio:'Articulaciones y piezas móviles libres de interferencias',herramienta:'Prueba manual',ideal:'Movimiento suave',sup:'3'}
+    ],
+    ensamble:[
+      {id:'gb-e1',item:'Anclajes y fijaciones',criterio:'Elementos de fijación completos, firmes y correctamente ubicados',herramienta:'Visual / Llave',ideal:'Fijación segura',sup:'3'},
+      {id:'gb-e2',item:'Agarres, apoyos y superficies de contacto',criterio:'Firmes, sin filos, sin holguras y sin daños',herramienta:'Tacto-Visual',ideal:'Firmes y seguros',sup:'3'},
+      {id:'gb-e3',item:'Prueba funcional del equipo',criterio:'Movimiento completo sin atascos, golpes o ruidos anormales',herramienta:'Prueba funcional',ideal:'Funcionamiento fluido',sup:'3'}
+    ],
+    pintado:[
+      {id:'gb-p1',item:'Protección de superficies para uso exterior',criterio:'Cobertura continua y uniforme en zonas expuestas',herramienta:'Visual / Medidor de espesor',ideal:'Según especificación',sup:'3'}
+    ]
+  },
+  [QUALITY_GROUPS.CIRCUITOS]:{
+    armado:[
+      {id:'gc-a1',item:'Estructura principal del circuito',criterio:'Geometría, verticalidad y alineación conforme al plano',herramienta:'Nivel / Escuadra / Flexómetro',ideal:'Según plano',sup:'3'},
+      {id:'gc-a2',item:'Uniones estructurales',criterio:'Todas las uniones previstas están completas y firmes',herramienta:'Visual / Plano',ideal:'Sin uniones faltantes',sup:'3'},
+      {id:'gc-a3',item:'Puntos de anclaje',criterio:'Posición y dimensiones conforme al diseño del circuito',herramienta:'Flexómetro / Plano',ideal:'Según plano',sup:'3'}
+    ],
+    ensamble:[
+      {id:'gc-e1',item:'Barras y elementos de ejercicio',criterio:'Firmes, alineados y sin movimiento no previsto',herramienta:'Prueba manual / Nivel',ideal:'Firmes y alineados',sup:'3'},
+      {id:'gc-e2',item:'Fijaciones y tornillería',criterio:'Elementos completos y asegurados según diseño',herramienta:'Visual / Llave',ideal:'Fijación segura',sup:'3'},
+      {id:'gc-e3',item:'Prueba funcional y estabilidad',criterio:'Sin balanceo, desplazamiento o interferencias no previstas',herramienta:'Prueba funcional',ideal:'Estable',sup:'3'}
+    ],
+    pintado:[
+      {id:'gc-p1',item:'Protección para uso exterior',criterio:'Cobertura continua en postes, barras, uniones y zonas expuestas',herramienta:'Visual / Medidor de espesor',ideal:'Según especificación',sup:'3'}
+    ],
+    empacado:[
+      {id:'gc-em1',item:'Protección de piezas y tornillería del circuito',criterio:'Barras, postes, piezas de unión y tornillería quedan protegidos para transporte',herramienta:'Checklist / Visual',ideal:'Componentes protegidos',sup:'3'}
+    ]
+  }
+,  [QUALITY_GROUPS.PARQUES]:{
+    armado:[
+      {id:'gj-a1',item:'Estructura del juego infantil',criterio:'Postes, plataformas, escaleras, pasamanos y demás elementos estructurales completos y sin deformaciones',herramienta:'Visual / Escuadra / Nivel',ideal:'Geometría conforme a plano',sup:'3'},
+      {id:'gj-a2',item:'Soldaduras y uniones estructurales',criterio:'Uniones completas, sin grietas, porosidad, bordes cortantes ni elementos sueltos',herramienta:'Visual / Tacto',ideal:'Uniones firmes y seguras',sup:'3'},
+      {id:'gj-a3',item:'Anclajes y estabilidad',criterio:'Bases y puntos de anclaje completos, firmes y correctamente ubicados',herramienta:'Visual / Nivel / Flexómetro',ideal:'Estabilidad total',sup:'3'}
+    ],
+    ensamble:[
+      {id:'gj-e1',item:'Plataformas, escaleras y accesos',criterio:'Elementos completos, firmes, alineados y sin bordes peligrosos',herramienta:'Visual / Tacto',ideal:'Accesos seguros',sup:'3'},
+      {id:'gj-e2',item:'Barandas, pasamanos y elementos de protección',criterio:'Firmes, continuos y correctamente fijados',herramienta:'Visual / Prueba manual',ideal:'Protección firme',sup:'3'},
+      {id:'gj-e3',item:'Elementos de juego',criterio:'Elementos de juego instalados según el diseño aplicable y con movimiento/uso seguro cuando corresponda',herramienta:'Visual / Prueba funcional',ideal:'Funcionamiento seguro',sup:'3'}
+    ],
+    pintado:[
+      {id:'gj-p1',item:'Protección superficial para exterior',criterio:'Acabado uniforme y sin desprendimientos, ampollas, corrosión visible o zonas sin protección',herramienta:'Visual / Tacto',ideal:'Superficie protegida',sup:'3'}
+    ],
+    empacado:[
+      {id:'gj-em1',item:'Protección de elementos del juego',criterio:'Plataformas, barras, piezas de contacto y elementos sensibles protegidos durante transporte',herramienta:'Visual',ideal:'Elementos protegidos',sup:'2'}
+    ]
+  },
+  [QUALITY_GROUPS.SERVICIOS]:{
+    armado:[
+      {id:'xs-a1',item:'Diagnóstico y condición inicial',criterio:'Falla, daño o condición reportada identificada antes de intervenir',herramienta:'Inspección visual / Registro',ideal:'Diagnóstico documentado',sup:'3'},
+      {id:'xs-a2',item:'Estado estructural del equipo',criterio:'Sin fracturas, deformaciones o uniones comprometidas que impidan una intervención segura',herramienta:'Visual / Tacto',ideal:'Estructura segura',sup:'3'}
+    ],
+    resoldado:[
+      {id:'xs-r1',item:'Reparación ejecutada según diagnóstico',criterio:'La zona intervenida queda completamente reparada y sin defectos visibles de soldadura',herramienta:'Visual / Tacto',ideal:'Reparación completa',sup:'3'}
+    ],
+    pulido:[
+      {id:'xs-pu1',item:'Acabado de zona intervenida',criterio:'Sin filos, rebabas ni salpicaduras en la zona reparada',herramienta:'Tacto-Visual',ideal:'Superficie segura',sup:'2'}
+    ],
+    pintado:[
+      {id:'xs-p1',item:'Acabado posterior al mantenimiento',criterio:'Zona intervenida protegida y con acabado uniforme cuando la reparación requiera pintura',herramienta:'Visual',ideal:'Acabado uniforme',sup:'2'}
+    ],
+    ensamble:[
+      {id:'xs-e1',item:'Montaje posterior al mantenimiento',criterio:'Componentes reinstalados correctamente, firmes y sin piezas faltantes',herramienta:'Visual / Llave',ideal:'Montaje completo',sup:'3'},
+      {id:'xs-e2',item:'Prueba funcional posterior',criterio:'El equipo opera correctamente y la falla reportada queda solucionada',herramienta:'Prueba funcional',ideal:'Funcionamiento correcto',sup:'3'},
+      {id:'xs-e3',item:'Seguridad para entrega',criterio:'Sin elementos sueltos, filos, ruidos anormales o condiciones inseguras',herramienta:'Visual / Prueba funcional',ideal:'Equipo seguro',sup:'3'}
+    ],
+    empacado:[
+      {id:'xs-em1',item:'Entrega y documentación del servicio',criterio:'Equipo entregado en condiciones seguras y servicio registrado',herramienta:'Checklist / Registro',ideal:'Servicio documentado',sup:'2'}
+    ]
+  },
+};
+
+// Controles específicos del producto/código. Se activan solo cuando el nombre,
+// código o atributos del BOM justifican el control; no se inventan tolerancias.
+const PRODUCT_STAGE_RULES=[
+  {match:(p,n)=>/percutor|percutores/.test(n),items:{armado:[
+    {id:'pp-perc-a1',item:'Bujes y cajitas de percutores',criterio:'Referencia, cantidad, ubicación y fijación conforme a BOM/plano',herramienta:'Visual / BOM / Plano',ideal:'Según BOM/plano',sup:'3'},
+    {id:'pp-perc-a2',item:'Percutores',criterio:'Recorrido, posición y fijación correctos; sin interferencias',herramienta:'Prueba manual / Visual',ideal:'Movimiento libre',sup:'3'}
+  ],ensamble:[
+    {id:'pp-perc-e1',item:'Movimiento de percutores y articulaciones',criterio:'Recorrido completo, sin trabas, golpes ni juego anormal',herramienta:'Prueba funcional',ideal:'Movimiento fluido',sup:'3'},
+    {id:'pp-perc-e2',item:'Holguras de articulaciones',criterio:'Sin holgura perceptible fuera de la condición prevista por diseño',herramienta:'Prueba manual',ideal:'Sin juego anormal',sup:'3'}
+  ]}},
+  {match:(p,n)=>/crossover/.test(n),items:{ensamble:[
+    {id:'pp-cross-e1',item:'Recorrido y regulación del crossover',criterio:'Regulaciones, carros y recorridos funcionan en todo el rango previsto',herramienta:'Prueba funcional',ideal:'Recorrido completo',sup:'3'},
+    {id:'pp-cross-e2',item:'Guayas del crossover',criterio:'Ruta, terminales y tensión conforme al diseño, sin roce anormal',herramienta:'Visual / Prueba funcional',ideal:'Ruta y tensión correctas',sup:'3'}
+  ]}},
+  {match:(p,n)=>/smith/.test(n),items:{armado:[
+    {id:'pp-smith-a1',item:'Guías de barra Smith',criterio:'Guías paralelas, firmes y sin obstrucciones',herramienta:'Nivel / Escuadra / Prueba manual',ideal:'Guías alineadas',sup:'3'}
+  ],ensamble:[
+    {id:'pp-smith-e1',item:'Recorrido y seguros de barra Smith',criterio:'Recorrido suave y seguros operativos en las posiciones previstas',herramienta:'Prueba funcional',ideal:'Operación segura',sup:'3'}
+  ]}},
+  {match:(p,n)=>/polea/.test(n),items:{ensamble:[
+    {id:'pp-polea-e1',item:'Regulación y recorrido de polea',criterio:'Regulación firme y recorrido completo sin interferencias',herramienta:'Prueba funcional',ideal:'Recorrido libre',sup:'3'}
+  ]}},
+  {match:(p,n)=>/banco/.test(n),items:{ensamble:[
+    {id:'pp-banco-e1',item:'Banco: posición y soporte del usuario',criterio:'Superficie de apoyo, respaldo y regulación firmes y simétricos cuando aplique',herramienta:'Visual / Prueba manual',ideal:'Soporte firme',sup:'3'}
+  ]}},
+  {match:(p,n)=>/hiperextensor/.test(n),items:{ensamble:[
+    {id:'pp-hiper-e1',item:'Apoyos del hiperextensor',criterio:'Apoyos de pelvis/piernas y puntos de contacto firmes y correctamente ubicados',herramienta:'Visual / Prueba manual',ideal:'Apoyos firmes',sup:'3'}
+  ]}},
+  {match:(p,n)=>/portadiscos/.test(n),items:{ensamble:[
+    {id:'pp-portadiscos-e1',item:'Soportes para discos',criterio:'Pines/soportes firmes, alineados y sin bordes peligrosos',herramienta:'Visual / Prueba manual',ideal:'Soportes firmes',sup:'3'}
+  ]}},
+  {match:(p,n)=>/barra monkey/.test(n),items:{ensamble:[
+    {id:'pp-monkey-e1',item:'Secuencia y separación de barras Monkey',criterio:'Barras firmes, alineadas y sin variaciones no previstas',herramienta:'Flexómetro / Visual',ideal:'Según plano',sup:'3'}
+  ]}},
+  {match:(p,n)=>/barras paralelas|barra dominadas|barras gimnasia|fondos jaula/.test(n),items:{ensamble:[
+    {id:'pp-bar-e1',item:'Barras de ejercicio y puntos de agarre',criterio:'Diámetro, posición, firmeza y acabado conforme al diseño; sin filos',herramienta:'Visual / Tacto / Plano',ideal:'Según diseño',sup:'3'}
+  ]}},
+  {match:(p,n)=>/escalera sueca/.test(n),items:{ensamble:[
+    {id:'pp-esc-e1',item:'Peldaños y separación de escalera',criterio:'Peldaños firmes, alineados y con separación conforme al diseño',herramienta:'Visual / Flexómetro',ideal:'Según plano',sup:'3'}
+  ]}},
+  {match:(p,n)=>/circuito de calistenia|jaula de potencia|jaula para crosfit/.test(n),items:{armado:[
+    {id:'pp-circ-a1',item:'Configuración del conjunto',criterio:'Cantidad y disposición de estaciones, postes y elementos conforme a plano/BOM',herramienta:'Plano / BOM / Visual',ideal:'Según plano/BOM',sup:'3'}
+  ],ensamble:[
+    {id:'pp-circ-e1',item:'Estaciones y puntos de ejercicio',criterio:'Cada estación queda firme, accesible y sin interferencias con las demás',herramienta:'Visual / Prueba funcional',ideal:'Estaciones seguras',sup:'3'}
+  ]}},
+  {match:(p,n)=>p?.group===QUALITY_GROUPS.BIO && /banco/.test(n),items:{ensamble:[
+    {id:'pp-bio-banco-e1',item:'Superficie de apoyo del bioparque',criterio:'Apoyo firme, sin filos y sin daños que comprometan el uso',herramienta:'Tacto-Visual',ideal:'Superficie segura',sup:'3'}
+  ]}}
 ];
+
+function productSpecificItems(profile){
+  const n=normProductText(profile?.name);
+  const out={};
+  PRODUCT_STAGE_RULES.forEach(rule=>{
+    if(!rule.match(profile,n)) return;
+    Object.entries(rule.items||{}).forEach(([stage,items])=>{
+      out[stage]=(out[stage]||[]).concat(items.map(x=>({...x})));
+    });
+  });
+  return out;
+}
+
+function featureItems(profile){
+  const f=profile?.features||{};
+  const items=[];
+  if(f.cushion) items.push({id:'pf-cushion',item:'Cojines y tapicería según BOM',criterio:'Cantidad, posición, simetría y acabado conforme al producto',herramienta:'Tacto-Visual / BOM',ideal:'Según BOM',sup:'2'});
+  if(f.bearing) items.push({id:'pf-bearing',item:'Rodamientos',criterio:'Referencia/cantidad conforme a BOM y giro sin ruido ni juego anormal',herramienta:'Visual / Prueba manual / BOM',ideal:'Según BOM',sup:'2'});
+  if(f.shaft) items.push({id:'pf-shaft',item:'Ejes',criterio:'Referencia, longitud y montaje conforme a plano/BOM',herramienta:'Calibrador / Visual / BOM',ideal:'Según plano/BOM',sup:'2'});
+  if(f.cable) items.push({id:'pf-cable',item:'Guayas/cables del producto',criterio:'Referencia, cantidad, ruta y terminaciones conforme a BOM',herramienta:'Visual / BOM / Prueba funcional',ideal:'Según BOM',sup:'3'});
+  if(f.portapeso) items.push({id:'pf-weight',item:'Portapesos del producto',criterio:'Cantidad, posición y fijación conforme a BOM/plano',herramienta:'Visual / BOM',ideal:'Según BOM',sup:'3'});
+  return items;
+}
+function buildStagesForProfile(profile){
+  const group=profile?.group||'Sin clasificar';
+  const groupDef=GROUP_STAGE_ITEMS[group]||{};
+  const productDef=productSpecificItems(profile);
+  const defs=[
+    ['armado','Armado','ti-tool'],['resoldado','Resoldado','ti-flame'],['pulido','Pulido','ti-wand'],
+    ['pintado','Pintado','ti-droplet'],['ensamble','Ensamble','ti-settings'],['empacado','Empacado','ti-package']
+  ];
+  return defs.map(([key,label,icon])=>{
+    let items=(COMMON_STAGE_ITEMS[key]||[]).map(x=>({...x}));
+    items.push(...(groupDef[key]||[]).map(x=>({...x})));
+    items.push(...(productDef[key]||[]).map(x=>({...x})));
+    if(key==='ensamble') items.push(...featureItems(profile));
+    // Evita duplicados si un control común/grupal y uno específico coinciden.
+    const seen=new Set();
+    items=items.filter(it=>{ if(seen.has(it.id)) return false; seen.add(it.id); return true; });
+    return {key,label,icon,items};
+  });
+}
+let STAGES=buildStagesForProfile(null);
+function setCurrentQualityProfile(m){
+  CURRENT_PROFILE=resolveProductProfile(m);
+  STAGES=buildStagesForProfile(CURRENT_PROFILE);
+  return CURRENT_PROFILE;
+}
+function getStagesForRecord(record){ return buildStagesForProfile(resolveProductProfile(record)); }
+function getQualityCatalogStats(){
+  const out={}; Object.values(PRODUCT_CATALOG).forEach(p=>{out[p.group]=(out[p.group]||0)+1;}); return out;
+}
 
 // ── STATE (persistido en Supabase) ──
 let inspData={};
@@ -1243,13 +1481,22 @@ let filteredList=[];
 let filteredHistorico=[];
 let activeFilter='all';
 let lastUpdate=null;
-let lastUpdateTimer=null;
-let syncInProgress=false;
-const SYNC_INTERVAL_MS=12*60*60*1000;
+let countdownSec=120;
+let countdownInterval=null;
 let sidebarOpen=true;
 let calLoaded=false;
 
 async function calFetchAll(){
+  try{
+    const {data:products,error:productsError}=await sb.from('calidad_productos').select('*').eq('activo',true);
+    if(!productsError && Array.isArray(products)){
+      products.forEach(p=>{ PRODUCT_CATALOG[String(p.codigo||'').trim().toUpperCase()]={
+        code:String(p.codigo||'').trim().toUpperCase(), name:p.nombre||'', group:p.grupo||'Sin clasificar',
+        source:p.fuente||'Supabase', features:p.atributos||{}
+      }; });
+    }
+  }catch(e){ /* usa fallback local */ }
+
   const insp = await sbCall(()=>sb.from('calidad_inspecciones').select('*'));
   inspData={};
   (insp||[]).forEach(row=>{ inspData[row.serial]=row.data; });
@@ -1277,7 +1524,7 @@ async function calInsertHistorico(entry){
       inspectors:entry.inspectors, stage_data:entry.stageData
     }).select().single());
     entry._dbId = row.id;
-  }catch(e){ throw e; }
+  }catch(e){ /* ya se mostró el toast */ }
 }
 
 function getInsp(serial){
@@ -1285,10 +1532,6 @@ function getInsp(serial){
     const sd={};STAGES.forEach(s=>{sd[s.key]={};});
     inspData[serial]={stageData:sd,inspectors:{},responsables:{},stageObs:{},currentStageIdx:0};
   }
-  // Completa cualquier etapa nueva (ej. Resoldado/Pulido) que no exista todavía en
-  // inspecciones guardadas antes de que esas etapas se agregaran a STAGES — sin esto,
-  // marcar un ítem en una etapa "nueva" fallaba silenciosamente porque el objeto
-  // stageData[etapa] no existía.
   const d=inspData[serial];
   if(!d.stageData) d.stageData={};
   STAGES.forEach(s=>{ if(!d.stageData[s.key]) d.stageData[s.key]={}; });
@@ -1296,6 +1539,7 @@ function getInsp(serial){
   if(!d.responsables) d.responsables={};
   if(!d.stageObs) d.stageObs={};
   if(d.currentStageIdx==null) d.currentStageIdx=0;
+  if(d.currentStageIdx>=STAGES.length) d.currentStageIdx=STAGES.length-1;
   return d;
 }
 
@@ -1399,20 +1643,23 @@ function parseFechaInspDate(str){
 }
 
 function getInspPct(serial){
-  const d=getInsp(serial);
+  const d=getInsp(serial),m=MACHINES.find(x=>String(x.serial)===String(serial));
+  const stages=m?getStagesForRecord(m):STAGES;
   let tot=0,ok=0;
-  STAGES.forEach(s=>{tot+=s.items.length;ok+=Object.values(d.stageData[s.key]||{}).filter(v=>v==='ok').length;});
+  stages.forEach(s=>{tot+=s.items.length;ok+=Object.values(d.stageData[s.key]||{}).filter(v=>v==='ok').length;});
   return tot>0?Math.round(ok/tot*100):0;
 }
 function getInspFails(serial){
-  const d=getInsp(serial);
-  let f=0;STAGES.forEach(s=>{f+=Object.values(d.stageData[s.key]||{}).filter(v=>v==='fail').length;});
+  const d=getInsp(serial),m=MACHINES.find(x=>String(x.serial)===String(serial));
+  const stages=m?getStagesForRecord(m):STAGES;
+  let f=0;stages.forEach(s=>{f+=Object.values(d.stageData[s.key]||{}).filter(v=>v==='fail').length;});
   return f;
 }
 function getInspDone(serial){
-  const d=getInsp(serial);
+  const d=getInsp(serial),m=MACHINES.find(x=>String(x.serial)===String(serial));
+  const stages=m?getStagesForRecord(m):STAGES;
   let tot=0,done=0;
-  STAGES.forEach(s=>{const items=s.items.length;tot+=items;done+=Object.values(d.stageData[s.key]||{}).filter(v=>v!=='').length;});
+  stages.forEach(s=>{const items=s.items.length;tot+=items;done+=Object.values(d.stageData[s.key]||{}).filter(v=>v!=='').length;});
   return tot>0?done===tot:'pending';
 }
 
@@ -1434,11 +1681,18 @@ function filterMachines(q){
     m.serial.includes(q)||m.code.toLowerCase().includes(q.toLowerCase())||
     m.name.toLowerCase().includes(q.toLowerCase())||m.client.toLowerCase().includes(q.toLowerCase())
   );
+  const searchBaseCount=list.length;
   if(activeFilter==='pending') list=list.filter(m=>getInspPct(m.serial)===0);
   else if(activeFilter==='progress') list=list.filter(m=>{const p=getInspPct(m.serial);return p>0&&p<100;});
   else if(activeFilter==='done') list=list.filter(m=>getInspPct(m.serial)===100);
   filteredList=list;
   renderList();
+  const countEl=document.getElementById('sb-search-count');
+  if(countEl){
+    const term=q.trim();
+    const label=searchBaseCount===1?'resultado':'resultados';
+    countEl.innerHTML=term?`<strong>${searchBaseCount}</strong> ${label} para <strong>"${escapeHtml(term)}"</strong>`:`<strong>${searchBaseCount}</strong> resultados`;
+  }
   updateSbStats();
 }
 
@@ -1484,12 +1738,11 @@ function renderList(){
     const pctCls=m.pct>=70?'hi':m.pct>=30?'':'lo';
     const fillCls=ip>=100?'g':fails>0?'r':'';
     const sel=m.serial===currentSerial?'selected':'';
-    const isTerm=m.sourceState==='terminados'||m.sourceState==='pendiente'||m.pendingInspection;
-    const rowCls=`${sel} ${isTerm?'status-terminados status-pending':''}`.trim();
-    return`<div class="mrow ${rowCls}" data-serial="${m.serial}" onclick="selectMachine('${m.serial}')">
+    return`<div class="mrow ${sel}" data-serial="${m.serial}" onclick="selectMachine('${m.serial}')">
       <div class="mr-top">
         <span class="mr-serial">#${m.serial}</span>
         <span class="mr-code">${m.code}</span>
+        <span class="cal-group-badge ${resolveProductProfile(m).group==='Sin clasificar'?'cal-group-unknown':''}">${resolveProductProfile(m).group}</span>
         <span class="mr-name">${m.name}</span>
       </div>
       <div class="mr-pct-bar"><div class="mr-pct-fill ${fillCls}" style="width:${ip}%"></div></div>
@@ -1498,7 +1751,6 @@ function renderList(){
         <span class="mr-date ${urgencyMeta(m.prometido).cls}" ${urgencyMeta(m.prometido).tip?`title="${urgencyMeta(m.prometido).tip}"`:''}>${urgencyMeta(m.prometido).icon?`<i class="ti ${urgencyMeta(m.prometido).icon}" style="font-size:11px"></i> ${urgencyMeta(m.prometido).label}: `:''}${m.prometido}</span>
       </div>
       <div class="mr-badges">
-        ${isTerm?`<span class="mrbadge mb-terminated"><i class="ti ti-alert-circle" style="font-size:9px"></i> Pendiente de inspección</span>`:`<span class="mrbadge mb-production"><i class="ti ti-player-play" style="font-size:9px"></i> Producción</span>`}
         <span class="mrbadge mb-pct ${pctCls}">${m.pct}% prod.</span>
         ${ip>0?`<span class="mrbadge ${ip>=100?'mb-ok':'mb-color'}">${ip}% insp.</span>`:''}
         ${fails>0?`<span class="mrbadge mb-alert"><i class="ti ti-alert-triangle" style="font-size:9px"></i>${fails} NC</span>`:''}
@@ -1525,6 +1777,7 @@ function selectMachine(serial,skipSave){
   if(currentSerial&&!skipSave) saveCurrentStage();
   currentSerial=serial;
   const m=MACHINES.find(x=>x.serial===serial);
+  setCurrentQualityProfile(m);
   const d=getInsp(serial);
   // Header
   const hdr=document.getElementById('mhdr');
@@ -1532,8 +1785,8 @@ function selectMachine(serial,skipSave){
   hdr.innerHTML=`
     <span class="mh-serial">#${m.serial}</span>
     <span class="mh-code">${m.code}</span>
+    <span class="cal-group-badge ${CURRENT_PROFILE.group==='Sin clasificar'?'cal-group-unknown':''}">${CURRENT_PROFILE.group}</span>
     <span class="mh-name">${m.name}</span>
-    ${m.sourceState==='terminados'||m.sourceState==='pendiente'||m.pendingInspection?`<span class="mrbadge mb-terminated"><i class="ti ti-alert-circle"></i> Pendiente de inspección</span>`:`<span class="mrbadge mb-production"><i class="ti ti-player-play"></i> En producción</span>`}
     <span class="mh-client">${m.client}</span>
     ${m.color&&m.color!=='—'?`<span class="mh-color"><i class="ti ti-palette" style="font-size:11px"></i> ${m.color}</span>`:''}
     <span class="mh-date ${urgencyMeta(m.prometido).cls}" ${urgencyMeta(m.prometido).tip?`title="${urgencyMeta(m.prometido).tip}"`:''}><i class="ti ${urgencyMeta(m.prometido).icon||'ti-calendar'}" style="font-size:11px"></i> ${urgencyMeta(m.prometido).label?urgencyMeta(m.prometido).label+': ':''}${m.prometido}</span>
@@ -1551,33 +1804,30 @@ function selectMachine(serial,skipSave){
 
 // ── HISTÓRICO ──
 async function checkAndArchive(serial){
-  if(historico.find(h=>String(h.serial)===String(serial))) return;
+  if(historico.find(h=>h.serial===serial)) return;
   const d=getInsp(serial);
   let totalItems=0,totalDone=0;
-  const stages=getStagesForRecord(MACHINES.find(x=>String(x.serial)===String(serial))||{});
-  stages.forEach(s=>{
+  STAGES.forEach(s=>{
     totalItems+=s.items.length;
     totalDone+=Object.values(d.stageData[s.key]||{}).filter(v=>v!=='').length;
   });
-  if(totalDone!==totalItems||!totalItems) return;
-  const m=MACHINES.find(x=>String(x.serial)===String(serial));
-  if(!m) return;
-  let tok=0,tof=0;
-  stages.forEach(s=>{const dd=d.stageData[s.key]||{};tok+=Object.values(dd).filter(v=>v==='ok').length;tof+=Object.values(dd).filter(v=>v==='fail').length;});
-  const entry={
-    serial,code:m.code,name:m.name,client:m.client,prometido:m.prometido,color:m.color,
-    fechaInsp:new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
-    conformes:tok,noConformes:tof,total:totalItems,pct:Math.round(tok/totalItems*100),
-    inspectors:Object.values(d.inspectors).filter(Boolean).join(', ')||'—',stageData:JSON.parse(JSON.stringify(d.stageData))
-  };
-  try{
-    await calInsertHistorico(entry);
+  if(totalDone===totalItems&&totalItems>0){
+    const m=MACHINES.find(x=>x.serial===serial);
+    if(!m) return;
+    let tok=0,tof=0;
+    STAGES.forEach(s=>{const dd=d.stageData[s.key]||{};tok+=Object.values(dd).filter(v=>v==='ok').length;tof+=Object.values(dd).filter(v=>v==='fail').length;});
+    const entry={
+      serial,code:m.code,name:m.name,client:m.client,prometido:m.prometido,color:m.color,
+      fechaInsp:new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
+      conformes:tok,noConformes:tof,total:totalItems,
+      pct:Math.round(tok/totalItems*100),
+      inspectors:Object.values(d.inspectors).filter(Boolean).join(', ')||'—',
+      stageData:JSON.parse(JSON.stringify(d.stageData)),
+    };
     historico.unshift(entry);
-    MACHINES=MACHINES.filter(x=>String(x.serial)!==String(serial));
-    updateHistoricoCount(); saveMachinesCache(); filterMachines(document.getElementById('sb-q').value||'');
+    updateHistoricoCount();
     showToast(`#${serial} ${m.name} archivado en histórico`,'yellow');
-  }catch(e){
-    // Si no se pudo guardar en histórico, la máquina permanece activa para no perder trazabilidad.
+    await calInsertHistorico(entry);
   }
 }
 
@@ -1598,6 +1848,7 @@ function renderHistorico(list){
   }
   el.innerHTML=list.map((h,i)=>{
     const pctCls=h.pct>=90?'hi':h.pct>=70?'':'lo';
+    const recordStages=getStagesForRecord(h);
     return`<div class="card" style="margin-bottom:8px">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <div style="flex:1;min-width:0">
@@ -1617,7 +1868,7 @@ function renderHistorico(list){
         </div>
       </div>
       <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
-        ${STAGES.map(s=>{
+        ${recordStages.map(s=>{
           const dd=h.stageData[s.key]||{};
           const ok=Object.values(dd).filter(v=>v==='ok').length;
           const fail=Object.values(dd).filter(v=>v==='fail').length;
@@ -1761,6 +2012,8 @@ function updateProgress(stage,d){
 
 function saveCurrentStage(){
   if(!currentSerial) return;
+  const m=MACHINES.find(x=>x.serial===currentSerial);
+  if(m) setCurrentQualityProfile(m);
   const d=getInsp(currentSerial);
   const s=STAGES[d.currentStageIdx];
   const fi=document.getElementById('field-inspector');
@@ -1809,6 +2062,7 @@ function renderSummary(){
           <span class="mrbadge mb-pct ${pctCls}">${m.pct}% producción</span>
         </div>
         <div style="font-size:15px;font-weight:600">${m.name}</div>
+        <div style="margin-top:4px"><span class="cal-group-badge">${CURRENT_PROFILE?.group||resolveProductProfile(m).group}</span></div>
         <div style="font-size:12px;color:var(--text2);margin-top:2px">${m.client}</div>
       </div>
       <div style="text-align:right;flex-shrink:0">
@@ -1912,243 +2166,71 @@ function exportSummary(){
     sendPrompt(`Genera un reporte de inspección de calidad para exportar del Serial #${m.serial} (${m.code} - ${m.name}, Cliente: ${m.client}, Prometido: ${m.prometido}).\nResultados:\n${lines.join('\n')}\nPresentalo como documento listo para imprimir o compartir.`);
 }
 
-// ── SINCRONIZACIÓN DE MÁQUINAS: Producción + Terminados ──
+// ── CACHÉ REAL de la última actualización exitosa (localStorage) ──
+// Reemplaza el viejo arreglo fijo de 34 máquinas: ahora, al abrir la app, se muestra
+// la última carga real que tuvo (en vivo o por archivo subido), no una muestra congelada.
 const MACHINES_CACHE_KEY='xtensor_machines_cache';
 const MACHINES_CACHE_TS_KEY='xtensor_machines_cache_ts';
-const MACHINES_SYNC_META_KEY='xtensor_machines_sync_meta';
-const MACHINES_SYNC_STATE_KEY='xtensor_machines_sync_state';
-const ADMIN_PROD_URL='https://xtensor-one.vercel.app/admin';
-const ADMIN_TERM_URL='https://xtensor-one.vercel.app/admin/terminados';
-
 function saveMachinesCache(){
   try{
     localStorage.setItem(MACHINES_CACHE_KEY, JSON.stringify(MACHINES));
-    if(lastUpdate) localStorage.setItem(MACHINES_CACHE_TS_KEY,lastUpdate.toISOString());
-    localStorage.setItem(MACHINES_SYNC_STATE_KEY, JSON.stringify(MACHINES.map(m=>({
-      serial:String(m.serial), sourceState:m.sourceState||'produccion', syncPending:!!m.syncPending,
-      firstTerminatedAt:m.firstTerminatedAt||null
-    }))));
-  }catch(e){}
+    localStorage.setItem(MACHINES_CACHE_TS_KEY, (lastUpdate||new Date()).toISOString());
+  }catch(e){ /* localStorage no disponible, no es crítico */ }
 }
 function loadMachinesFromCache(){
   try{
     const raw=localStorage.getItem(MACHINES_CACHE_KEY);
     if(!raw) return false;
     const data=JSON.parse(raw);
-    if(!Array.isArray(data)) return false;
+    if(!Array.isArray(data)||!data.length) return false;
     MACHINES=data;
     const ts=localStorage.getItem(MACHINES_CACHE_TS_KEY);
     lastUpdate=ts?new Date(ts):null;
     return true;
   }catch(e){ return false; }
 }
-function loadSyncMeta(){
-  try{
-    const raw=localStorage.getItem(MACHINES_SYNC_META_KEY);
-    return raw?JSON.parse(raw):{};
-  }catch(e){ return {}; }
-}
-function saveSyncMeta(meta){
-  try{localStorage.setItem(MACHINES_SYNC_META_KEY,JSON.stringify(meta||{}));}catch(e){}
-}
-function formatElapsedSince(date){
-  if(!date||isNaN(new Date(date).getTime())) return 'Sin actualización exitosa';
-  const sec=Math.max(0,Math.floor((Date.now()-new Date(date).getTime())/1000));
-  if(sec<10) return 'Actualizado hace unos segundos';
-  if(sec<60) return `Actualizado hace ${sec} segundos`;
-  const min=Math.floor(sec/60);
-  if(min<60) return `Actualizado hace ${min} ${min===1?'minuto':'minutos'}`;
-  const hrs=Math.floor(min/60);
-  if(hrs<24) return `Actualizado hace ${hrs} ${hrs===1?'hora':'horas'}`;
-  const days=Math.floor(hrs/24);
-  return `Actualizado hace ${days} ${days===1?'día':'días'}`;
-}
-function updateLastUpdateLabel(){
-  const el=document.getElementById('t-updated');
-  if(!el) return;
-  el.textContent=formatElapsedSince(lastUpdate);
-  el.className='sync-age '+(lastUpdate?'ok':'warn');
-}
-function startLastUpdateTimer(){
-  clearInterval(lastUpdateTimer);
-  updateLastUpdateLabel();
-  lastUpdateTimer=setInterval(updateLastUpdateLabel,1000);
-}
-function rememberSyncFailure(message){
-  const meta=loadSyncMeta();
-  meta.lastFailureAt=new Date().toISOString();
-  meta.lastFailure=String(message||'Error de sincronización');
-  saveSyncMeta(meta);
-}
-function mergeMachineSources(produccion,terminados){
-  const bySerial=new Map();
-  const add=(m,sourceState)=>{
-    const serial=String(m.serial||'').trim();
-    if(!serial) return;
-    const prev=bySerial.get(serial);
-    bySerial.set(serial,{...(prev||{}),...m,serial,sourceState});
-  };
-  produccion.forEach(m=>add(m,'produccion'));
-  terminados.forEach(m=>add(m,'terminados'));
-  return Array.from(bySerial.values());
-}
-function validateSyncSources(produccion,terminados){
-  if(!Array.isArray(produccion)||!Array.isArray(terminados)) throw new Error('La respuesta del admin no tiene un formato válido');
-  const seen=new Set(), dup=[];
-  [...produccion,...terminados].forEach(m=>{
-    const serial=String(m.serial||'').trim();
-    if(!serial) return;
-    if(seen.has(serial)) dup.push(serial); else seen.add(serial);
-  });
-  if(dup.length) throw new Error(`Seriales duplicados en las fuentes del admin: ${[...new Set(dup)].slice(0,5).join(', ')}`);
-  const invalid=[...produccion,...terminados].filter(m=>!m.serial||!m.code||!m.name);
-  if(invalid.length) throw new Error('Hay máquinas sin serial, código o nombre en el admin');
-  return true;
-}
-async function loadSyncStateFromSupabase(){
-  if(!SUPABASE_CONFIGURED||!sb) return;
-  try{
-    const row=await sbCall(()=>sb.from('calidad_sync_estado').select('*').eq('id',1).maybeSingle());
-    if(row&&row.last_success_at){
-      lastUpdate=new Date(row.last_success_at);
-      saveSyncMeta({lastSuccessAt:row.last_success_at,lastFailureAt:row.last_failure_at||null,lastFailure:row.last_failure||''});
-    }
-  }catch(e){ /* conserva caché local */ }
-}
-async function persistSyncSuccess(meta){
-  if(!SUPABASE_CONFIGURED||!sb) return;
-  await sbCall(()=>sb.from('calidad_sync_estado').upsert({
-    id:1,last_success_at:meta.lastSuccessAt,status:'ok',last_error:null,
-    production_count:meta.productionCount,terminated_count:meta.terminatedCount,total_count:meta.totalCount,
-    updated_at:new Date().toISOString()
-  }));
-}
-async function persistSyncFailure(message){
-  if(!SUPABASE_CONFIGURED||!sb) return;
-  try{
-    const meta=loadSyncMeta();
-    await sbCall(()=>sb.from('calidad_sync_estado').upsert({
-      id:1,last_success_at:meta.lastSuccessAt||null,status:'error',last_error:String(message||'Error de sincronización'),
-      updated_at:new Date().toISOString()
-    }));
-  }catch(e){}
-}
-function validateMergedResult(sourceMachines,merged){
-  const sourceSet=new Set(sourceMachines.map(m=>String(m.serial)));
-  const mergedSet=new Set(merged.filter(m=>!m.syncPending).map(m=>String(m.serial)));
-  for(const serial of sourceSet){ if(!mergedSet.has(serial)) throw new Error(`La máquina #${serial} no quedó disponible en Calidad`); }
-  return true;
-}
-async function persistMachineStates(machines){
-  if(!SUPABASE_CONFIGURED||!sb||!machines.length) return;
-  const rows=machines.map(m=>({
-    serial:String(m.serial),code:m.code||null,name:m.name||null,client:m.client||null,color:m.color||null,
-    prometido:m.prometido||null,source_state:m.sourceState||'produccion',
-    pending_inspection:!!m.pendingInspection,first_terminated_at:m.firstTerminatedAt||null,
-    machine_data:m,updated_at:new Date().toISOString()
-  }));
-  await sbCall(()=>sb.from('calidad_maquinas_estado').upsert(rows,{onConflict:'serial'}));
-}
-async function loadPersistedMachineStates(){
-  if(!SUPABASE_CONFIGURED||!sb) return [];
-  try{return await sbCall(()=>sb.from('calidad_maquinas_estado').select('*'));}catch(e){return [];}
-}
-function applyPersistedStates(machines,persisted){
-  const p=new Map((persisted||[]).map(x=>[String(x.serial),x]));
-  const hist=new Set(historico.map(h=>String(h.serial)));
-  const out=[];
-  const seen=new Set();
-  machines.forEach(m=>{
-    const serial=String(m.serial); if(seen.has(serial)) return; seen.add(serial);
-    const old=p.get(serial)||{};
-    if(hist.has(serial)) return; // ya inspeccionada: Histórico manda
-    const terminated=m.sourceState==='terminados';
-    out.push({...m,
-      firstTerminatedAt: terminated?(old.first_terminated_at||new Date().toISOString()):(old.first_terminated_at||null),
-      pendingInspection: terminated || !!old.pending_inspection,
-      syncPending:false
-    });
-  });
-  // Nunca perder una máquina que ya estaba pendiente/terminada aunque temporalmente desaparezca de ambas fuentes.
-  (persisted||[]).forEach(old=>{
-    const serial=String(old.serial||'');
-    if(!serial||seen.has(serial)||hist.has(serial)||!old.pending_inspection) return;
-    const base=old.machine_data||{};
-    out.push({...base,serial,sourceState:'pendiente',pendingInspection:true,syncPending:true,
-      firstTerminatedAt:old.first_terminated_at||null});
-  });
-  return out;
-}
-function markSyncSuccess(meta){
-  lastUpdate=new Date(meta.lastSuccessAt);
-  const saved=loadSyncMeta();
-  saveSyncMeta({...saved,lastSuccessAt:meta.lastSuccessAt,lastFailureAt:null,lastFailure:''});
-  updateLastUpdateLabel();
-  setStatus(true);
-}
-window.loadMachines=function(json,silent){
+
+// ── REFRESH — trae producción desde el panel admin ──
+window.loadMachines=function(json){
   try{
     const data=typeof json==='string'?JSON.parse(json):json;
-    if(!Array.isArray(data)) throw new Error('Sin datos válidos');
+    if(!Array.isArray(data)||!data.length) throw new Error('Sin datos');
     MACHINES=data;
-    const now=new Date().toISOString();
-    lastUpdate=new Date(now);
+    lastUpdate=new Date();
+    setStatus(true);
     saveMachinesCache();
-    markSyncSuccess({lastSuccessAt:now});
     filterMachines(document.getElementById('sb-q').value||'');
-    if(!silent) showToast(`${data.length} máquinas sincronizadas`,'green');
+    startCountdown();
+    showToast(`${data.length} máquinas cargadas`,'green');
   }catch(e){
-    rememberSyncFailure(e.message);
-    if(!silent) showToast('Actualización no exitosa: '+e.message,'red');
-    setStatus(false,e.message);
+    showToast('Error al cargar: '+e.message,'red');
   }
 };
 
-async function requestRefresh(silent=false){
-  if(syncInProgress) return;
-  syncInProgress=true;
+async function requestRefresh(silent){
   const btn=document.getElementById('btn-refresh');
-  if(btn){btn.innerHTML='<i class="ti ti-refresh spin"></i> Sincronizando…';btn.disabled=true;}
-  const previousMachines=MACHINES.slice();
+  btn.innerHTML='<i class="ti ti-refresh spin"></i> Cargando…';
+  btn.disabled=true;
+  clearInterval(countdownInterval);
+  document.getElementById('t-countdown').textContent='';
+
+  const ADMIN_URL='https://xtensor-one.vercel.app/admin';
+
   try{
-    const [prodHtml,termHtml]=await Promise.all([fetchAdminHtml(ADMIN_PROD_URL),fetchAdminHtml(ADMIN_TERM_URL)]);
-    const produccion=parseMachinesFromHtml(prodHtml,'produccion');
-    const terminados=parseMachinesFromHtml(termHtml,'terminados');
-    validateSyncSources(produccion,terminados);
-    const sourceMachines=mergeMachineSources(produccion,terminados);
-    if(!sourceMachines.length && previousMachines.length) throw new Error('El admin devolvió 0 máquinas; se conserva la información anterior');
-    const persisted=await loadPersistedMachineStates();
-    const merged=applyPersistedStates(sourceMachines,persisted);
-    validateMergedResult(sourceMachines,merged);
-    MACHINES=merged;
-    const meta={lastSuccessAt:new Date().toISOString(),productionCount:produccion.length,terminatedCount:terminados.length,totalCount:merged.length};
-    await persistMachineStates(merged);
-    await persistSyncSuccess(meta);
-    saveMachinesCache();
-    markSyncSuccess(meta);
-    // Si una inspección ya estaba completa al momento de detectar el cambio de estado,
-    // archívala de inmediato. Si no está completa, permanece visible como pendiente.
-    for(const m of [...MACHINES]){
-      if(getInspPct(m.serial)===100) await checkAndArchive(m.serial);
-    }
-    filterMachines(document.getElementById('sb-q').value||'');
-    if(!silent) showToast(`${merged.length} máquinas sincronizadas · Producción ${produccion.length} · Terminados ${terminados.length}`,'green');
+    const html = await fetchAdminHtml(ADMIN_URL);
+    const machines = parseMachinesFromHtml(html);
+    if(!machines.length) throw new Error('No se encontraron filas en la tabla del admin');
+    window.loadMachines(machines);
   }catch(e){
-    MACHINES=previousMachines;
-    rememberSyncFailure(e.message);
-    await persistSyncFailure(e.message);
-    setStatus(false,e.message);
-    if(!silent) showToast('Actualización no exitosa: '+e.message,'red');
-    filterMachines(document.getElementById('sb-q').value||'');
+    // No se muestra ningún aviso emergente al fallar la actualización (ni manual ni
+    // automática): solo cambia el punto de estado a "Sin conexión" (con el detalle en
+    // el tooltip), para no interrumpir el trabajo con mensajes de error repetidos.
+    setStatus(false, e.message);
   }finally{
-    if(btn){btn.innerHTML='<i class="ti ti-refresh"></i> Actualizar';btn.disabled=false;}
-    syncInProgress=false;
-    updateLastUpdateLabel();
+    btn.innerHTML='<i class="ti ti-refresh"></i> Actualizar';
+    btn.disabled=false;
+    startCountdown();
   }
-}
-function scheduleAutomaticSync(){
-  clearInterval(window.xtensorAutoSyncTimer);
-  window.xtensorAutoSyncTimer=setInterval(()=>requestRefresh(true),SYNC_INTERVAL_MS);
 }
 
 // ── CARGA MANUAL (sin red) — HTML o CSV guardado del admin ──
@@ -2199,12 +2281,7 @@ function handleAdminFileUpload(event){
       const isCsv=/\.csv$/i.test(file.name);
       const machines = isCsv ? parseMachinesFromCsv(text) : parseMachinesFromHtml(text);
       if(!machines.length) throw new Error('No se encontraron máquinas en el archivo');
-      // Carga auxiliar: permite trabajar sin internet, pero NO altera la fecha de la
-      // última sincronización exitosa con /admin.
-      MACHINES=machines;
-      filterMachines(document.getElementById('sb-q').value||'');
-      saveMachinesCache();
-      showToast(`${machines.length} máquinas cargadas desde archivo (sin cambiar la última sincronización)`,'yellow');
+      window.loadMachines(machines);
     }catch(e){
       showToast('Error al leer el archivo: '+e.message,'red');
     }
@@ -2245,7 +2322,7 @@ function dedupeRepeated(str){
   return s;
 }
 
-function parseMachinesFromHtml(html, sourceState='produccion'){
+function parseMachinesFromHtml(html){
   const doc=new DOMParser().parseFromString(html,'text/html');
   const table=doc.querySelector('table');
   if(!table) throw new Error('No se encontró ninguna tabla en la página');
@@ -2287,18 +2364,28 @@ function parseMachinesFromHtml(html, sourceState='produccion'){
     });
     const pctNum=parseFloat(String(obj.pct).replace(/[^\d.]/g,''));
     obj.pct=isNaN(pctNum)?0:pctNum;
-    if(obj.serial||obj.name){ obj.sourceState=sourceState; machines.push(obj); }
+    if(obj.serial||obj.name) machines.push(obj);
   });
   return machines;
 }
 
 function setStatus(live, errMsg){
   const dot=document.getElementById('sdot');
-  if(dot){
-    dot.className='sdot'+(live?'':' stale');
-    dot.title=live?'Sincronización correcta con Producción + Terminados':`Sincronización no exitosa${errMsg?': '+errMsg:''} — se conserva la última actualización exitosa`;
-  }
-  updateLastUpdateLabel();
+  dot.className='sdot'+(live?'':' stale');
+  dot.title = live ? 'Conectado' : `Sin conexión con el admin${errMsg?': '+errMsg:''} — mostrando la última actualización guardada`;
+  document.getElementById('t-updated').textContent=lastUpdate
+    ?`${lastUpdate.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}`:'–';
+}
+function startCountdown(){
+  clearInterval(countdownInterval);countdownSec=120;updateCountdown();
+  countdownInterval=setInterval(()=>{
+    countdownSec--;updateCountdown();
+    if(countdownSec<=0) requestRefresh(true);
+  },1000);
+}
+function updateCountdown(){
+  const m=Math.floor(countdownSec/60),s=countdownSec%60;
+  document.getElementById('t-countdown').textContent=`(${m}:${String(s).padStart(2,'0')})`;
 }
 
 // ── RESIZE HANDLE ──
@@ -2352,23 +2439,19 @@ function calSubscribeRealtime(){
 // ── INIT CALIDAD (llamado desde el bloque de init general) ──
 async function calInit(){
   loadMachinesFromCache();
+  if(MACHINES[0]) setCurrentQualityProfile(MACHINES[0]);
   filterMachines('');
   document.querySelector('#sb-filters .sf').classList.add('active');
   activeFilterEl=document.querySelector('#sb-filters .sf');
   try{
     await calFetchAll();
   }catch(e){ /* ya se mostró el toast */ }
-  await loadSyncStateFromSupabase();
-  const meta=loadSyncMeta();
-  if(!lastUpdate && meta.lastSuccessAt) lastUpdate=new Date(meta.lastSuccessAt);
   calLoaded=true;
-  setStatus(!!lastUpdate);
+  setStatus(true);
   filterMachines(document.getElementById('sb-q').value||'');
   updateHistoricoCount();
   calSubscribeRealtime();
-  startLastUpdateTimer();
-  scheduleAutomaticSync();
-  requestRefresh(true);
+  requestRefresh(true); // intenta traer datos en vivo de una vez, sin esperar el ciclo de 2 min; si falla, se queda con la caché (requestRefresh ya reinicia el contador de 2 min al terminar)
 }
 </script>
 
@@ -2602,7 +2685,7 @@ function garCreateFromHistorico(serial){
   garRenderMachinesTable();
 
   // Trae automáticamente las no conformidades detectadas en la inspección ya archivada, como defectos base
-  STAGES.forEach(s=>{
+  getStagesForRecord(h).forEach(s=>{
     const dd = h.stageData[s.key] || {};
     s.items.forEach(it=>{
       if((dd[it.id]||'')==='fail'){
