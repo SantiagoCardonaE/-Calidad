@@ -33,6 +33,7 @@ create table if not exists calidad_inspecciones (
 -- Cuando una inspección llega al 100% se archiva aquí (histórico permanente).
 create table if not exists calidad_historico (
   id            uuid primary key default gen_random_uuid(),
+  machine_key   text,
   serial        text not null,
   code          text,
   name          text,
@@ -50,6 +51,11 @@ create table if not exists calidad_historico (
 );
 create index if not exists idx_cal_historico_created on calidad_historico(created_at desc);
 create index if not exists idx_cal_historico_serial  on calidad_historico(serial);
+create index if not exists idx_cal_historico_machine_key on calidad_historico(machine_key);
+
+-- Permite conservar inspecciones separadas cuando varias máquinas comparten serial.
+-- Es seguro para bases ya creadas y no modifica los registros históricos existentes.
+alter table calidad_historico add column if not exists machine_key text;
 
 -- ───────────────────────────────────────────────────────────────────────
 -- GARANTÍAS
