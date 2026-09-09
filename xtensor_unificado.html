@@ -2184,6 +2184,9 @@ function exportSummary(){
 const MACHINES_CACHE_KEY='xtensor_machines_cache';
 const MACHINES_CACHE_TS_KEY='xtensor_machines_cache_ts';
 const MACHINES_SOURCES_CACHE_KEY='xtensor_machines_sources_cache';
+// Invalida únicamente cachés creadas por parsers anteriores que podían truncar 99 a 9.
+const MACHINES_CACHE_VERSION='serial-literal-v2';
+const MACHINES_CACHE_VERSION_KEY='xtensor_machines_cache_version';
 
 function machineIdentity(machine,index){
   const clean=value=>normKey(String(value||'')).replace(/\s+/g,' ');
@@ -2229,8 +2232,9 @@ function consolidateMachines(machines){
 function readMachineSourcesCache(){
   try{
     const data=JSON.parse(localStorage.getItem(MACHINES_SOURCES_CACHE_KEY)||'{}');
-    return {admin:Array.isArray(data.admin)?data.admin:[],terminados:Array.isArray(data.terminados)?data.terminados:[]};
-  }catch(e){ return {admin:[],terminados:[]}; }
+    if(data.version!==MACHINES_CACHE_VERSION) return {version:MACHINES_CACHE_VERSION,admin:[],terminados:[]};
+    return {version:MACHINES_CACHE_VERSION,admin:Array.isArray(data.admin)?data.admin:[],terminados:Array.isArray(data.terminados)?data.terminados:[]};
+  }catch(e){ return {version:MACHINES_CACHE_VERSION,admin:[],terminados:[]}; }
 }
 function saveMachineSourceCache(source,machines){
   try{
@@ -2243,10 +2247,12 @@ function saveMachinesCache(){
   try{
     localStorage.setItem(MACHINES_CACHE_KEY, JSON.stringify(MACHINES));
     localStorage.setItem(MACHINES_CACHE_TS_KEY, (lastUpdate||new Date()).toISOString());
+    localStorage.setItem(MACHINES_CACHE_VERSION_KEY,MACHINES_CACHE_VERSION);
   }catch(e){ /* localStorage no disponible, no es crítico */ }
 }
 function loadMachinesFromCache(){
   try{
+    if(localStorage.getItem(MACHINES_CACHE_VERSION_KEY)!==MACHINES_CACHE_VERSION) return false;
     const raw=localStorage.getItem(MACHINES_CACHE_KEY);
     if(!raw) return false;
     const data=JSON.parse(raw);
