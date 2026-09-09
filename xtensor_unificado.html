@@ -2353,7 +2353,8 @@ function parseMachinesFromCsv(text){
     const obj={};
     order.forEach(field=>{
       const idx=colIndex[field];
-      obj[field]= idx!==undefined && cells[idx]!==undefined ? dedupeRepeated(cells[idx]) : '';
+      const value=idx!==undefined && cells[idx]!==undefined ? cells[idx] : '';
+      obj[field]=field==='serial'?String(value).trim():dedupeRepeated(value);
     });
     const pctNum=parseFloat(String(obj.pct).replace(/[^\d.]/g,''));
     obj.pct=isNaN(pctNum)?0:pctNum;
@@ -2402,6 +2403,7 @@ function normKey(s){
 // Algunas celdas de la tabla de origen (xtensor-one/admin) duplican el texto dos veces
 // (versión oculta para escritorio/móvil dentro de la misma celda), y textContent las
 // junta a ambas sin importar si están visibles. Esto detecta y limpia esa duplicación exacta.
+// Los seriales nunca pasan por esta regla: valores válidos como 99 o 66 no son duplicados.
 function dedupeRepeated(str){
   if(!str) return str;
   const s=String(str).trim();
@@ -2451,7 +2453,8 @@ function parseMachinesFromHtml(html){
     order.forEach((field,i)=>{
       const idx=hasHeaderMap?colIndex[field]:i;
       const cell=idx!==undefined?cells[idx]:undefined;
-      obj[field]=cell?dedupeRepeated(cell.textContent.trim()):'';
+      const value=cell?cell.textContent.trim():'';
+      obj[field]=field==='serial'?value:dedupeRepeated(value);
     });
     const pctNum=parseFloat(String(obj.pct).replace(/[^\d.]/g,''));
     obj.pct=isNaN(pctNum)?0:pctNum;
