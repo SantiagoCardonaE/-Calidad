@@ -53,6 +53,36 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
 .btn-ghost:hover{background:var(--surface2)}
 .btn-sm{padding:4px 9px;font-size:11px}
 
+/* Avisos de etapas de produccion listas para inspeccionar. */
+#cal-bell{position:relative;width:34px;height:32px;justify-content:center;padding:0;flex-shrink:0}
+#cal-bell-count{position:absolute;top:-4px;right:-5px;min-width:17px;height:17px;padding:0 3px;border-radius:9px;background:var(--red);color:#fff;font-size:10px;line-height:17px;text-align:center}
+#cal-notifications{position:fixed;top:50px;right:12px;width:420px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 68px);z-index:100;display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;box-shadow:0 8px 28px #0006;overflow:hidden}
+#cal-notifications[hidden],#cal-bell-count[hidden]{display:none}
+.cal-not-head,.cal-not-filters{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.cal-not-head h2{font-size:15px;font-weight:600;margin-right:auto}
+.cal-not-head .btn{width:30px;height:30px;padding:0;justify-content:center}
+.cal-not-filters{flex-wrap:wrap;font-size:12px}
+.cal-not-tabs{display:flex;gap:2px;margin-right:auto}
+.cal-not-tabs button{border:0;border-bottom:2px solid transparent;background:none;color:var(--text2);padding:6px;font:inherit;cursor:pointer}
+.cal-not-tabs button[aria-selected="true"]{color:var(--yellow);border-color:var(--yellow)}
+.cal-not-filters select{max-width:145px;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:4px;font:inherit;padding:5px}
+#cal-not-list{overflow-y:auto;overscroll-behavior:contain;min-height:0}
+.cal-not-row{display:flex;width:100%;gap:10px;align-items:flex-start;text-align:left;padding:12px;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);font:inherit;cursor:pointer}
+.cal-not-row:hover,.cal-not-row:focus-visible{background:var(--surface)}
+.cal-not-row.unread{background:var(--yellow-bg)}
+.cal-not-icon{width:26px;flex-shrink:0;font-size:20px;color:var(--yellow)}
+.cal-not-row[data-stage="pintado"] .cal-not-icon{color:#60a5fa}
+.cal-not-row[data-stage="ensamble"] .cal-not-icon{color:var(--green)}
+.cal-not-copy{flex:1;min-width:0;overflow-wrap:anywhere;font-size:12px;line-height:1.5}
+.cal-not-copy strong{display:block;font-size:13px;font-weight:600}
+.cal-not-copy .cal-not-meta{display:block;color:var(--text2);font-size:11px}
+.cal-not-dot{width:7px;height:7px;background:var(--yellow);border-radius:50%;flex-shrink:0;margin-top:6px}
+.cal-not-empty{padding:28px 14px;text-align:center;color:var(--text2);font-size:12px}
+#cal-not-sync{padding:7px 12px;border-top:1px solid var(--border);color:var(--text2);font-size:11px;flex-shrink:0}
+.cal-not-more{width:100%;border:0;background:var(--surface);color:var(--yellow);padding:10px;cursor:pointer}
+.cal-not-sr{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+@media(max-width:700px){#cal-notifications{top:50px;right:8px;max-width:calc(100vw - 16px)}#topbar{gap:4px;padding:0 8px}#main-tabs{min-width:0;flex-shrink:1;overflow-x:auto}.t-brand{padding-right:6px}.tbr-variant.show{display:none}.db-status{display:none}.mtab{padding:6px 8px}.mtab-lbl{display:none}.t-right{gap:4px}}
+
 /* ── APP SECTIONS ── */
 #app-body{flex:1;display:flex;min-height:0;overflow:hidden}
 .app-section{display:none;flex:1;min-height:0;overflow:hidden;flex-direction:column}
@@ -341,8 +371,31 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
       <div class="stat-chip g"><b id="gar-st-res">0</b> resueltas</div>
       <div class="stat-chip r"><b id="gar-st-crit">0</b> defectos críticos sin corregir</div>
     </div>
+    <button class="btn btn-ghost" id="cal-bell" type="button" aria-label="Notificaciones de Calidad" aria-expanded="false" aria-controls="cal-notifications" title="Notificaciones de Calidad" onclick="calToggleNotifications()">
+      <i class="ti ti-bell" aria-hidden="true"></i><span id="cal-bell-count" hidden>0</span>
+    </button>
+    <span id="cal-not-live" class="cal-not-sr" aria-live="polite"></span>
   </div>
 </div>
+
+<section id="cal-notifications" role="dialog" aria-labelledby="cal-not-title" hidden>
+  <div class="cal-not-head">
+    <h2 id="cal-not-title">Notificaciones de Calidad</h2>
+    <button class="btn btn-ghost" type="button" aria-label="Marcar todas como leídas" title="Marcar todas como leídas" onclick="calMarkAllNotificationsRead()"><i class="ti ti-checks" aria-hidden="true"></i></button>
+    <button class="btn btn-ghost" type="button" aria-label="Cerrar notificaciones" title="Cerrar notificaciones" onclick="calToggleNotifications(false)"><i class="ti ti-x" aria-hidden="true"></i></button>
+  </div>
+  <div class="cal-not-filters">
+    <div class="cal-not-tabs" role="tablist" aria-label="Lectura">
+      <button type="button" role="tab" aria-selected="true" data-not-filter="all" onclick="calSetNotificationFilter('all')">Todas</button>
+      <button type="button" role="tab" aria-selected="false" data-not-filter="unread" onclick="calSetNotificationFilter('unread')">No leídas</button>
+    </div>
+    <select id="cal-not-stage" aria-label="Etapa de producción" onchange="calRenderNotifications()">
+      <option value="">Todas las etapas</option><option value="armado">Armado (ARM)</option><option value="pintado">Pintado (PIN)</option><option value="ensamble">Ensamble (ENS)</option>
+    </select>
+  </div>
+  <div id="cal-not-list"></div>
+  <div id="cal-not-sync" role="status">Avisos guardados en este equipo</div>
+</section>
 
 <div id="app-body">
   <!-- ═══════════════ SECCIÓN RECEPCIÓN ═══════════════ -->
@@ -1269,13 +1322,14 @@ function resolveProductProfile(m){
 
 const COMMON_STAGE_ITEMS={
   armado:[
-    {id:'a6',item:'Soldaduras completas',criterio:'Cordón continuo, sin porosidad ni grietas, buen acabado',herramienta:'Visual',ideal:'',sup:'2'},
+    {id:'a-punteado',item:'Punteado y fijación provisional',criterio:'Piezas ubicadas y punteadas según plano; puntos firmes que mantienen la geometría para entregar a Resoldado',herramienta:'Visual / Plano / Escuadra',ideal:'Conjunto punteado y alineado',sup:'2'},
     {id:'a7',item:'Filos, puntas y rebabas',criterio:'No deben existir aristas cortantes',herramienta:'Tacto-Visual',ideal:'',sup:'2'},
     {id:'a8',item:'Diagonales',criterio:'Diferencia entre diagonales ≤ 2 mm',herramienta:'Flexómetro',ideal:'',sup:'1'},
     {id:'a9',item:'Dimensiones críticas y escuadras',criterio:'Según plano vigente; ángulos y dimensiones dentro de tolerancia especificada',herramienta:'Goniómetro / Escuadra / Nivel / Flexómetro',ideal:'Según plano',sup:'1'},
     {id:'a10',item:'Alineación general',criterio:'Desalineación dentro de la tolerancia definida en plano',herramienta:'Láser / Nivel / Visual',ideal:'Según plano',sup:'1'}
   ],
   resoldado:[
+    {id:'a6',item:'Soldaduras completas',criterio:'Cordón continuo, sin porosidad ni grietas, buen acabado',herramienta:'Visual',ideal:'',sup:'2'},
     {id:'r1',item:'Cordones repasados',criterio:'Sin porosidad, sin grietas, sin socavado',herramienta:'Visual',ideal:'Cordón continuo y uniforme',sup:'2'},
     {id:'r2',item:'Puntos de soldadura completos',criterio:'Todos los puntos indicados en plano quedan soldados',herramienta:'Visual / Plano',ideal:'Sin puntos faltantes',sup:'1'},
     {id:'r3',item:'Deformación por calor',criterio:'Sin alabeo ni deformación visible en piezas resoldadas',herramienta:'Visual / Escuadra',ideal:'Pieza recta, sin pandeo',sup:'2'},
@@ -1317,7 +1371,7 @@ const GROUP_STAGE_ITEMS={
     armado:[
       {id:'gp-a1',item:'Estructura y soportes del sistema de placas',criterio:'Soportes firmes, sin deformación y conforme al plano/BOM',herramienta:'Visual / Escuadra / BOM',ideal:'Según plano/BOM',sup:'2'},
       {id:'gp-a2',item:'Guías y flauta del paquete de placas',criterio:'Guías alineadas y sin interferencias durante el recorrido',herramienta:'Visual / Prueba manual',ideal:'Desplazamiento libre',sup:'2'},
-      {id:'gp-a3',item:'Puntos de fijación del mecanismo',criterio:'Tornillería y uniones completas, sin holguras',herramienta:'Visual / Llave',ideal:'Fijación firme',sup:'2'}
+      {id:'gp-a3',item:'Puntos de fijación del mecanismo',criterio:'Puntos de fijación ubicados según plano; uniones punteadas y tornillería de armado firme',herramienta:'Visual / Llave',ideal:'Fijación firme',sup:'2'}
     ],
     ensamble:[
       {id:'gp-e1',item:'Paquete de placas y placa guía',criterio:'Cantidad y montaje conforme a BOM/plano; desplazamiento sin trabas',herramienta:'Visual / Prueba funcional / BOM',ideal:'Según BOM',sup:'3'},
@@ -1328,8 +1382,8 @@ const GROUP_STAGE_ITEMS={
   },
   [QUALITY_GROUPS.DISCOS]:{
     armado:[
-      {id:'gd-a1',item:'Portapesos y soportes de carga',criterio:'Firmes, alineados y soldados según plano/BOM',herramienta:'Visual / Escuadra / BOM',ideal:'Según plano/BOM',sup:'3'},
-      {id:'gd-a2',item:'Estructura de carga',criterio:'Sin deformaciones y con uniones completas',herramienta:'Visual / Escuadra',ideal:'Sin deformación',sup:'2'},
+      {id:'gd-a1',item:'Portapesos y soportes de carga',criterio:'Ubicados, alineados y punteados según plano/BOM',herramienta:'Visual / Escuadra / BOM',ideal:'Según plano/BOM',sup:'3'},
+      {id:'gd-a2',item:'Estructura de carga',criterio:'Sin deformaciones y con uniones punteadas que mantienen la geometría',herramienta:'Visual / Escuadra',ideal:'Sin deformación',sup:'2'},
       {id:'gd-a3',item:'Puntos de apoyo y bases',criterio:'Apoyos completos, estables y correctamente ubicados',herramienta:'Nivel / Visual',ideal:'Estabilidad total',sup:'2'}
     ],
     ensamble:[
@@ -1340,7 +1394,7 @@ const GROUP_STAGE_ITEMS={
   },
   [QUALITY_GROUPS.BIO]:{
     armado:[
-      {id:'gb-a1',item:'Bases y puntos de anclaje',criterio:'Ubicación, soldadura y geometría conforme al plano',herramienta:'Visual / Flexómetro / Escuadra',ideal:'Según plano',sup:'3'},
+      {id:'gb-a1',item:'Bases y puntos de anclaje',criterio:'Ubicación, punteado y geometría conforme al plano',herramienta:'Visual / Flexómetro / Escuadra',ideal:'Según plano',sup:'3'},
       {id:'gb-a2',item:'Geometría de elementos de uso exterior',criterio:'Sin deformaciones, torsiones ni desalineaciones visibles',herramienta:'Nivel / Escuadra / Visual',ideal:'Geometría uniforme',sup:'2'},
       {id:'gb-a3',item:'Elementos móviles',criterio:'Articulaciones y piezas móviles libres de interferencias',herramienta:'Prueba manual',ideal:'Movimiento suave',sup:'3'}
     ],
@@ -1356,7 +1410,7 @@ const GROUP_STAGE_ITEMS={
   [QUALITY_GROUPS.CIRCUITOS]:{
     armado:[
       {id:'gc-a1',item:'Estructura principal del circuito',criterio:'Geometría, verticalidad y alineación conforme al plano',herramienta:'Nivel / Escuadra / Flexómetro',ideal:'Según plano',sup:'3'},
-      {id:'gc-a2',item:'Uniones estructurales',criterio:'Todas las uniones previstas están completas y firmes',herramienta:'Visual / Plano',ideal:'Sin uniones faltantes',sup:'3'},
+      {id:'gc-a2',item:'Uniones estructurales',criterio:'Todas las uniones previstas están ubicadas y punteadas conforme al plano',herramienta:'Visual / Plano',ideal:'Sin uniones faltantes',sup:'3'},
       {id:'gc-a3',item:'Puntos de anclaje',criterio:'Posición y dimensiones conforme al diseño del circuito',herramienta:'Flexómetro / Plano',ideal:'Según plano',sup:'3'}
     ],
     ensamble:[
@@ -1374,8 +1428,10 @@ const GROUP_STAGE_ITEMS={
 ,  [QUALITY_GROUPS.PARQUES]:{
     armado:[
       {id:'gj-a1',item:'Estructura del juego infantil',criterio:'Postes, plataformas, escaleras, pasamanos y demás elementos estructurales completos y sin deformaciones',herramienta:'Visual / Escuadra / Nivel',ideal:'Geometría conforme a plano',sup:'3'},
-      {id:'gj-a2',item:'Soldaduras y uniones estructurales',criterio:'Uniones completas, sin grietas, porosidad, bordes cortantes ni elementos sueltos',herramienta:'Visual / Tacto',ideal:'Uniones firmes y seguras',sup:'3'},
       {id:'gj-a3',item:'Anclajes y estabilidad',criterio:'Bases y puntos de anclaje completos, firmes y correctamente ubicados',herramienta:'Visual / Nivel / Flexómetro',ideal:'Estabilidad total',sup:'3'}
+    ],
+    resoldado:[
+      {id:'gj-a2',item:'Soldaduras y uniones estructurales',criterio:'Uniones completas, sin grietas, porosidad, bordes cortantes ni elementos sueltos',herramienta:'Visual / Tacto',ideal:'Uniones firmes y seguras',sup:'3'}
     ],
     ensamble:[
       {id:'gj-e1',item:'Plataformas, escaleras y accesos',criterio:'Elementos completos, firmes, alineados y sin bordes peligrosos',herramienta:'Visual / Tacto',ideal:'Accesos seguros',sup:'3'},
@@ -1511,7 +1567,39 @@ function setCurrentQualityProfile(m){
   STAGES=buildStagesForProfile(CURRENT_PROFILE);
   return CURRENT_PROFILE;
 }
-function getStagesForRecord(record){ return buildStagesForProfile(resolveProductProfile(record)); }
+const WELDING_STAGE_MOVES=[{id:'a6',before:'a7'},{id:'gj-a2',before:'gj-a3'}];
+function getStagesForRecord(record){
+  const stages=buildStagesForProfile(resolveProductProfile(record));
+  // El histórico conserva la etapa original de las respuestas anteriores al cambio.
+  if(Object.prototype.hasOwnProperty.call(record?.stageData?.armado||{},'a6')){
+    const armado=stages.find(s=>s.key==='armado');
+    const resoldado=stages.find(s=>s.key==='resoldado');
+    armado.items=armado.items.filter(it=>it.id!=='a-punteado');
+    WELDING_STAGE_MOVES.forEach(({id,before})=>{
+      const index=resoldado.items.findIndex(it=>it.id===id);
+      if(index<0) return;
+      const [item]=resoldado.items.splice(index,1);
+      const position=armado.items.findIndex(it=>it.id===before);
+      armado.items.splice(position<0?armado.items.length:position,0,item);
+    });
+  }
+  return stages;
+}
+function migrateWeldingStageAnswers(d){
+  const armado=d.stageData.armado||{};
+  const resoldado=d.stageData.resoldado||(d.stageData.resoldado={});
+  WELDING_STAGE_MOVES.forEach(({id})=>{
+    if(!Object.prototype.hasOwnProperty.call(armado,id)) return;
+    // Conserva el origen y cualquier respuesta anterior si ya hay un resultado en Resoldado.
+    if(!d.weldingStageMigration) d.weldingStageMigration={
+      from:'armado',to:'resoldado',items:{},inspector:d.inspectors?.armado||'',
+      responsable:d.responsables?.armado||'',observaciones:d.stageObs?.armado||''
+    };
+    if(!Object.prototype.hasOwnProperty.call(d.weldingStageMigration.items,id)) d.weldingStageMigration.items[id]=armado[id];
+    if(!resoldado[id]) resoldado[id]=armado[id];
+    delete armado[id];
+  });
+}
 function getQualityCatalogStats(){
   const out={}; Object.values(PRODUCT_CATALOG).forEach(p=>{out[p.group]=(out[p.group]||0)+1;}); return out;
 }
@@ -1589,6 +1677,7 @@ function getInsp(serial){
   if(!d.inspectors) d.inspectors={};
   if(!d.responsables) d.responsables={};
   if(!d.stageObs) d.stageObs={};
+  migrateWeldingStageAnswers(d);
   if(d.currentStageIdx==null) d.currentStageIdx=0;
   if(d.currentStageIdx>=STAGES.length) d.currentStageIdx=STAGES.length-1;
   return d;
@@ -2180,6 +2269,7 @@ function updateBBPos(){
 // ── KEYBOARD ── (solo activo cuando la sección Calidad está visible)
 document.addEventListener('keydown',e=>{
   if(!document.getElementById('sec-calidad').classList.contains('active')) return;
+  if(!document.getElementById('cal-notifications').hidden || document.activeElement.id==='cal-bell') return;
   const tag=document.activeElement.tagName;
   if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
   if(e.key==='ArrowLeft') prevMachine();
@@ -2220,6 +2310,201 @@ function exportSummary(){
   if(typeof sendPrompt==='function')
     sendPrompt(`Genera un reporte de inspección de calidad para exportar del Serial #${m.serial} (${m.code} - ${m.name}, Cliente: ${m.client}, Prometido: ${m.prometido}).\nResultados:\n${lines.join('\n')}\nPresentalo como documento listo para imprimir o compartir.`);
 }
+
+// Avisos persistentes: solo estados explicitos de ARM, PIN y ENS, nunca el porcentaje global.
+const CAL_PRODUCTION_STAGES={
+  armado:{code:'ARM',label:'Armado',icon:'ti-tool'},
+  pintado:{code:'PIN',label:'Pintado',icon:'ti-droplet'},
+  ensamble:{code:'ENS',label:'Ensamble',icon:'ti-settings'}
+};
+const CAL_NOT_CACHE_KEY='xtensor_quality_notifications_v1';
+let calNotifications={events:[],states:{},queue:[],reads:{}};
+let calNotSyncing=false,calNotSyncAgain=false,calNotFilter='all',calNotLimit=50;
+let calNotStorageOk=true,calNotCloudOk=false;
+function calProductionKey(machine){
+  if(machine._productionId) return 'production:'+machine._productionId;
+  return 'fields:'+encodeURIComponent(JSON.stringify(['serial','code','name','client','color'].map(k=>normKey(machine[k]).replace(/\s+/g,' '))));
+}
+function calReadProductionState(value){
+  const text=normKey(value).replace(/[\uFE0E\uFE0F]/g,'').trim();
+  if(/^(?:\u2713|\u2714|\u2705|100\s*%|completad[oa]|terminad[oa]|finalizad[oa]|true)$/.test(text)) return true;
+  if(/^(?:\u00b7|\u2014|-|0\s*%|pendiente|en proceso|en curso|false)$/.test(text)) return false;
+  return null;
+}
+function calLoadNotifications(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(CAL_NOT_CACHE_KEY)||'null');
+    if(saved && Array.isArray(saved.events) && Array.isArray(saved.queue)) calNotifications={
+      events:saved.events,queue:saved.queue,states:saved.states||{},reads:saved.reads||{}
+    };
+  }catch(e){calNotStorageOk=false;}
+  calRenderNotifications();
+}
+function calSaveNotifications(){
+  try{localStorage.setItem(CAL_NOT_CACHE_KEY,JSON.stringify(calNotifications));calNotStorageOk=true;}
+  catch(e){calNotStorageOk=false;}
+  calRenderNotifications();
+}
+function calMergeNotification(event){
+  if(!event?.id || !CAL_PRODUCTION_STAGES[event.etapa]) return;
+  const index=calNotifications.events.findIndex(n=>n.id===event.id);
+  const previous=index>=0?calNotifications.events[index]:null;
+  const merged={...event,leida_at:calNotifications.reads[event.id]||event.leida_at||previous?.leida_at||null};
+  if(index>=0) calNotifications.events[index]=merged;
+  else calNotifications.events.push(merged);
+}
+function calObserveProduction(machines,observedAt=new Date().toISOString()){
+  let added=0;
+  machines.forEach(machine=>{
+    const machineKey=calProductionKey(machine);
+    Object.keys(CAL_PRODUCTION_STAGES).forEach(etapa=>{
+      const complete=machine._productionStages?.[etapa];
+      if(typeof complete!=='boolean') return;
+      const stateKey=machineKey+'|'+etapa,previous=calNotifications.states[stateKey];
+      if(previous && previous.observed_at>=observedAt) return;
+      const token=crypto.randomUUID();
+      const observation={token,machine_key:machineKey,etapa,completada:complete,observed_at:observedAt,maquina:{
+        serial:machine.serial,code:machine.code,name:machine.name,client:machine.client,color:machine.color,
+        _productionId:machine._productionId||null,_qualityId:machineQualityId(machine)
+      }};
+      const queued=calNotifications.queue.findLast(o=>o.machine_key===machineKey && o.etapa===etapa);
+      if(!queued || queued.completada!==complete) calNotifications.queue.push(observation);
+      if(complete && previous?.complete!==true){
+        calMergeNotification({id:token,machine_key:machineKey,etapa,maquina:observation.maquina,detectada_at:observedAt,leida_at:null,pending:true});
+        added++;
+      }
+      calNotifications.states[stateKey]={complete,observed_at:observedAt};
+    });
+  });
+  calSaveNotifications();
+  if(added) showToast(`${added} ${added===1?'etapa lista':'etapas listas'} para inspeccionar`,'yellow');
+  void calSyncNotifications();
+}
+async function calSyncNotifications(){
+  if(!sb || !SUPABASE_CONFIGURED){calRenderNotifications();return;}
+  if(calNotSyncing){calNotSyncAgain=true;return;}
+  calNotSyncing=true;
+  try{
+    // El servidor serializa las transiciones y devuelve el mismo aviso a todos los equipos.
+    while(calNotifications.queue.length){
+      const batch=calNotifications.queue.slice(0,200);
+      const {data,error}=await sb.rpc('calidad_observar_produccion',{observaciones:batch});
+      if(error) throw error;
+      if(!Array.isArray(data)||data.length!==batch.length) throw new Error('Respuesta incompleta de notificaciones');
+      data.forEach(({input_token,notification})=>{
+        const provisional=calNotifications.events.find(n=>n.id===input_token && n.pending);
+        const readAt=calNotifications.reads[input_token]||provisional?.leida_at;
+        calNotifications.events=calNotifications.events.filter(n=>!(n.id===input_token && n.pending));
+        if(notification){
+          if(readAt) calNotifications.reads[notification.id]=readAt;
+          calMergeNotification(notification);
+        }
+        if(input_token!==notification?.id) delete calNotifications.reads[input_token];
+      });
+      const acknowledged=new Set(batch.map(o=>o.token));
+      calNotifications.queue=calNotifications.queue.filter(o=>!acknowledged.has(o.token));
+      calSaveNotifications();
+    }
+    for(const [id,readAt] of Object.entries(calNotifications.reads)){
+      if(calNotifications.events.some(n=>n.id===id && n.pending)) continue;
+      const {error}=await sb.from('calidad_notificaciones').update({leida_at:readAt}).eq('id',id);
+      if(error) throw error;
+      if(calNotifications.reads[id]===readAt) delete calNotifications.reads[id];
+    }
+    for(let offset=0;;offset+=1000){
+      const {data,error}=await sb.from('calidad_notificaciones').select('*').order('detectada_at',{ascending:false}).order('id').range(offset,offset+999);
+      if(error) throw error;
+      (data||[]).forEach(calMergeNotification);
+      if(!data || data.length<1000) break;
+    }
+    calNotCloudOk=true;
+  }catch(e){
+    // Conserva avisos, lecturas y observaciones para reintentar, incluso sin la migracion SQL.
+    calNotCloudOk=false;
+  }finally{
+    calNotSyncing=false;
+    calSaveNotifications();
+    if(calNotSyncAgain){calNotSyncAgain=false; if(calNotCloudOk) void calSyncNotifications();}
+  }
+}
+function calRenderNotifications(){
+  const unread=calNotifications.events.filter(n=>!n.leida_at).length;
+  const badge=document.getElementById('cal-bell-count');
+  badge.textContent=unread>99?'99+':String(unread);badge.hidden=!unread;
+  document.getElementById('cal-bell').setAttribute('aria-label',`Notificaciones de Calidad: ${unread} no leídas`);
+  const live=document.getElementById('cal-not-live'),announcement=`${unread} notificaciones no leídas`;
+  if(live.textContent!==announcement) live.textContent=announcement;
+  document.getElementById('cal-not-sync').textContent=calNotCloudOk?'Sincronizadas con Calidad':
+    calNotStorageOk?'Guardadas en este equipo; sincronización pendiente':'Sin respaldo local disponible; mantén esta página abierta';
+  const list=document.getElementById('cal-not-list'),scroll=list.scrollTop;
+  const focused=document.activeElement?.dataset?.notificationId;
+  const stage=document.getElementById('cal-not-stage').value;
+  const events=calNotifications.events.filter(n=>(calNotFilter!=='unread'||!n.leida_at)&&(!stage||n.etapa===stage))
+    .sort((a,b)=>b.detectada_at.localeCompare(a.detectada_at)||a.id.localeCompare(b.id));
+  list.innerHTML=events.slice(0,calNotLimit).map(n=>{
+    const def=CAL_PRODUCTION_STAGES[n.etapa],m=n.maquina||{};
+    const time=new Date(n.detectada_at).toLocaleString('es-CO',{timeZone:'America/Bogota',year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    return `<button class="cal-not-row${n.leida_at?'':' unread'}" data-stage="${n.etapa}" data-notification-id="${escapeHtml(n.id)}" type="button">
+      <i class="ti ${def.icon} cal-not-icon" aria-hidden="true"></i><span class="cal-not-copy">
+      <span class="cal-not-meta">Calidad · ${def.label} (${def.code})</span><strong>${def.label} completado</strong>
+      <span>#${escapeHtml(m.serial)} · ${escapeHtml(m.code)} · ${escapeHtml(m.name)}</span>
+      <span class="cal-not-meta">${escapeHtml(m.client)}</span><time class="cal-not-meta" datetime="${escapeHtml(n.detectada_at)}">Detectada: ${escapeHtml(time)}</time>
+      </span>${n.leida_at?'':'<span class="cal-not-dot" aria-label="No leída"></span>'}</button>`;
+  }).join('')||'<div class="cal-not-empty">No hay notificaciones'+(calNotFilter==='unread'?' sin leer':'')+'.</div>';
+  if(events.length>calNotLimit) list.insertAdjacentHTML('beforeend','<button class="cal-not-more" type="button" onclick="calNotLimit+=50;calRenderNotifications()">Ver más</button>');
+  list.querySelectorAll('[data-notification-id]').forEach(el=>{
+    el.addEventListener('click',()=>calOpenNotification(el.dataset.notificationId));
+    if(el.dataset.notificationId===focused) el.focus({preventScroll:true});
+  });
+  list.scrollTop=scroll;
+}
+function calToggleNotifications(force){
+  const panel=document.getElementById('cal-notifications');
+  const open=typeof force==='boolean'?force:panel.hidden;
+  panel.hidden=!open;
+  document.getElementById('cal-bell').setAttribute('aria-expanded',String(open));
+  if(open){calRenderNotifications();panel.querySelector('button').focus();void calSyncNotifications();}
+  else document.getElementById('cal-bell').focus();
+}
+function calSetNotificationFilter(filter){
+  calNotFilter=filter;calNotLimit=50;
+  document.querySelectorAll('[data-not-filter]').forEach(el=>el.setAttribute('aria-selected',String(el.dataset.notFilter===filter)));
+  calRenderNotifications();
+}
+function calMarkNotificationRead(notification){
+  if(notification.leida_at) return;
+  notification.leida_at=new Date().toISOString();
+  calNotifications.reads[notification.id]=notification.leida_at;
+}
+function calMarkAllNotificationsRead(){
+  calNotifications.events.forEach(calMarkNotificationRead);
+  calSaveNotifications();void calSyncNotifications();
+}
+function calOpenNotification(id){
+  const notification=calNotifications.events.find(n=>n.id===id);
+  if(!notification) return;
+  calMarkNotificationRead(notification);calSaveNotifications();void calSyncNotifications();
+  const machine=MACHINES.find(m=>calProductionKey(m)===notification.machine_key)||
+    MACHINES.find(m=>machineQualityId(m)===notification.maquina?._qualityId);
+  if(!machine){showToast('La máquina no está en la lista actual. El aviso se conserva.','yellow');return;}
+  if(currentSerial) saveCurrentStage();
+  switchSection('calidad');
+  document.getElementById('sb-q').value='';
+  calSetFilter('all',document.querySelector('#sb-filters .sf'));
+  selectMachine(machineQualityId(machine),true);
+  setView('checklist');
+  jumpStage(STAGES.findIndex(s=>s.key===notification.etapa));
+  calToggleNotifications(false);
+  document.getElementById('stage-title').scrollIntoView({block:'nearest'});
+}
+document.addEventListener('click',e=>{
+  if(!document.getElementById('cal-notifications').hidden && !e.target.closest('#cal-notifications,#cal-bell')) calToggleNotifications(false);
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape' && !document.getElementById('cal-notifications').hidden){e.preventDefault();calToggleNotifications(false);}
+});
+window.addEventListener('online',()=>{void calSyncNotifications();});
+calLoadNotifications();
 
 // ── CACHÉ REAL de la última actualización exitosa (localStorage) ──
 // Reemplaza el viejo arreglo fijo de 34 máquinas: ahora, al abrir la app, se muestra
@@ -2326,6 +2611,8 @@ window.loadMachines=function(json){
 
 async function requestRefresh(silent){
   const btn=document.getElementById('btn-refresh');
+  if(btn.disabled) return;
+  const observedAt=new Date().toISOString();
   btn.innerHTML='<i class="ti ti-refresh spin"></i> Cargando…';
   btn.disabled=true;
   clearInterval(countdownInterval);
@@ -2359,6 +2646,7 @@ async function requestRefresh(silent){
     const machines=consolidateMachines(results.flatMap(result=>result.machines));
     if(!machines.length) throw new Error('No se encontraron máquinas en las fuentes disponibles');
     window.loadMachines(machines);
+    calObserveProduction(successful.flatMap(result=>result.machines),observedAt);
     const failures=results.filter(result=>result.error);
     if(failures.length) setStatus(true,`Actualización parcial: ${failures.map(result=>result.source.key).join(', ')}`);
   }catch(e){
@@ -2370,6 +2658,7 @@ async function requestRefresh(silent){
     btn.innerHTML='<i class="ti ti-refresh"></i> Actualizar';
     btn.disabled=false;
     startCountdown();
+    void calSyncNotifications();
   }
 }
 
@@ -2483,7 +2772,15 @@ function parseMachinesFromHtml(html){
     pct:['%','avance','progreso','pct']
   };
 
-  const headerCells=Array.from(rows[0].querySelectorAll('th,td')).map(c=>normKey(c.textContent));
+  const headerElements=Array.from(rows[0].querySelectorAll('th,td'));
+  const headerCells=headerElements.map(c=>normKey(c.textContent));
+  const productionColumns={};
+  headerElements.forEach((cell,i)=>{
+    const title=normKey(cell.querySelector('button')?.textContent||cell.textContent).replace(/[^a-z]/g,'');
+    Object.entries(CAL_PRODUCTION_STAGES).forEach(([stage,def])=>{
+      if(title===def.code.toLowerCase()) productionColumns[stage]=i;
+    });
+  });
   const colIndex={};
   headerCells.forEach((h,i)=>{
     for(const [field,aliases] of Object.entries(fieldAliases)){
@@ -2507,6 +2804,14 @@ function parseMachinesFromHtml(html){
     });
     const pctNum=parseFloat(String(obj.pct).replace(/[^\d.]/g,''));
     obj.pct=isNaN(pctNum)?0:pctNum;
+    obj._productionStages={};
+    Object.entries(productionColumns).forEach(([stage,index])=>{
+      const state=calReadProductionState(cells[index]?.textContent||'');
+      if(state!==null) obj._productionStages[stage]=state;
+    });
+    const detail=tr.querySelector('a[href*="/admin/maquinas/"]')?.getAttribute('href')||'';
+    const productionId=detail.match(/\/admin\/maquinas\/([0-9a-f-]{36})(?:[/?#]|$)/i)?.[1]||tr.querySelector('input[name="machineId"]')?.getAttribute('value');
+    if(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(productionId||'')) obj._productionId=productionId.toLowerCase();
     if(obj.serial||obj.name) machines.push(obj);
   });
   return machines;
@@ -2556,6 +2861,10 @@ function updateCountdown(){
 // ── SINCRONIZACIÓN EN VIVO — otros dispositivos ven avances/histórico sin recargar ──
 function calSubscribeRealtime(){
   if(!SUPABASE_CONFIGURED || !sb) return;
+  sb.channel('calidad_notificaciones_rt')
+    .on('postgres_changes',{event:'*',schema:'public',table:'calidad_notificaciones'},payload=>{
+      if(payload.new?.id){calMergeNotification(payload.new);calSaveNotifications();}
+    }).subscribe();
   sb.channel('calidad_inspecciones_rt')
     .on('postgres_changes', {event:'*', schema:'public', table:'calidad_inspecciones'}, payload=>{
       const changedSerial = payload.new && payload.new.serial;
@@ -2596,6 +2905,7 @@ async function calInit(){
   filterMachines(document.getElementById('sb-q').value||'');
   updateHistoricoCount();
   calSubscribeRealtime();
+  void calSyncNotifications();
   requestRefresh(true); // intenta traer datos en vivo de una vez, sin esperar el ciclo de 2 min; si falla, se queda con la caché (requestRefresh ya reinicia el contador de 2 min al terminar)
 }
 </script>
