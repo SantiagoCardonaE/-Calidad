@@ -1182,9 +1182,12 @@ let MACHINES=[];
 
 // ══════════════ CATÁLOGO Y CHECKLISTS POR GRUPO ══════════════
 const QUALITY_GROUPS={
+  MUSCULACION:'Musculación',
   PLACAS:'Musculación con placas',
   DISCOS:'Musculación con discos',
+  PESO_LIBRE:'Peso libre',
   BIO:'Bioparques',
+  BIO_DISCOS:'Bioparques con discos',
   CIRCUITOS:'Circuitos',
   PARQUES:'Parques infantiles',
   SERVICIOS:'Servicios'
@@ -1197,17 +1200,57 @@ const PRODUCT_CATALOG_FALLBACK={"XM100":{"code":"XM100","name":"Abductor Aductor
 let PRODUCT_CATALOG={...PRODUCT_CATALOG_FALLBACK};
 let CURRENT_PROFILE=null;
 
+// Percutores confirmados en Nombre Pieza + cantidad positiva en la base/BOM.
+// XM115: BOM, Hoja2!A3/E3; XM193: BOM, Pieza!D13/H13.
+// BARR-1 y BAM-1: Costeo Linea hogar varios, maquinas!E160/I160 y E191/I191.
+const BOM_PERCUTOR_CODES=new Set([
+  'XM100','XM103','XM105','XM106','XM107','XM110','XM111','XM112',
+  'XM113','XM114','XM115','XM116','XM119','XM121','XM125','XM126',
+  'XM127','XM128','XM129','XM130','XM133','XM138','XM139','XM140',
+  'XM143','XM145','XM148','XM162','XM166','XM169','XM172','XM176',
+  'XM178','XM184','XM188','XM193','BARR-1','BAM-1'
+]);
+function withBomPercutores(profile){
+  const code=String(profile?.code||'').trim().toUpperCase();
+  if(!BOM_PERCUTOR_CODES.has(code)) return profile;
+  return {...profile,features:{percutor:true,...profile.features}};
+}
+
 function normProductText(v){
   return String(v||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 }
-function inferGroupByCode(code){
+function classifyMusculacion(profile){
+  const technicalGroup=profile?.group||'';
+  const name=normProductText(profile?.name);
+  if(technicalGroup===QUALITY_GROUPS.PLACAS || profile?.features?.plates) return QUALITY_GROUPS.PLACAS;
+  if(/peso libre|\bbanco\b|\brack\b|portadiscos|hiperextensor|dominadas|fondos|remo en punta|sentadilla sissy/.test(name)) return QUALITY_GROUPS.PESO_LIBRE;
+  return QUALITY_GROUPS.DISCOS;
+}
+function classifyBioparque(profile){
+  const name=normProductText(profile?.name);
+  return /con discos?/.test(name)?QUALITY_GROUPS.BIO_DISCOS:QUALITY_GROUPS.BIO;
+}
+function classifyProductCode(code,profile){
   const c=String(code||'').trim().toUpperCase();
-  if(/^XS/.test(c)) return QUALITY_GROUPS.SERVICIOS;
+  if(/^XB/.test(c)) return profile?classifyBioparque(profile):QUALITY_GROUPS.BIO;
   if(/^XJ/.test(c)) return QUALITY_GROUPS.PARQUES;
-  if(/^XM\d+/.test(c)) return QUALITY_GROUPS.DISCOS;
-  if(/^XB\d+/.test(c)) return QUALITY_GROUPS.BIO;
+  if(/^XS/.test(c)) return QUALITY_GROUPS.SERVICIOS;
+  if(/^XM/.test(c)) return profile?classifyMusculacion(profile):QUALITY_GROUPS.MUSCULACION;
+  return '';
+}
+function inferGroupByCode(code){
+  const classified=classifyProductCode(code);
+  if(classified) return classified;
+  const c=String(code||'').trim().toUpperCase();
   if(/^(CIRC|JAU|BAR|BAC|FON|PIV|ESC)-?/.test(c)) return QUALITY_GROUPS.CIRCUITOS;
   return '';
+}
+function applyProductClassification(profile,code){
+  profile=withBomPercutores(profile);
+  const classified=classifyProductCode(code,profile);
+  // group es la clasificación visible. checklistGroup conserva el detalle técnico
+  // del catálogo para que las etapas existentes no cambien.
+  return classified?{...profile,code,group:classified,checklistGroup:profile.group}:profile;
 }
 function resolveProductProfile(m){
   const code=String(m?.code||'').trim().toUpperCase();
@@ -1215,13 +1258,13 @@ function resolveProductProfile(m){
   // En el ZIP hay dos archivos XM121; la base maestra identifica Flexor de Pie como XM122.
   if(code==='XM121' && name.includes('pie')){
     const p=PRODUCT_CATALOG.XM122;
-    if(p) return {...p,code:code,source:(p.source||'')+' · alias BOM XM121'};
+    if(p) return {...applyProductClassification(p,code),source:(p.source||'')+' · alias BOM XM121'};
   }
-  if(PRODUCT_CATALOG[code]) return PRODUCT_CATALOG[code];
+  if(PRODUCT_CATALOG[code]) return applyProductClassification(PRODUCT_CATALOG[code],code);
   const byName=Object.values(PRODUCT_CATALOG).find(p=>normProductText(p.name)===name);
-  if(byName) return byName;
+  if(byName) return applyProductClassification(byName,code);
   const inferred=inferGroupByCode(code);
-  return {code:code,name:m?.name||'Producto sin catálogo',group:inferred||'Sin clasificar',source:'inferido por código',features:{}};
+  return withBomPercutores({code:code,name:m?.name||'Producto sin catálogo',group:inferred||'Sin clasificar',source:'inferido por código',features:{}});
 }
 
 const COMMON_STAGE_ITEMS={
@@ -1374,7 +1417,7 @@ const GROUP_STAGE_ITEMS={
 // Controles específicos del producto/código. Se activan solo cuando el nombre,
 // código o atributos del BOM justifican el control; no se inventan tolerancias.
 const PRODUCT_STAGE_RULES=[
-  {match:(p,n)=>/percutor|percutores/.test(n),items:{armado:[
+  {match:(p,n)=>p?.features?.percutor===true || /percutor|percutores/.test(n),items:{armado:[
     {id:'pp-perc-a1',item:'Bujes y cajitas de percutores',criterio:'Referencia, cantidad, ubicación y fijación conforme a BOM/plano',herramienta:'Visual / BOM / Plano',ideal:'Según BOM/plano',sup:'3'},
     {id:'pp-perc-a2',item:'Percutores',criterio:'Recorrido, posición y fijación correctos; sin interferencias',herramienta:'Prueba manual / Visual',ideal:'Movimiento libre',sup:'3'}
   ],ensamble:[
@@ -1444,7 +1487,7 @@ function featureItems(profile){
   return items;
 }
 function buildStagesForProfile(profile){
-  const group=profile?.group||'Sin clasificar';
+  const group=profile?.checklistGroup||profile?.group||'Sin clasificar';
   const groupDef=GROUP_STAGE_ITEMS[group]||{};
   const productDef=productSpecificItems(profile);
   const defs=[
