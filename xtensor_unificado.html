@@ -211,6 +211,7 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 .mb-color{background:var(--surface2);color:var(--text3);border-color:var(--border)}
 .mb-alert{background:var(--red-bg);color:var(--red);border-color:var(--red-border)}
 .mb-ok{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+.mb-terminated{background:var(--red-bg);color:var(--red);border-color:var(--red-border);font-weight:700}
 #resize-handle{width:4px;cursor:col-resize;background:transparent;flex-shrink:0;transition:background .15s;position:relative;z-index:5}
 #resize-handle:hover,#resize-handle.dragging{background:var(--yellow-border)}
 #main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
@@ -1752,6 +1753,7 @@ function renderList(){
       </div>
       <div class="mr-badges">
         <span class="mrbadge mb-pct ${pctCls}">${m.pct}% prod.</span>
+        ${m.terminated?'<span class="mrbadge mb-terminated">TERMINADA</span>':''}
         ${ip>0?`<span class="mrbadge ${ip>=100?'mb-ok':'mb-color'}">${ip}% insp.</span>`:''}
         ${fails>0?`<span class="mrbadge mb-alert"><i class="ti ti-alert-triangle" style="font-size:9px"></i>${fails} NC</span>`:''}
         ${m.color&&m.color!=='—'?`<span class="mrbadge mb-color">${m.color}</span>`:''}
@@ -1788,6 +1790,7 @@ function selectMachine(serial,skipSave){
     <span class="cal-group-badge ${CURRENT_PROFILE.group==='Sin clasificar'?'cal-group-unknown':''}">${CURRENT_PROFILE.group}</span>
     <span class="mh-name">${m.name}</span>
     <span class="mh-client">${m.client}</span>
+    ${m.terminated?'<span class="mrbadge mb-terminated">TERMINADA</span>':''}
     ${m.color&&m.color!=='—'?`<span class="mh-color"><i class="ti ti-palette" style="font-size:11px"></i> ${m.color}</span>`:''}
     <span class="mh-date ${urgencyMeta(m.prometido).cls}" ${urgencyMeta(m.prometido).tip?`title="${urgencyMeta(m.prometido).tip}"`:''}><i class="ti ${urgencyMeta(m.prometido).icon||'ti-calendar'}" style="font-size:11px"></i> ${urgencyMeta(m.prometido).label?urgencyMeta(m.prometido).label+': ':''}${m.prometido}</span>
     <div class="mh-nav">
@@ -2060,6 +2063,7 @@ function renderSummary(){
           <span class="mh-serial">#${m.serial}</span>
           <span class="badge badge-y">${m.code}</span>
           <span class="mrbadge mb-pct ${pctCls}">${m.pct}% producción</span>
+          ${m.terminated?'<span class="mrbadge mb-terminated">TERMINADA</span>':''}
         </div>
         <div style="font-size:15px;font-weight:600">${m.name}</div>
         <div style="margin-top:4px"><span class="cal-group-badge">${CURRENT_PROFILE?.group||resolveProductProfile(m).group}</span></div>
@@ -2171,6 +2175,59 @@ function exportSummary(){
 // la última carga real que tuvo (en vivo o por archivo subido), no una muestra congelada.
 const MACHINES_CACHE_KEY='xtensor_machines_cache';
 const MACHINES_CACHE_TS_KEY='xtensor_machines_cache_ts';
+const MACHINES_SOURCES_CACHE_KEY='xtensor_machines_sources_cache';
+
+function machineIdentity(machine,index){
+  const clean=value=>normKey(String(value||'')).replace(/\s+/g,' ');
+  const serial=clean(machine.serial);
+  if(serial) return `serial:${serial}`;
+  const fallback=[machine.code,machine.name,machine.client].map(clean).filter(Boolean).join('|');
+  return fallback?`machine:${fallback}`:`row:${index}`;
+}
+function machineSources(machine){
+  const sources=Array.isArray(machine._sources)?machine._sources:[];
+  return [...new Set(sources.filter(source=>source==='admin'||source==='terminados'))];
+}
+function markMachineSource(machine,source){
+  const sources=[...new Set([...machineSources(machine),source])];
+  return {...machine,_sources:sources,terminated:sources.includes('terminados')};
+}
+function consolidateMachines(machines){
+  const merged=new Map();
+  (machines||[]).forEach((machine,index)=>{
+    if(!machine) return;
+    const key=machineIdentity(machine,index);
+    const current=merged.get(key);
+    if(!current){
+      const sources=machineSources(machine);
+      merged.set(key,{...machine,_sources:sources,terminated:machine.terminated===true||sources.includes('terminados')});
+      return;
+    }
+    // La primera fuente conserva sus datos visibles; la segunda solo completa vacíos
+    // y aporta su origen. Así un duplicado no altera navegación ni el estado de calidad.
+    const sources=[...new Set([...machineSources(current),...machineSources(machine)])];
+    const combined={...machine,...current,_sources:sources};
+    ['serial','code','name','client','color','prometido','pct'].forEach(field=>{
+      if((combined[field]===undefined||combined[field]===null||combined[field]==='') && machine[field]!==undefined) combined[field]=machine[field];
+    });
+    combined.terminated=current.terminated===true||machine.terminated===true||sources.includes('terminados');
+    merged.set(key,combined);
+  });
+  return [...merged.values()];
+}
+function readMachineSourcesCache(){
+  try{
+    const data=JSON.parse(localStorage.getItem(MACHINES_SOURCES_CACHE_KEY)||'{}');
+    return {admin:Array.isArray(data.admin)?data.admin:[],terminados:Array.isArray(data.terminados)?data.terminados:[]};
+  }catch(e){ return {admin:[],terminados:[]}; }
+}
+function saveMachineSourceCache(source,machines){
+  try{
+    const cache=readMachineSourcesCache();
+    cache[source]=machines;
+    localStorage.setItem(MACHINES_SOURCES_CACHE_KEY,JSON.stringify(cache));
+  }catch(e){ /* localStorage no disponible, no es crítico */ }
+}
 function saveMachinesCache(){
   try{
     localStorage.setItem(MACHINES_CACHE_KEY, JSON.stringify(MACHINES));
@@ -2195,7 +2252,7 @@ window.loadMachines=function(json){
   try{
     const data=typeof json==='string'?JSON.parse(json):json;
     if(!Array.isArray(data)||!data.length) throw new Error('Sin datos');
-    MACHINES=data;
+    MACHINES=consolidateMachines(data);
     lastUpdate=new Date();
     setStatus(true);
     saveMachinesCache();
@@ -2214,13 +2271,36 @@ async function requestRefresh(silent){
   clearInterval(countdownInterval);
   document.getElementById('t-countdown').textContent='';
 
-  const ADMIN_URL='https://xtensor-one.vercel.app/admin';
+  const sources=[
+    {key:'admin',url:'https://xtensor-one.vercel.app/admin'},
+    {key:'terminados',url:'https://xtensor-one.vercel.app/admin/terminados'}
+  ];
 
   try{
-    const html = await fetchAdminHtml(ADMIN_URL);
-    const machines = parseMachinesFromHtml(html);
-    if(!machines.length) throw new Error('No se encontraron filas en la tabla del admin');
+    const cachedSources=readMachineSourcesCache();
+    const results=await Promise.all(sources.map(async source=>{
+      try{
+        const html=await fetchAdminHtml(source.url);
+        const machines=parseMachinesFromHtml(html).map(machine=>markMachineSource(machine,source.key));
+        if(!machines.length) throw new Error('No se encontraron filas en la tabla');
+        saveMachineSourceCache(source.key,machines);
+        return {source,machines,error:null};
+      }catch(error){
+        // Una fuente caída nunca vacía la lista: usamos su última carga por separado
+        // y, para cachés antiguas, conservamos la lista consolidada que ya está abierta.
+        const cached=(cachedSources[source.key]||[]).map(machine=>markMachineSource(machine,source.key));
+        const previous=cached.length?cached:MACHINES.filter(machine=>machineSources(machine).includes(source.key));
+        const legacy=previous.length?previous:MACHINES.filter(machine=>!machineSources(machine).length);
+        return {source,machines:legacy,error};
+      }
+    }));
+    const successful=results.filter(result=>!result.error);
+    if(!successful.length) throw new Error('No se pudo actualizar ninguna fuente');
+    const machines=consolidateMachines(results.flatMap(result=>result.machines));
+    if(!machines.length) throw new Error('No se encontraron máquinas en las fuentes disponibles');
     window.loadMachines(machines);
+    const failures=results.filter(result=>result.error);
+    if(failures.length) setStatus(true,`Actualización parcial: ${failures.map(result=>result.source.key).join(', ')}`);
   }catch(e){
     // No se muestra ningún aviso emergente al fallar la actualización (ni manual ni
     // automática): solo cambia el punto de estado a "Sin conexión" (con el detalle en
@@ -2372,7 +2452,9 @@ function parseMachinesFromHtml(html){
 function setStatus(live, errMsg){
   const dot=document.getElementById('sdot');
   dot.className='sdot'+(live?'':' stale');
-  dot.title = live ? 'Conectado' : `Sin conexión con el admin${errMsg?': '+errMsg:''} — mostrando la última actualización guardada`;
+  dot.title = live
+    ?(errMsg?`Conectado con actualización parcial: ${errMsg}`:'Conectado')
+    :`Sin conexión con el admin${errMsg?': '+errMsg:''} — mostrando la última actualización guardada`;
   document.getElementById('t-updated').textContent=lastUpdate
     ?`${lastUpdate.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}`:'–';
 }
