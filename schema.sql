@@ -457,3 +457,175 @@ end $$;
 -- Fin del esquema. Siguiente paso: Project Settings → API → copiar
 -- "Project URL" y "anon public key" y pegarlos en la app (bloque CONFIG).
 -- ═══════════════════════════════════════════════════════════════════════
+
+-- Notificaciones de Calidad: ARM, PIN y ENS. Migracion aditiva e idempotente.
+-- Ejecutar en el SQL Editor del mismo proyecto Supabase de Calidad.
+create table if not exists public.calidad_etapas_produccion (
+  machine_key text not null,
+  etapa text not null check (etapa in ('armado','pintado','ensamble')),
+  completada boolean,
+  ciclo integer not null default 0,
+  observed_at timestamptz,
+  primary key (machine_key, etapa)
+);
+create table if not exists public.calidad_notificaciones (
+  id uuid primary key,
+  machine_key text not null,
+  etapa text not null check (etapa in ('armado','pintado','ensamble')),
+  ciclo integer not null check (ciclo > 0),
+  maquina jsonb not null,
+  detectada_at timestamptz not null,
+  leida_at timestamptz,
+  unique (machine_key, etapa, ciclo)
+);
+create index if not exists idx_cal_notificaciones_fecha on public.calidad_notificaciones(detectada_at desc, id);
+
+alter table public.calidad_etapas_produccion enable row level security;
+alter table public.calidad_notificaciones enable row level security;
+-- Mismo acceso compartido de la app actual, sin permitir eliminar avisos.
+drop policy if exists cal_etapas_select on public.calidad_etapas_produccion;
+create policy cal_etapas_select on public.calidad_etapas_produccion for select to anon, authenticated using (true);
+drop policy if exists cal_etapas_insert on public.calidad_etapas_produccion;
+create policy cal_etapas_insert on public.calidad_etapas_produccion for insert to anon, authenticated with check (true);
+drop policy if exists cal_etapas_update on public.calidad_etapas_produccion;
+create policy cal_etapas_update on public.calidad_etapas_produccion for update to anon, authenticated using (true) with check (true);
+drop policy if exists cal_not_select on public.calidad_notificaciones;
+create policy cal_not_select on public.calidad_notificaciones for select to anon, authenticated using (true);
+drop policy if exists cal_not_insert on public.calidad_notificaciones;
+create policy cal_not_insert on public.calidad_notificaciones for insert to anon, authenticated with check (true);
+drop policy if exists cal_not_update on public.calidad_notificaciones;
+create policy cal_not_update on public.calidad_notificaciones for update to anon, authenticated using (true) with check (true);
+grant select, insert, update on public.calidad_etapas_produccion to anon, authenticated;
+grant select, insert, update(leida_at) on public.calidad_notificaciones to anon, authenticated;
+
+create or replace function public.calidad_observar_produccion(observaciones jsonb)
+returns table (input_token uuid, notification jsonb)
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  o jsonb;
+  previous public.calidad_etapas_produccion%rowtype;
+  event_row public.calidad_notificaciones%rowtype;
+  seen_at timestamptz;
+  done boolean;
+begin
+  if jsonb_typeof(observaciones) is distinct from 'array' then
+    raise exception 'Se requiere una lista de observaciones';
+  end if;
+  for o in select value from jsonb_array_elements(observaciones)
+    order by value->>'machine_key',value->>'etapa',value->>'observed_at'
+  loop
+    input_token := (o->>'token')::uuid;
+    notification := null;
+    if coalesce(o->>'machine_key','') = ''
+       or coalesce(o->>'etapa','') not in ('armado','pintado','ensamble')
+       or jsonb_typeof(o->'completada') is distinct from 'boolean'
+       or jsonb_typeof(o->'maquina') is distinct from 'object'
+       or o->>'observed_at' is null then
+      raise exception 'Observacion de produccion invalida';
+    end if;
+    seen_at := (o->>'observed_at')::timestamptz;
+    done := (o->>'completada')::boolean;
+    insert into public.calidad_etapas_produccion(machine_key,etapa)
+    values (o->>'machine_key',o->>'etapa') on conflict do nothing;
+    select * into previous from public.calidad_etapas_produccion
+    where machine_key=o->>'machine_key' and etapa=o->>'etapa' for update;
+
+    if previous.observed_at is null or seen_at > previous.observed_at then
+      if done and previous.completada is distinct from true then
+        previous.ciclo := previous.ciclo + 1;
+        insert into public.calidad_notificaciones(id,machine_key,etapa,ciclo,maquina,detectada_at)
+        values (input_token,o->>'machine_key',o->>'etapa',previous.ciclo,o->'maquina',seen_at);
+      end if;
+      update public.calidad_etapas_produccion
+      set completada=done,ciclo=previous.ciclo,observed_at=seen_at
+      where machine_key=o->>'machine_key' and etapa=o->>'etapa';
+    end if;
+    if done then
+      select * into event_row from public.calidad_notificaciones
+      where machine_key=o->>'machine_key' and etapa=o->>'etapa'
+        and (id=input_token or detectada_at<=seen_at)
+      order by (id=input_token) desc,detectada_at desc limit 1;
+      if found then notification := to_jsonb(event_row); end if;
+    end if;
+    return next;
+  end loop;
+end;
+$$;
+revoke all on function public.calidad_observar_produccion(jsonb) from public;
+grant execute on function public.calidad_observar_produccion(jsonb) to anon, authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname='supabase_realtime' and schemaname='public' and tablename='calidad_notificaciones'
+  ) then
+    alter publication supabase_realtime add table public.calidad_notificaciones;
+  end if;
+end $$;
+
+-- Calidad interna y externa. Migracion aditiva para la base existente.
+alter table public.garantias_solicitudes
+  add column if not exists tipo_reporte text not null default 'Garantía';
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname='gar_tipo_reporte_check'
+    and conrelid='public.garantias_solicitudes'::regclass) then
+    alter table public.garantias_solicitudes add constraint gar_tipo_reporte_check
+      check (tipo_reporte in ('Garantía','Inconformidad','Reclamo','Sugerencia'));
+  end if;
+end $$;
+
+-- La solicitud, sus maquinas, defectos y clasificacion se guardan juntos.
+-- Se conserva intacta la funcion original para clientes anteriores.
+create or replace function public.crear_reporte_calidad(payload jsonb)
+returns uuid language plpgsql security invoker set search_path=public
+as $$
+declare
+  reporte_id uuid;
+  tipo text := coalesce(nullif(payload->>'tipoReporte',''),'Garantía');
+begin
+  if tipo not in ('Garantía','Inconformidad','Reclamo','Sugerencia') then
+    raise exception 'Tipo de reporte no valido';
+  end if;
+  reporte_id := public.crear_garantia(payload);
+  update public.garantias_solicitudes set tipo_reporte=tipo where id=reporte_id;
+  return reporte_id;
+end;
+$$;
+revoke all on function public.crear_reporte_calidad(jsonb) from public;
+grant execute on function public.crear_reporte_calidad(jsonb) to anon, authenticated;
+
+-- No permite que un cliente desactualizado borre hallazgos ya guardados
+-- ni reabra un evento corregido. Una nueva ocurrencia tiene un ID distinto.
+create or replace function public.calidad_conservar_hallazgos()
+returns trigger language plpgsql set search_path=public
+as $$
+declare merged jsonb;
+begin
+  select coalesce(jsonb_agg(e order by e->>'id'),'[]'::jsonb) into merged
+  from (
+    select distinct on (event->>'id') event as e
+    from (
+      select value as event,0 as version from jsonb_array_elements(
+        case when jsonb_typeof(old.data->'internalFindings')='array' then old.data->'internalFindings' else '[]'::jsonb end)
+      union all
+      select value as event,1 as version from jsonb_array_elements(
+        case when jsonb_typeof(new.data->'internalFindings')='array' then new.data->'internalFindings' else '[]'::jsonb end)
+    ) events
+    where coalesce(event->>'id','')<>''
+    order by event->>'id',nullif(event->>'closedAt','') asc nulls last,version desc
+  ) dedup;
+  if jsonb_array_length(merged)>0 then
+    new.data:=jsonb_set(new.data,'{internalFindings}',merged,true);
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists trg_calidad_conservar_hallazgos on public.calidad_inspecciones;
+create trigger trg_calidad_conservar_hallazgos
+  before update on public.calidad_inspecciones
+  for each row execute function public.calidad_conservar_hallazgos();

@@ -81,7 +81,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
 #cal-not-sync{padding:7px 12px;border-top:1px solid var(--border);color:var(--text2);font-size:11px;flex-shrink:0}
 .cal-not-more{width:100%;border:0;background:var(--surface);color:var(--yellow);padding:10px;cursor:pointer}
 .cal-not-sr{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
-@media(max-width:700px){#cal-notifications{top:50px;right:8px;max-width:calc(100vw - 16px)}#topbar{gap:4px;padding:0 8px}#main-tabs{min-width:0;flex-shrink:1;overflow-x:auto}.t-brand{padding-right:6px}.tbr-variant.show{display:none}.db-status{display:none}.mtab{padding:6px 8px}.mtab-lbl{display:none}.t-right{gap:4px}}
+@media(max-width:700px){#cal-notifications{top:50px;right:8px;max-width:calc(100vw - 16px)}#topbar{gap:4px;padding:0 8px}#main-tabs{min-width:0;flex-shrink:1;overflow-x:auto}.t-brand{font-size:0;padding:0;border:0;gap:0}.db-status,#t-updated,#t-countdown{display:none}.mtab{padding:6px 8px}.mtab-lbl{display:none}.t-right{gap:4px}.tbr-variant{gap:2px}.tbr-variant .btn{width:28px;height:30px;padding:0;justify-content:center}#btn-refresh{font-size:0;gap:0}#btn-refresh i{font-size:14px}.stat-chip{font-size:0;padding:4px 6px;gap:0}}
 
 /* ── APP SECTIONS ── */
 #app-body{flex:1;display:flex;min-height:0;overflow:hidden}
@@ -559,6 +559,10 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
           </div>
           <form id="gar-form">
 
+            <div class="field" style="max-width:320px;margin-bottom:14px"><label for="gf-tipoReporte">Tipo de solicitud del cliente</label>
+              <select id="gf-tipoReporte"><option>Garantía</option><option>Inconformidad</option><option>Reclamo</option><option>Sugerencia</option></select>
+            </div>
+
             <div class="section-lbl">Información del cliente</div>
             <div class="form-grid">
               <div class="field"><label>Nombre del cliente</label><input id="gf-cliente" type="text" required></div>
@@ -722,12 +726,17 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
         </div>
 
         <!-- FILTROS -->
+        <div class="view-tabs" style="margin-bottom:14px" role="tablist" aria-label="Origen de calidad">
+          <button class="vtab active" type="button" role="tab" aria-selected="true" data-est-origin="Interna" onclick="estSetOrigin('Interna')" style="background:none;border-top:0;border-left:0;border-right:0"><i class="ti ti-building-factory"></i> Calidad interna</button>
+          <button class="vtab" type="button" role="tab" aria-selected="false" data-est-origin="Externa" onclick="estSetOrigin('Externa')" style="background:none;border-top:0;border-left:0;border-right:0"><i class="ti ti-users"></i> Calidad externa</button>
+        </div>
         <div class="card">
           <div class="card-title"><i class="ti ti-filter"></i> Filtros</div>
           <div id="est-filters" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px"></div>
           <div style="font-size:11.5px;color:var(--text3);margin-top:8px">Ciudad y Proyecto no están disponibles todavía (no se capturan esos datos en Recepción/Calidad/Garantías) — si los necesitas, se pueden agregar al formulario.</div>
         </div>
 
+        <div id="est-sync-info" role="status" style="font-size:12px;color:var(--yellow);margin-bottom:10px"></div>
         <!-- SEMÁFORO -->
         <div id="est-semaforo" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:16px 0"></div>
 
@@ -740,7 +749,7 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
             <div style="height:270px;margin-top:10px;position:relative"><canvas id="chart-pareto"></canvas></div>
           </div>
           <div class="card" style="margin-bottom:0">
-            <div class="card-title"><i class="ti ti-chart-pie"></i> Distribución de garantías por estado</div>
+            <div class="card-title"><i class="ti ti-chart-pie"></i> Estado de los reportes</div>
             <div style="height:270px;margin-top:10px;position:relative"><canvas id="chart-estado"></canvas></div>
           </div>
         </div>
@@ -1618,6 +1627,107 @@ let countdownInterval=null;
 let sidebarOpen=true;
 let calLoaded=false;
 
+const CAL_INSP_PENDING_KEY='xtensor_quality_pending_v1';
+let calInspPending={},calInspFlushing=false;
+function calMergeFindings(...lists){
+  const map=new Map();
+  lists.flat().forEach(event=>{
+    if(!event?.id) return;
+    const old=map.get(event.id);
+    map.set(event.id,{...old,...event,closedAt:event.closedAt||old?.closedAt||null});
+  });
+  return [...map.values()];
+}
+function calStatsMachine(key,data={},record={}){
+  let snapshot=data.machineSnapshot||record.stageData?.__quality?.machine||record;
+  if(!snapshot.code){
+    const matches=historico.filter(h=>h._machineKey===key);
+    if(matches.length===1) snapshot=matches[0];
+    else try{
+      const decoded=decodeURIComponent(key);
+      const fields=decoded.startsWith('machine:')?decoded.slice(8).split('|'):[];
+      if(fields.length===6) snapshot={serial:fields[0],code:fields[1],name:fields[2],client:fields[3],color:fields[5]};
+    }catch(e){/* No interpreta claves desconocidas como un serial. */}
+  }
+  let machine=MACHINES.find(m=>machineQualityId(m)===key || (snapshot._productionId && m._productionId===snapshot._productionId));
+  if(!machine && snapshot.code){
+    const matches=MACHINES.filter(m=>['serial','code','name','client','color'].every(k=>normKey(m[k])===normKey(snapshot[k])));
+    if(matches.length===1) machine=matches[0];
+  }
+  if(!machine && !snapshot.code){
+    const matches=MACHINES.filter(m=>String(m.serial)===String(key));
+    if(matches.length===1) machine=matches[0];
+  }
+  const source=machine||snapshot;
+  return {serial:source.serial||(!String(key).includes('machine')?key:''),code:source.code||'',name:source.name||'',
+    client:source.client||'',color:source.color||'',_productionId:source._productionId||null};
+}
+function calStatsMachineKey(machine,key){return machine.code||machine.name?calProductionKey(machine):'quality:'+key;}
+function calAllFindingLogs(){
+  return calMergeFindings(...Object.values(inspData).map(d=>d.internalFindings||[]),...historico.map(h=>h.stageData?.__quality?.events||[]))
+    .map(e=>({...e,machineKey:calStatsMachineKey(calStatsMachine('',{machineSnapshot:e.machine}),e.machineKey)}));
+}
+function calLegacyFinding(key,machine,stage,item,fecha=null){
+  const machineKey=calStatsMachineKey(machine,key);
+  return {id:'legacy:'+encodeURIComponent(machineKey)+'|'+item.id,machineKey,machine,cycle:0,itemId:item.id,
+    stage:stage.key,area:stage.label,item:item.item,criterio:item.criterio,detectedAt:fecha,closedAt:null,
+    inspector:'',responsable:'',legacy:true};
+}
+function calRecordInternalResult(key,stageKey,itemId,value){
+  const d=getInsp(key),machine=calStatsMachine(key,d),machineKey=calStatsMachineKey(machine,key);
+  const stage=STAGES.find(s=>s.key===stageKey),item=stage?.items.find(i=>i.id===itemId);
+  if(!item) return;
+  const now=new Date().toISOString();
+  d.machineSnapshot=machine;
+  d.internalFindings=calMergeFindings(d.internalFindings||[],calAllFindingLogs().filter(e=>e.machineKey===machineKey));
+  let open=d.internalFindings.find(e=>e.itemId===itemId&&!e.closedAt);
+  if(!open && d.stageData[stageKey]?.[itemId]==='fail'){
+    open=calLegacyFinding(key,machine,stage,item);
+    d.internalFindings.push(open);
+  }
+  if(value==='fail'&&!open){
+    const cycle=1+Math.max(0,...d.internalFindings.filter(e=>e.itemId===itemId).map(e=>e.cycle||0));
+    d.internalFindings.push({id:'finding:'+encodeURIComponent(machineKey)+'|'+itemId+'|'+cycle,machineKey,machine,cycle,itemId,
+      stage:stageKey,area:stage.label,item:item.item,criterio:item.criterio,detectedAt:now,closedAt:null,
+      inspector:document.getElementById('field-inspector')?.value||d.inspectors[stageKey]||'',
+      responsable:document.getElementById('field-responsable')?.value||d.responsables[stageKey]||''});
+  }else if(value==='ok'&&open) open.closedAt=now;
+  // Vaciar el resultado no borra ni da por corregida una inconformidad.
+  d.resultDates=d.resultDates||{};
+  d.resultDates[stageKey]={...(d.resultDates[stageKey]||{}),[itemId]:now};
+}
+function calSavePendingInspections(){
+  try{localStorage.setItem(CAL_INSP_PENDING_KEY,JSON.stringify(calInspPending));}
+  catch(e){showToast('No hay respaldo local disponible para los cambios pendientes','red');}
+  estNotifyDataChanged();
+}
+function calRestorePendingInspections(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(CAL_INSP_PENDING_KEY)||'{}');
+    calInspPending={...saved,...calInspPending};
+    Object.entries(calInspPending).forEach(([key,row])=>{
+      if(!row?.data?.stageData) return;
+      row.data.internalFindings=calMergeFindings(inspData[key]?.internalFindings||[],row.data.internalFindings||[]);
+      inspData[key]=row.data;
+    });
+  }catch(e){/* Conserva los datos disponibles en memoria. */}
+}
+async function calFlushPendingInspections(){
+  if(calInspFlushing||!sb) return;
+  calInspFlushing=true;
+  try{
+    while(Object.keys(calInspPending).length){
+      const [key,row]=Object.entries(calInspPending)[0];
+      const {error}=await sb.from('calidad_inspecciones').upsert(row);
+      if(error) throw error;
+      if(calInspPending[key]===row) delete calInspPending[key];
+      calSavePendingInspections();
+    }
+  }catch(e){/* La siguiente acción o actualización reintenta el envío guardado. */}
+  finally{calInspFlushing=false;}
+}
+window.addEventListener('online',()=>{void calFlushPendingInspections();});
+
 async function calFetchAll(){
   try{
     const {data:products,error:productsError}=await sb.from('calidad_productos').select('*').eq('activo',true);
@@ -1631,21 +1741,25 @@ async function calFetchAll(){
 
   const insp = await sbCall(()=>sb.from('calidad_inspecciones').select('*'));
   inspData={};
-  (insp||[]).forEach(row=>{ inspData[row.serial]=row.data; });
+  (insp||[]).forEach(row=>{ inspData[row.serial]={...row.data}; });
+  calRestorePendingInspections();
 
   const hist = await sbCall(()=>sb.from('calidad_historico').select('*').order('created_at',{ascending:false}));
   historico = (hist||[]).map(h=>({
     _dbId:h.id, _machineKey:h.machine_key||h.serial, serial:h.serial, code:h.code, name:h.name, client:h.client, prometido:h.prometido, color:h.color,
-    fechaInsp:h.fecha_insp, conformes:h.conformes, noConformes:h.no_conformes, total:h.total, pct:h.pct,
+    fechaInsp:h.fecha_insp, _createdAt:h.created_at, conformes:h.conformes, noConformes:h.no_conformes, total:h.total, pct:h.pct,
     inspectors:h.inspectors, stageData:h.stage_data||{}
   }));
+  estNotifyDataChanged();
 }
 
 async function calUpsertInsp(serial){
   const d=getInsp(serial);
-  try{
-    await sbCall(()=>sb.from('calidad_inspecciones').upsert({serial, data:d, updated_at:new Date().toISOString()}));
-  }catch(e){ /* sbCall ya avisó; el cambio queda en memoria para reintentar en la próxima acción */ }
+  d.machineSnapshot=calStatsMachine(serial,d);
+  calInspPending[serial]={serial,data:JSON.parse(JSON.stringify(d)),updated_at:new Date().toISOString()};
+  calSavePendingInspections();
+  estNotifyDataChanged();
+  await calFlushPendingInspections();
 }
 
 async function calInsertHistorico(entry){
@@ -1965,7 +2079,7 @@ async function checkAndArchive(machineId){
       conformes:tok,noConformes:tof,total:totalItems,
       pct:Math.round(tok/totalItems*100),
       inspectors:Object.values(d.inspectors).filter(Boolean).join(', ')||'—',
-      stageData:JSON.parse(JSON.stringify(d.stageData)),
+      stageData:JSON.parse(JSON.stringify({...d.stageData,__quality:{events:d.internalFindings||[],machine:d.machineSnapshot||m,resultDates:d.resultDates||{}}})),
     };
     historico.unshift(entry);
     updateHistoricoCount();
@@ -2118,6 +2232,7 @@ function toggleItem(sk,id,el){
   const d=getInsp(currentSerial);
   const cur=(d.stageData[sk]||{})[id]||'';
   const next=cur===''?'ok':cur==='ok'?'fail':'';
+  calRecordInternalResult(currentSerial,sk,id,next);
   d.stageData[sk][id]=next;
   el.className='check-circle '+next;
   el.innerHTML=next==='ok'?'<i class="ti ti-check" style="font-size:11px;color:#fff"></i>':next==='fail'?'<i class="ti ti-x" style="font-size:11px;color:#fff"></i>':'';
@@ -2130,6 +2245,7 @@ function toggleItem(sk,id,el){
 
 function selectResult(sk,id,val){
   const d=getInsp(currentSerial);
+  calRecordInternalResult(currentSerial,sk,id,val);
   d.stageData[sk][id]=val;
   renderChecklist(STAGES[d.currentStageIdx],d);
   updateProgress(STAGES[d.currentStageIdx],d);
@@ -2495,7 +2611,10 @@ function calOpenNotification(id){
   setView('checklist');
   jumpStage(STAGES.findIndex(s=>s.key===notification.etapa));
   calToggleNotifications(false);
-  document.getElementById('stage-title').scrollIntoView({block:'nearest'});
+  if(window.matchMedia('(max-width:760px)').matches && sidebarOpen) toggleSidebar();
+  const title=document.getElementById('stage-title');
+  title.setAttribute('tabindex','-1');title.focus({preventScroll:true});
+  title.scrollIntoView({block:'nearest'});
 }
 document.addEventListener('click',e=>{
   if(!document.getElementById('cal-notifications').hidden && !e.target.closest('#cal-notifications,#cal-bell')) calToggleNotifications(false);
@@ -2659,6 +2778,7 @@ async function requestRefresh(silent){
     btn.disabled=false;
     startCountdown();
     void calSyncNotifications();
+    void calFlushPendingInspections();
   }
 }
 
@@ -2869,7 +2989,12 @@ function calSubscribeRealtime(){
     .on('postgres_changes', {event:'*', schema:'public', table:'calidad_inspecciones'}, payload=>{
       const changedSerial = payload.new && payload.new.serial;
       // No pisamos la máquina que el usuario tiene abierta ahora mismo (evita perder texto sin guardar)
-      if(changedSerial && changedSerial!==currentSerial) inspData[changedSerial]=payload.new.data;
+      if(changedSerial){
+        const events=calMergeFindings(inspData[changedSerial]?.internalFindings||[],payload.new.data?.internalFindings||[]);
+        if(changedSerial!==currentSerial && !calInspPending[changedSerial]) inspData[changedSerial]=payload.new.data;
+        if(inspData[changedSerial]) inspData[changedSerial].internalFindings=events;
+      }
+      estNotifyDataChanged();
       renderList();
       updateSbStats();
     })
@@ -2879,10 +3004,11 @@ function calSubscribeRealtime(){
       const hist = await sbCall(()=>sb.from('calidad_historico').select('*').order('created_at',{ascending:false}));
       historico = (hist||[]).map(h=>({
         _dbId:h.id, _machineKey:h.machine_key||h.serial, serial:h.serial, code:h.code, name:h.name, client:h.client, prometido:h.prometido, color:h.color,
-        fechaInsp:h.fecha_insp, conformes:h.conformes, noConformes:h.no_conformes, total:h.total, pct:h.pct,
+        fechaInsp:h.fecha_insp, _createdAt:h.created_at, conformes:h.conformes, noConformes:h.no_conformes, total:h.total, pct:h.pct,
         inspectors:h.inspectors, stageData:h.stage_data||{}
       }));
       updateHistoricoCount();
+      estNotifyDataChanged();
       if(currentView==='historico') renderHistorico(activeFilter==='historico'?filteredHistorico:historico);
       renderList();
       updateSbStats();
@@ -2893,6 +3019,7 @@ function calSubscribeRealtime(){
 // ── INIT CALIDAD (llamado desde el bloque de init general) ──
 async function calInit(){
   loadMachinesFromCache();
+  calRestorePendingInspections();
   if(MACHINES[0]) setCurrentQualityProfile(MACHINES[0]);
   filterMachines('');
   document.querySelector('#sb-filters .sf').classList.add('active');
@@ -2927,6 +3054,7 @@ function garMapRow(row){
   return {
     id: row.id,
     numero: row.numero!=null ? String(row.numero).padStart(4,'0') : '----',
+    tipoReporte:row.tipo_reporte||'Garantía',
     cliente: row.cliente,
     celular: row.celular,
     direccion: row.direccion,
@@ -2954,6 +3082,7 @@ async function garFetchAll(){
     .select('*, maquinas:garantias_maquinas(*), defectos:garantias_defectos(*)')
     .order('created_at',{ascending:false}));
   GAR_DATA = (rows||[]).map(garMapRow);
+  estNotifyDataChanged();
 }
 
 function garFmtDate(iso){
@@ -3187,11 +3316,16 @@ async function garSubmit(e){
     if(codigo||desc) garTempMachines.push({factura,fechaCompra,codigo,desc});
   }
   const cliente=document.getElementById('gf-cliente').value.trim();
+  const tipoReporte=document.getElementById('gf-tipoReporte').value;
   if(!cliente){ showToast('Ingresa el nombre del cliente','red'); return; }
-  if(garTempMachines.length===0){ showToast('Agrega al menos una máquina a la solicitud','red'); return; }
+  if(tipoReporte==='Garantía'&&garTempMachines.length===0){ showToast('Agrega al menos una máquina a la solicitud','red'); return; }
+  if(tipoReporte!=='Garantía'&&!garTempDefectos.length&&!document.getElementById('gf-descGarantia').value.trim()){
+    showToast('Describe la solicitud del cliente','red');return;
+  }
 
   const payload = {
     cliente,
+    tipoReporte,
     celular: document.getElementById('gf-celular').value.trim(),
     direccion: document.getElementById('gf-direccion').value.trim(),
     fechaVisita: document.getElementById('gf-fechaVisita').value,
@@ -3211,7 +3345,7 @@ async function garSubmit(e){
   const submitBtn = e.target.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
   try{
-    await sbCall(()=>sb.rpc('crear_garantia', {payload}));
+    await sbCall(()=>sb.rpc('crear_reporte_calidad', {payload}));
     await garFetchAll();
     garResetForm();
     garRenderTable();
@@ -3260,7 +3394,7 @@ function garRenderTable(){
       <td>${r.serialMaquina
           ? `<b style="color:var(--yellow);cursor:pointer" onclick="garGoToMachine('${escapeHtml(r.serialMaquina)}')" title="Ver esta máquina en el Histórico de Calidad">#${escapeHtml(r.serialMaquina)}</b>`
           : `<span style="color:var(--text3)" title="Solicitud creada manualmente, sin vínculo a una máquina del histórico">—</span>`}</td>
-      <td>${escapeHtml(garFmtDate(r.fechaVisita)||'—')}</td>
+      <td>${escapeHtml(garFmtDate(r.fechaVisita)||'—')}<div class="badge badge-gray">${escapeHtml(r.tipoReporte||'Garantía')}</div></td>
       <td>${escapeHtml(r.cliente)}</td>
       <td class="obs">${escapeHtml(codes||'—')}</td>
       <td>${garDefectosSummary(r.defectos)}</td>
@@ -3330,16 +3464,18 @@ async function garSaveSeguimiento(id){
   if(!respEl||!fechaEl) return;
   const responsable=respEl.value.trim();
   const fechaCompromiso=fechaEl.value||null;
-  const prevResp=r.responsable, prevFecha=r.fechaCompromiso;
-  r.responsable=responsable; r.fechaCompromiso=fechaCompromiso;
+  const tipoReporte=document.getElementById('ge-tipoReporte').value;
+  const prevResp=r.responsable,prevFecha=r.fechaCompromiso,prevTipo=r.tipoReporte;
+  r.responsable=responsable;r.fechaCompromiso=fechaCompromiso;r.tipoReporte=tipoReporte;
   try{
-    await sbCall(()=>sb.from('garantias_solicitudes').update({responsable, fecha_compromiso:fechaCompromiso}).eq('id',id));
+    await sbCall(()=>sb.from('garantias_solicitudes').update({responsable,fecha_compromiso:fechaCompromiso,tipo_reporte:tipoReporte}).eq('id',id));
     showToast('Seguimiento guardado','green');
     garOpenModal(id);
   }catch(e){
-    r.responsable=prevResp; r.fechaCompromiso=prevFecha;
+    r.responsable=prevResp;r.fechaCompromiso=prevFecha;r.tipoReporte=prevTipo;
     garOpenModal(id);
   }
+  estNotifyDataChanged();
 }
 
 async function garDelete(id){
@@ -3372,7 +3508,74 @@ async function garToggleDefecto(recId,defectoId,checked){
 // Se calcula en el navegador a partir de lo ya cargado en memoria (historico
 // de Calidad y GAR_DATA de Garantías) + config compartida de app_settings.
 // ═══════════════════════════════════════════════════════════════════════
-let estFilters = {desde:'', hasta:'', cliente:'', maquina:'', area:'', tipoDefecto:'', estado:'', responsable:''};
+let estFilters = {origen:'Interna',tipoReporte:'',desde:'', hasta:'', cliente:'', maquina:'', area:'', tipoDefecto:'', estado:'', responsable:''};
+const GAR_TIPOS_REPORTE=['Garantía','Inconformidad','Reclamo','Sugerencia'];
+let estRefreshTimer=null;
+function estNotifyDataChanged(){
+  clearTimeout(estRefreshTimer);
+  estRefreshTimer=setTimeout(()=>{
+    if(document.getElementById('sec-estadisticas')?.classList.contains('active')){
+      estRenderFilters();estApplyFilters();
+    }
+  },0);
+}
+function estSetOrigin(origen){
+  const {desde,hasta}=estFilters;
+  estFilters={origen,tipoReporte:'',desde,hasta,cliente:'',maquina:'',area:'',tipoDefecto:'',estado:'',responsable:''};
+  document.querySelectorAll('[data-est-origin]').forEach(el=>{
+    const active=el.dataset.estOrigin===origen;
+    el.classList.toggle('active',active);el.setAttribute('aria-selected',String(active));
+  });
+  estRenderFilters();estApplyFilters();
+}
+function estDateKey(value){
+  if(!value) return '';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date=new Date(value);
+  return isNaN(date)?'':date.toLocaleDateString('en-CA',{timeZone:'America/Bogota'});
+}
+function estInternalData(){
+  const findings=calAllFindingLogs(),checks=new Map();
+  const known=new Set(findings.map(e=>e.machineKey+'|'+e.itemId));
+  const visit=(key,d,history,priority)=>{
+    const machine=calStatsMachine(key,d,history||{}),machineKey=calStatsMachineKey(machine,key);
+    const stages=getStagesForRecord(history||machine),sd=d.stageData||{};
+    const dates=d.resultDates||sd.__quality?.resultDates||{};
+    const allItems=stages.flatMap(s=>s.items);
+    stages.forEach(stage=>{
+      const values=sd[stage.key]||{};
+      const ids=new Set([...stage.items.map(i=>i.id),...Object.keys(values)]);
+      ids.forEach(id=>{
+        const item=allItems.find(i=>i.id===id)||{id,item:id,criterio:''};
+        const result=values[id]||'';
+        const fecha=dates[stage.key]?.[id]||history?._createdAt||null;
+        const checkKey=machineKey+'|'+id;
+        const check={origen:'Interna',tipoReporte:'Inconformidad',machineKey,fecha,cliente:machine.client||'Sin cliente',
+          maquinaCodigo:machine.code||'—',maquinaDesc:machine.name,serial:machine.serial,area:stage.label,defecto:item.item,
+          responsable:d.responsables?.[stage.key]||'Sin asignar',estado:result==='fail'?'Pendiente':'Corregida',result,priority};
+        const previous=checks.get(checkKey);
+        if(!previous || priority>previous.priority || (priority===previous.priority && (fecha||'')>(previous.fecha||''))) checks.set(checkKey,check);
+        if(result==='fail'&&!known.has(checkKey)){
+          findings.push(calLegacyFinding(key,machine,stage,item,fecha));known.add(checkKey);
+        }
+      });
+    });
+  };
+  Object.entries(inspData).forEach(([key,d])=>visit(key,d,null,2));
+  historico.forEach(h=>visit(h._machineKey||h.serial,{stageData:h.stageData},h,1));
+  return {checks:[...checks.values()].filter(c=>c.result==='ok'||c.result==='fail'),events:calMergeFindings(findings).map(e=>{
+    const current=checks.get(e.machineKey+'|'+e.itemId);
+    const corrected=!!e.closedAt || (e.legacy && current?.result==='ok');
+    return {origen:'Interna',tipoReporte:'Inconformidad',eventId:e.id,solId:e.id,machineKey:e.machineKey,
+      fecha:e.detectedAt,fechaTipo:e.legacy?'Registro previo':'Inspección',fechaCierre:e.closedAt,
+      cliente:e.machine?.client||'Sin cliente',maquinaCodigo:e.machine?.code||'—',maquinaDesc:e.machine?.name||'',serial:e.machine?.serial||'',
+      area:e.area,defecto:e.item,criterio:e.criterio||'',responsable:e.responsable||'Sin asignar',inspector:e.inspector||'',
+      estado:corrected?'Corregida':'Pendiente',corregido:corrected,severidad:'',causa:'',costo:0,esDefecto:true,
+      tiempoCierreDias:e.closedAt&&e.detectedAt?Math.max(0,(new Date(e.closedAt)-new Date(e.detectedAt))/86400000):null};
+  })};
+}
+function estReportRows(rows){return [...new Map(rows.map(r=>[r.solId,r])).values()];}
+function estDefectRows(rows){return rows.filter(r=>r.esDefecto!==false);}
 let estGranularity = 'week';
 let estSortCol = 'fecha';
 let estSortDir = 'desc';
@@ -3400,22 +3603,23 @@ async function renderEstadisticas(){
 
 // ── Datos base: un registro por defecto (join solicitud + defecto) ──
 function estBuildRows(){
-  const rows=[];
+  const rows=estInternalData().events;
   GAR_DATA.forEach(r=>{
     const maquinaCodigo = (r.maquinas||[]).map(m=>m.codigo).filter(Boolean).join(', ') || (r.serialMaquina?`#${r.serialMaquina}`:'—');
     const maquinaDesc = (r.maquinas && r.maquinas[0]) ? r.maquinas[0].desc : '';
     const fecha = r.fechaRegistro || r.createdAt || r.fechaVisita;
     const tiempoCierreDias = (r.fechaCierre && (r.createdAt||r.fechaRegistro))
       ? Math.max(0, (new Date(r.fechaCierre) - new Date(r.createdAt||r.fechaRegistro)) / 86400000) : null;
-    const base = {solId:r.id, fecha, cliente:r.cliente||'Sin cliente', maquinaCodigo, maquinaDesc,
+    const tipoReporte=r.tipoReporte||'Garantía';
+    const base = {origen:'Externa',tipoReporte,solId:r.id,fecha,fechaTipo:'Solicitud de cliente',serial:r.serialMaquina||(r.maquinas||[]).map(m=>m.factura).filter(Boolean).join(', '),cliente:r.cliente||'Sin cliente', maquinaCodigo, maquinaDesc,
       responsable:r.responsable||'Sin asignar', estado:r.estado||'Pendiente', fechaCierre:r.fechaCierre, tiempoCierreDias};
     if(r.defectos && r.defectos.length){
       r.defectos.forEach(d=>{
-        rows.push({...base, area:d.proceso||'Sin área', defecto:d.item||'Sin especificar',
-          severidad:d.severidad||'Media', causa:d.causa||'', corregido:!!d.corregido, costo:d.costo||0});
+        rows.push({...base,eventId:d.id||r.id+':'+rows.length,esDefecto:tipoReporte!=='Sugerencia',area:d.proceso||'Sin área', defecto:d.item||'Sin especificar',criterio:d.criterio||'',
+          severidad:d.severidad||'Media', causa:d.causa||'', corregido:!!d.corregido, costo:Number(d.costo)||0});
       });
     }else{
-      rows.push({...base, area:'', defecto:'', severidad:'', causa:'', corregido:false, costo:0, sinDefecto:true});
+      rows.push({...base,eventId:r.id,area:'Sin área',defecto:r.descGarantia||tipoReporte,criterio:'',severidad:'',causa:'',corregido:false,costo:0,esDefecto:false,sinDefecto:true});
     }
   });
   return rows;
@@ -3424,8 +3628,10 @@ function estBuildRows(){
 function estFilteredRows(rows){
   let list = rows || estBuildRows();
   const f=estFilters;
-  if(f.desde) list=list.filter(r=>r.fecha && String(r.fecha).slice(0,10)>=f.desde);
-  if(f.hasta) list=list.filter(r=>r.fecha && String(r.fecha).slice(0,10)<=f.hasta);
+  list=list.filter(r=>r.origen===f.origen);
+  if(f.tipoReporte) list=list.filter(r=>r.tipoReporte===f.tipoReporte);
+  if(f.desde) list=list.filter(r=>estDateKey(r.fecha)>=f.desde);
+  if(f.hasta) list=list.filter(r=>estDateKey(r.fecha)&&estDateKey(r.fecha)<=f.hasta);
   if(f.cliente) list=list.filter(r=>r.cliente===f.cliente);
   if(f.maquina) list=list.filter(r=>r.maquinaCodigo.includes(f.maquina));
   if(f.area) list=list.filter(r=>r.area===f.area);
@@ -3438,28 +3644,30 @@ function estFilteredRows(rows){
 function estRenderFilters(){
   const el=document.getElementById('est-filters');
   if(!el) return;
-  const allRows=estBuildRows();
+  const allRows=estBuildRows().filter(r=>r.origen===estFilters.origen);
+  if(estFilters.origen==='Interna') allRows.push(...estInternalData().checks);
   const uniq=(field)=>[...new Set(allRows.map(r=>r[field]).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   const clientes=uniq('cliente');
   const maquinas=[...new Set(allRows.map(r=>r.maquinaCodigo).filter(v=>v&&v!=='—'))].sort((a,b)=>a.localeCompare(b));
-  const areas=STAGES.map(s=>s.label);
+  const areas=uniq('area');
   const defectos=uniq('defecto');
   const responsables=uniq('responsable');
   const opt=(v,cur)=>`<option value="${escapeHtml(v)}" ${cur===v?'selected':''}>${escapeHtml(v)}</option>`;
   el.innerHTML = `
+    ${estFilters.origen==='Externa'?`<div class="est-filter-field"><label>Tipo de solicitud</label><select aria-label="Tipo de solicitud" onchange="estFilters.tipoReporte=this.value;estApplyFilters()"><option value="">Todos</option>${GAR_TIPOS_REPORTE.map(t=>opt(t,estFilters.tipoReporte)).join('')}</select></div>`:''}
     <div class="est-filter-field"><label>Desde</label><input type="date" value="${estFilters.desde}" onchange="estFilters.desde=this.value;estApplyFilters()"></div>
     <div class="est-filter-field"><label>Hasta</label><input type="date" value="${estFilters.hasta}" onchange="estFilters.hasta=this.value;estApplyFilters()"></div>
     <div class="est-filter-field"><label>Cliente</label><select onchange="estFilters.cliente=this.value;estApplyFilters()"><option value="">Todos</option>${clientes.map(c=>opt(c,estFilters.cliente)).join('')}</select></div>
     <div class="est-filter-field"><label>Máquina / referencia</label><select onchange="estFilters.maquina=this.value;estApplyFilters()"><option value="">Todas</option>${maquinas.map(c=>opt(c,estFilters.maquina)).join('')}</select></div>
     <div class="est-filter-field"><label>Área responsable</label><select onchange="estFilters.area=this.value;estApplyFilters()"><option value="">Todas</option>${areas.map(c=>opt(c,estFilters.area)).join('')}</select></div>
     <div class="est-filter-field"><label>Tipo de defecto</label><select onchange="estFilters.tipoDefecto=this.value;estApplyFilters()"><option value="">Todos</option>${defectos.map(c=>opt(c,estFilters.tipoDefecto)).join('')}</select></div>
-    <div class="est-filter-field"><label>Estado garantía</label><select onchange="estFilters.estado=this.value;estApplyFilters()"><option value="">Todos</option>${GAR_ESTADOS.map(c=>opt(c,estFilters.estado)).join('')}</select></div>
+    <div class="est-filter-field"><label>Estado del reporte</label><select aria-label="Estado del reporte" onchange="estFilters.estado=this.value;estApplyFilters()"><option value="">Todos</option>${(estFilters.origen==='Interna'?['Pendiente','Corregida']:GAR_ESTADOS).map(c=>opt(c,estFilters.estado)).join('')}</select></div>
     <div class="est-filter-field"><label>Responsable</label><select onchange="estFilters.responsable=this.value;estApplyFilters()"><option value="">Todos</option>${responsables.map(c=>opt(c,estFilters.responsable)).join('')}</select></div>
   `;
 }
 
 function estResetFilters(){
-  estFilters={desde:'',hasta:'',cliente:'',maquina:'',area:'',tipoDefecto:'',estado:'',responsable:''};
+  estFilters={origen:estFilters.origen,tipoReporte:'',desde:'',hasta:'',cliente:'',maquina:'',area:'',tipoDefecto:'',estado:'',responsable:''};
   estRenderFilters();
   estApplyFilters();
 }
@@ -3469,17 +3677,19 @@ function estResetFilters(){
 function estApplyFilters(){
   const rows=estFilteredRows();
   estCurrentRows=rows;
+  const pending=Object.keys(calInspPending).length;
+  document.getElementById('est-sync-info').textContent=pending?`${pending} inspección(es) pendientes de sincronizar`:'';
   const steps=[
     ['KPIs', ()=>estRenderKpis(rows)],
     ['Semáforo', ()=>estRenderSemaforo(rows)],
-    ['Gráfico Pareto', ()=>estRenderParetoChart(rows)],
+    ['Gráfico Pareto', ()=>estRenderParetoChart(estDefectRows(rows))],
     ['Gráfico por estado', ()=>estRenderEstadoChart(rows)],
-    ['Gráfico por área', ()=>estRenderAreaChart(rows)],
+    ['Gráfico por área', ()=>estRenderAreaChart(estDefectRows(rows))],
     ['Gráfico de tendencia', ()=>estRenderTrendChart(rows)],
-    ['Gráfico de máquinas', ()=>estRenderMaquinasChart(rows)],
+    ['Gráfico de máquinas', ()=>estRenderMaquinasChart(estDefectRows(rows))],
     ['Gráfico de clientes', ()=>estRenderClientesChart(rows)],
-    ['Mapas de calor', ()=>estRenderHeatmaps(rows)],
-    ['Indicadores inteligentes', ()=>estRenderInsights(rows)],
+    ['Mapas de calor', ()=>estRenderHeatmaps(estDefectRows(rows))],
+    ['Indicadores inteligentes', ()=>estRenderInsights(estDefectRows(rows))],
     ['Tabla', ()=>estRenderTable()],
   ];
   steps.forEach(([nombre, fn])=>{
@@ -3491,6 +3701,15 @@ function estApplyFilters(){
 function estRenderKpis(rows){
   const el=document.getElementById('est-kpis');
   if(!el) return;
+  if(estFilters.origen==='Interna'){
+    const checks=estFilteredRows(estInternalData().checks),ok=checks.filter(c=>c.result==='ok').length;
+    const closed=rows.filter(r=>r.corregido).length;
+    const cards=[{n:rows.length,l:'Inconformidades detectadas'},{n:rows.length-closed,l:'Inconformidades pendientes'},
+      {n:closed,l:'Inconformidades corregidas'},{n:new Set(rows.map(r=>r.machineKey)).size,l:'Máquinas con inconformidad'},
+      {n:checks.length,l:'Ítems revisados'},{n:checks.length?Math.round(ok/checks.length*100)+'%':'—',l:'Conformidad actual de ítems revisados'}];
+    el.innerHTML=cards.map(c=>`<div class="kpi-card"><div class="kpi-n">${c.n}</div><div class="kpi-l">${c.l}</div></div>`).join('');
+    return;
+  }
   const solIds=[...new Set(rows.map(r=>r.solId))];
   const sols=GAR_DATA.filter(r=>solIds.includes(r.id));
   const total=sols.length;
@@ -3502,25 +3721,27 @@ function estRenderKpis(rows){
   const tMax = tiempos.length? Math.round(Math.max(...tiempos)):null;
   const tMin = tiempos.length? Math.round(Math.min(...tiempos)):null;
 
-  const areaCounts={}; rows.forEach(r=>{if(r.area) areaCounts[r.area]=(areaCounts[r.area]||0)+1;});
+  const areaCounts={}; estDefectRows(rows).forEach(r=>{if(r.area) areaCounts[r.area]=(areaCounts[r.area]||0)+1;});
   const topArea=Object.entries(areaCounts).sort((a,b)=>b[1]-a[1])[0];
-  const defCounts={}; rows.forEach(r=>{if(r.defecto) defCounts[r.defecto]=(defCounts[r.defecto]||0)+1;});
+  const defCounts={}; estDefectRows(rows).forEach(r=>{if(r.defecto) defCounts[r.defecto]=(defCounts[r.defecto]||0)+1;});
   const topDef=Object.entries(defCounts).sort((a,b)=>b[1]-a[1])[0];
-  const maqCounts={}; rows.forEach(r=>{if(r.maquinaCodigo&&r.maquinaCodigo!=='—') maqCounts[r.maquinaCodigo]=(maqCounts[r.maquinaCodigo]||0)+1;});
+  const maqCounts={}; estReportRows(rows).forEach(r=>{if(r.maquinaCodigo&&r.maquinaCodigo!=='—') maqCounts[r.maquinaCodigo]=(maqCounts[r.maquinaCodigo]||0)+1;});
   const topMaq=Object.entries(maqCounts).sort((a,b)=>b[1]-a[1])[0];
   const cliCounts={}; sols.forEach(r=>{if(r.cliente) cliCounts[r.cliente]=(cliCounts[r.cliente]||0)+1;});
   const topCli=Object.entries(cliCounts).sort((a,b)=>b[1]-a[1])[0];
 
   const pctCerradas = total? Math.round((cerradas/total)*100):0;
-  const costoTotal = rows.reduce((a,r)=>a+(r.costo||0),0);
+  const costoTotal = estDefectRows(rows).reduce((a,r)=>a+Number(r.costo||0),0);
   const hayCosto = rows.some(r=>r.costo>0);
 
   const kpis=[
-    {n:total, l:'Total de garantías'},
-    {n:abiertas, l:'Garantías abiertas', cls:abiertas>0?'kpi-red':'kpi-green'},
-    {n:enProceso, l:'Garantías en proceso'},
-    {n:cerradas, l:'Garantías cerradas', cls:'kpi-green'},
-    {n:pctCerradas+'%', l:'% garantías cerradas', cls:pctCerradas>=80?'kpi-green':pctCerradas>=60?'':'kpi-red'},
+    {n:total, l:'Solicitudes de clientes'},
+    ...GAR_TIPOS_REPORTE.map(t=>({n:sols.filter(r=>(r.tipoReporte||'Garantía')===t).length,l:t})),
+    {n:estDefectRows(rows).length,l:'Defectos reportados'},
+    {n:abiertas, l:'Solicitudes abiertas', cls:abiertas>0?'kpi-red':'kpi-green'},
+    {n:enProceso, l:'Solicitudes en proceso'},
+    {n:cerradas, l:'Solicitudes cerradas', cls:'kpi-green'},
+    {n:pctCerradas+'%', l:'% solicitudes cerradas', cls:pctCerradas>=80?'kpi-green':pctCerradas>=60?'':'kpi-red'},
     {n:tProm!=null?tProm+' d':'—', l:'Tiempo promedio de cierre'},
     {n:tMax!=null?tMax+' d':'—', l:'Tiempo máximo de cierre'},
     {n:tMin!=null?tMin+' d':'—', l:'Tiempo mínimo de cierre'},
@@ -3541,8 +3762,9 @@ function estRenderKpis(rows){
 function estRenderSemaforo(rows){
   const el=document.getElementById('est-semaforo');
   if(!el) return;
-  const totalItems = historico.reduce((a,h)=>a+(h.total||0),0);
-  const totalConf = historico.reduce((a,h)=>a+(h.conformes||0),0);
+  const checks=estFilteredRows(estInternalData().checks);
+  const totalItems=checks.length;
+  const totalConf=checks.filter(c=>c.result==='ok').length;
   const calPct = totalItems? Math.round((totalConf/totalItems)*100):null;
 
   const solIds=[...new Set(rows.map(r=>r.solId))];
@@ -3558,9 +3780,9 @@ function estRenderSemaforo(rows){
   const nivelTiempo=(val)=>{ if(val==null) return null; if(val<=c.tiempoAmarillo) return 'g'; if(val<=c.tiempoRojo) return 'y'; return 'r'; };
 
   const items=[
-    {label:'Calidad en planta', txt:calPct!=null?calPct+'%':'Sin datos', nivel:nivelPct(calPct,c.calVerde,c.calAmarillo)},
-    {label:'Garantías cerradas', txt:garPct!=null?garPct+'%':'Sin datos', nivel:nivelPct(garPct,c.garVerde,c.garAmarillo)},
-    {label:'Tiempo máx. de cierre', txt:tMax!=null?tMax+' días':'Sin datos', nivel:nivelTiempo(tMax)},
+    ...(estFilters.origen==='Interna'?[{label:'Conformidad interna actual',txt:calPct!=null?calPct+'%':'Sin datos',nivel:nivelPct(calPct,c.calVerde,c.calAmarillo)}]:[
+      {label:'Solicitudes externas cerradas',txt:garPct!=null?garPct+'%':'Sin datos',nivel:nivelPct(garPct,c.garVerde,c.garAmarillo)},
+      {label:'Tiempo máx. de cierre externo',txt:tMax!=null?tMax+' días':'Sin datos',nivel:nivelTiempo(tMax)}]),
   ];
   const clsMap={g:'semaforo-g',y:'semaforo-y',r:'semaforo-r'};
   el.innerHTML = items.map(it=>`
@@ -3613,8 +3835,9 @@ function estRenderParetoChart(rows){
   if(!window.Chart) return;
   const counts={};
   rows.forEach(r=>{ if(r.defecto) counts[r.defecto]=(counts[r.defecto]||0)+1; });
-  const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  const total=entries.reduce((a,[,v])=>a+v,0)||1;
+  const allEntries=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const entries=allEntries.slice(0,10);
+  const total=allEntries.reduce((a,[,v])=>a+v,0)||1;
   let acc=0;
   const accPct=entries.map(([,v])=>{acc+=v; return Math.round((acc/total)*100);});
   const ctx=document.getElementById('chart-pareto');
@@ -3642,16 +3865,16 @@ function estRenderParetoChart(rows){
 
 function estRenderEstadoChart(rows){
   if(!window.Chart) return;
-  const solIds=[...new Set(rows.map(r=>r.solId))];
-  const sols=GAR_DATA.filter(r=>solIds.includes(r.id));
-  const counts={}; GAR_ESTADOS.forEach(e=>counts[e]=0);
+  const sols=estReportRows(rows);
+  const estados=estFilters.origen==='Interna'?['Pendiente','Corregida']:GAR_ESTADOS;
+  const counts={}; estados.forEach(e=>counts[e]=0);
   sols.forEach(r=>{const e=r.estado||'Pendiente'; counts[e]=(counts[e]||0)+1;});
-  const colors={'Pendiente':cssVar('--yellow'),'En revisión':cssVar('--yellow-dim'),'Aprobada':cssVar('--green'),'Resuelta':cssVar('--green'),'Rechazada':cssVar('--red')};
+  const colors={'Pendiente':cssVar('--yellow'),'Corregida':cssVar('--green'),'En revisión':cssVar('--yellow-dim'),'Aprobada':cssVar('--green'),'Resuelta':cssVar('--green'),'Rechazada':cssVar('--red')};
   const ctx=document.getElementById('chart-estado'); if(!ctx) return;
   if(estCharts.estado) estCharts.estado.destroy();
   estCharts.estado = new Chart(ctx,{
     type:'doughnut',
-    data:{labels:GAR_ESTADOS, datasets:[{data:GAR_ESTADOS.map(e=>counts[e]), backgroundColor:GAR_ESTADOS.map(e=>colors[e])}]},
+    data:{labels:estados, datasets:[{data:estados.map(e=>counts[e]), backgroundColor:estados.map(e=>colors[e])}]},
     options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:10,font:{size:11}}}}}
   });
 }
@@ -3671,24 +3894,24 @@ function estRenderAreaChart(rows){
 }
 
 function estGroupKey(dateStr, gran){
-  const d=new Date(dateStr);
-  if(isNaN(d)) return null;
-  if(gran==='day') return d.toISOString().slice(0,10);
+  const day=estDateKey(dateStr);
+  if(!day) return null;
+  const d=new Date(day+'T12:00:00Z');
+  if(gran==='day') return day;
   if(gran==='week'){
-    const onejan=new Date(d.getFullYear(),0,1);
-    const week=Math.ceil((((d-onejan)/86400000)+onejan.getDay()+1)/7);
-    return `${d.getFullYear()}-S${String(week).padStart(2,'0')}`;
+    const onejan=new Date(Date.UTC(d.getUTCFullYear(),0,1,12));
+    const week=Math.ceil((((d-onejan)/86400000)+onejan.getUTCDay()+1)/7);
+    return `${d.getUTCFullYear()}-S${String(week).padStart(2,'0')}`;
   }
-  if(gran==='month') return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-  return String(d.getFullYear());
+  if(gran==='month') return day.slice(0,7);
+  return day.slice(0,4);
 }
 function estRenderTrendChart(rows){
   if(!window.Chart) return;
-  const solIds=[...new Set(rows.map(r=>r.solId))];
-  const sols=GAR_DATA.filter(r=>solIds.includes(r.id));
+  const sols=estReportRows(rows);
   const counts={};
   sols.forEach(r=>{
-    const f=r.fechaRegistro||r.createdAt||r.fechaVisita;
+    const f=r.fecha;
     const key=estGroupKey(f, estGranularity);
     if(key) counts[key]=(counts[key]||0)+1;
   });
@@ -3724,8 +3947,7 @@ function estRenderMaquinasChart(rows){
 
 function estRenderClientesChart(rows){
   if(!window.Chart) return;
-  const solIds=[...new Set(rows.map(r=>r.solId))];
-  const sols=GAR_DATA.filter(r=>solIds.includes(r.id));
+  const sols=estReportRows(rows);
   const counts={};
   sols.forEach(r=>{ if(r.cliente) counts[r.cliente]=(counts[r.cliente]||0)+1; });
   const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,8);
@@ -3787,6 +4009,8 @@ function estRenderInsights(rows){
   const allRows=estBuildRows();
   const f=estFilters;
   function passOtherFilters(r){
+    if(r.origen!==f.origen || r.esDefecto===false) return false;
+    if(f.tipoReporte && r.tipoReporte!==f.tipoReporte) return false;
     if(f.cliente && r.cliente!==f.cliente) return false;
     if(f.maquina && !r.maquinaCodigo.includes(f.maquina)) return false;
     if(f.area && r.area!==f.area) return false;
@@ -3843,11 +4067,16 @@ function estRenderInsights(rows){
 
 // ── Tabla dinámica: buscar, ordenar, exportar ──
 const estTableCols=[
-  {key:'fecha', label:'Fecha', fmt:v=>v?new Date(v).toLocaleDateString('es-CO'):'—'},
+  {key:'fecha',label:'Fecha y hora',fmt:v=>v?new Date(v).toLocaleString('es-CO',{timeZone:'America/Bogota'}):'Sin fecha registrada'},
+  {key:'origen',label:'Calidad'},
+  {key:'tipoReporte',label:'Tipo de reporte'},
+  {key:'serial',label:'Serial'},
   {key:'cliente', label:'Cliente'},
   {key:'maquinaCodigo', label:'Máquina'},
   {key:'area', label:'Área'},
-  {key:'defecto', label:'Defecto'},
+  {key:'defecto', label:'Hallazgo / solicitud'},
+  {key:'criterio',label:'Criterio'},
+  {key:'fechaTipo',label:'Origen de fecha'},
   {key:'responsable', label:'Responsable'},
   {key:'estado', label:'Estado'},
   {key:'tiempoCierreDias', label:'Tiempo de cierre', fmt:v=>v!=null?Math.round(v)+' d':'—'},
@@ -3858,7 +4087,7 @@ function estRenderTable(){
   const countEl=document.getElementById('est-table-count');
   if(!head||!body) return;
   head.innerHTML = estTableCols.map(c=>`<th class="est-th-sort" onclick="estSortBy('${c.key}')">${c.label}${estSortCol===c.key?(estSortDir==='asc'?' ▲':' ▼'):''}</th>`).join('');
-  let rows=(estCurrentRows||[]).filter(r=>!r.sinDefecto);
+  let rows=estCurrentRows||[];
   const q=(document.getElementById('est-table-search')?.value||'').toLowerCase();
   if(q) rows=rows.filter(r=>estTableCols.some(c=>String(r[c.key]||'').toLowerCase().includes(q)));
   rows=[...rows].sort((a,b)=>{
@@ -3880,7 +4109,7 @@ function estSortBy(key){
 }
 
 function estExportCSV(){
-  const rows=(estCurrentRows||[]).filter(r=>!r.sinDefecto);
+  const rows=estCurrentRows||[];
   if(!rows.length){ showToast('No hay datos para exportar','red'); return; }
   const header=estTableCols.map(c=>c.label).join(',');
   const lines=rows.map(r=>estTableCols.map(c=>{
@@ -3895,7 +4124,7 @@ function estExportCSV(){
 }
 
 function estExportPDF(){
-  const rows=(estCurrentRows||[]).filter(r=>!r.sinDefecto);
+  const rows=estCurrentRows||[];
   if(!rows.length){ showToast('No hay datos para exportar','red'); return; }
   const w=window.open('','_blank');
   if(!w){ showToast('El navegador bloqueó la ventana emergente. Permite pop-ups para exportar a PDF.','red'); return; }
@@ -3965,6 +4194,7 @@ function garOpenModal(id){
 
       <div class="section-lbl no-print">Seguimiento de la solución</div>
       <div class="form-grid no-print">
+        <div class="field"><label for="ge-tipoReporte">Tipo de solicitud del cliente</label><select id="ge-tipoReporte">${GAR_TIPOS_REPORTE.map(t=>`<option ${t===(r.tipoReporte||'Garantía')?'selected':''}>${t}</option>`).join('')}</select></div>
         <div class="field"><label>Responsable del reproceso</label><input id="ge-responsable" value="${escapeHtml(r.responsable||'')}"></div>
         <div class="field"><label>Fecha compromiso</label><input id="ge-fechaCompromiso" type="date" value="${r.fechaCompromiso?String(r.fechaCompromiso).slice(0,10):''}"></div>
       </div>
@@ -4013,6 +4243,7 @@ function garExportCSV(){
 }
 
 function garUpdateStats(){
+  estNotifyDataChanged();
   const total=GAR_DATA.length;
   const pend=GAR_DATA.filter(r=>r.estado==='Pendiente'||r.estado==='En revisión').length;
   const res=GAR_DATA.filter(r=>r.estado==='Resuelta'||r.estado==='Aprobada').length;
