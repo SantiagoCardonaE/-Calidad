@@ -70,6 +70,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
 .cal-not-row{display:flex;width:100%;gap:10px;align-items:flex-start;text-align:left;padding:12px;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);font:inherit;cursor:pointer}
 .cal-not-row:hover,.cal-not-row:focus-visible{background:var(--surface)}
 .cal-not-row.unread{background:var(--yellow-bg)}
+.cal-not-entry{display:flex;align-items:stretch;border-bottom:1px solid var(--border)}
+.cal-not-entry .cal-not-row{flex:1;min-width:0;border-bottom:0}
+.cal-not-delete,.est-delete-finding{width:32px;height:32px;padding:0;justify-content:center;flex-shrink:0;color:var(--text2)}
+.cal-not-delete{margin:8px 6px 0 0}
+.cal-not-delete:hover,.est-delete-finding:hover{color:var(--red)}
+#est-table .est-actions{position:sticky;right:0;z-index:1;background:var(--surface);text-align:center;min-width:64px;border-left:1px solid var(--border)}
 .cal-not-icon{width:26px;flex-shrink:0;font-size:20px;color:var(--yellow)}
 .cal-not-row[data-stage="pintado"] .cal-not-icon{color:#60a5fa}
 .cal-not-row[data-stage="ensamble"] .cal-not-icon{color:var(--green)}
@@ -291,8 +297,8 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 .metric-num{font-size:22px;font-weight:600}
 .metric-lbl{font-size:11px;color:var(--text2);margin-top:2px}
 .sum-stage{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:6px}
-[data-tip]{position:relative}
-[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);background:#111;color:var(--text);font-size:11px;padding:3px 7px;border-radius:4px;white-space:nowrap;border:1px solid var(--border2);pointer-events:none;z-index:99}
+#app-tooltip{position:fixed;inset:auto;max-width:min(320px,calc(100vw - 16px));padding:7px 10px;border:1px solid var(--border2);border-radius:4px;background:#111;color:#f0f0f0;font-size:12px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;pointer-events:none;z-index:10000;box-shadow:0 3px 12px #0008}
+#app-tooltip[hidden]{display:none}
 
 /* ══════════════ GARANTÍAS ══════════════ */
 #gar-content{flex:1;overflow-y:auto;padding:16px}
@@ -918,6 +924,40 @@ async function sbCall(promiseFn){
 function escapeHtml(s){
   return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+// Una sola ayuda fuera de los contenedores con overflow, siempre dentro de la ventana.
+const appTooltip=document.createElement('div');
+appTooltip.id='app-tooltip';appTooltip.setAttribute('role','tooltip');appTooltip.hidden=true;
+document.body.appendChild(appTooltip);
+let appTooltipTarget=null;
+function hideAppTooltip(){
+  if(appTooltipTarget){
+    const ids=(appTooltipTarget.getAttribute('aria-describedby')||'').split(/\s+/).filter(id=>id&&id!=='app-tooltip');
+    if(ids.length) appTooltipTarget.setAttribute('aria-describedby',ids.join(' '));
+    else appTooltipTarget.removeAttribute('aria-describedby');
+  }
+  appTooltipTarget=null;appTooltip.hidden=true;
+}
+function showAppTooltip(target){
+  const text=target?.getAttribute('data-tip');
+  if(!text) return;
+  hideAppTooltip();appTooltipTarget=target;appTooltip.textContent=text;
+  appTooltip.style.left='8px';appTooltip.style.top='8px';appTooltip.hidden=false;
+  const rect=target.getBoundingClientRect(),tip=appTooltip.getBoundingClientRect();
+  const width=document.documentElement.clientWidth,height=document.documentElement.clientHeight;
+  const left=Math.max(8,Math.min(rect.left+(rect.width-tip.width)/2,width-tip.width-8));
+  const preferred=rect.top>=tip.height+14?rect.top-tip.height-6:rect.bottom+6;
+  appTooltip.style.left=left+'px';appTooltip.style.top=Math.max(8,Math.min(preferred,height-tip.height-8))+'px';
+  const ids=(target.getAttribute('aria-describedby')||'').split(/\s+/).filter(Boolean);
+  target.setAttribute('aria-describedby',[...new Set([...ids,'app-tooltip'])].join(' '));
+}
+document.addEventListener('pointerover',e=>{const target=e.target.closest?.('[data-tip]');if(target&&target!==appTooltipTarget) showAppTooltip(target);});
+document.addEventListener('pointerout',e=>{if(appTooltipTarget&&!appTooltipTarget.contains(e.relatedTarget)) hideAppTooltip();});
+document.addEventListener('focusin',e=>showAppTooltip(e.target.closest?.('[data-tip]')));
+document.addEventListener('focusout',hideAppTooltip);
+document.addEventListener('scroll',hideAppTooltip,true);
+document.addEventListener('pointerdown',hideAppTooltip);
+document.addEventListener('keydown',e=>{if(e.key==='Escape') hideAppTooltip();});
+window.addEventListener('resize',hideAppTooltip);
 function showToast(msg,type='green'){
   const t=document.createElement('div');
   t.style.cssText=`position:fixed;bottom:20px;right:20px;z-index:9999;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:500;border:1px solid;
@@ -1634,7 +1674,7 @@ function calMergeFindings(...lists){
   lists.flat().forEach(event=>{
     if(!event?.id) return;
     const old=map.get(event.id);
-    map.set(event.id,{...old,...event,closedAt:event.closedAt||old?.closedAt||null});
+    map.set(event.id,{...old,...event,closedAt:event.closedAt||old?.closedAt||null,voidedAt:event.voidedAt||old?.voidedAt||null});
   });
   return [...map.values()];
 }
@@ -1672,6 +1712,20 @@ function calLegacyFinding(key,machine,stage,item,fecha=null){
   return {id:'legacy:'+encodeURIComponent(machineKey)+'|'+item.id,machineKey,machine,cycle:0,itemId:item.id,
     stage:stage.key,area:stage.label,item:item.item,criterio:item.criterio,detectedAt:fecha,closedAt:null,
     inspector:'',responsable:'',legacy:true};
+}
+async function calVoidInternalFinding(id){
+  const event=estInternalData().logs.find(e=>e.id===id&&!e.voidedAt);
+  if(!event) return;
+  if(!confirm(`¿Eliminar de estadísticas la falla "${event.item}" de la máquina #${event.machine?.serial||''}?\n\nLa inspección y su historial no se modificarán. El retiro se sincroniza con los demás equipos.`)) return;
+  hideAppTooltip();
+  const key=Object.keys(inspData).find(k=>calStatsMachineKey(calStatsMachine(k,inspData[k]),k)===event.machineKey)
+    ||'stats-audit:'+encodeURIComponent(event.machineKey);
+  if(!inspData[key]) inspData[key]={statsOnly:true,stageData:{},inspectors:{},responsables:{},stageObs:{},machineSnapshot:event.machine};
+  const d=inspData[key];
+  d.internalFindings=calMergeFindings(d.internalFindings||[],[{...event,voidedAt:new Date().toISOString()}]);
+  await calUpsertInsp(key);
+  estRenderFilters();estApplyFilters();
+  showToast(calInspPending[key]?'Falla retirada; sincronización pendiente':'Falla retirada de estadísticas',calInspPending[key]?'yellow':'green');
 }
 function calRecordInternalResult(key,stageKey,itemId,value){
   const d=getInsp(key),machine=calStatsMachine(key,d),machineKey=calStatsMachineKey(machine,key);
@@ -2434,7 +2488,7 @@ const CAL_PRODUCTION_STAGES={
   ensamble:{code:'ENS',label:'Ensamble',icon:'ti-settings'}
 };
 const CAL_NOT_CACHE_KEY='xtensor_quality_notifications_v1';
-let calNotifications={events:[],states:{},queue:[],reads:{}};
+let calNotifications={events:[],states:{},queue:[],reads:{},deletes:{}};
 let calNotSyncing=false,calNotSyncAgain=false,calNotFilter='all',calNotLimit=50;
 let calNotStorageOk=true,calNotCloudOk=false;
 function calProductionKey(machine){
@@ -2451,7 +2505,7 @@ function calLoadNotifications(){
   try{
     const saved=JSON.parse(localStorage.getItem(CAL_NOT_CACHE_KEY)||'null');
     if(saved && Array.isArray(saved.events) && Array.isArray(saved.queue)) calNotifications={
-      events:saved.events,queue:saved.queue,states:saved.states||{},reads:saved.reads||{}
+      events:saved.events,queue:saved.queue,states:saved.states||{},reads:saved.reads||{},deletes:saved.deletes||{}
     };
   }catch(e){calNotStorageOk=false;}
   calRenderNotifications();
@@ -2465,7 +2519,8 @@ function calMergeNotification(event){
   if(!event?.id || !CAL_PRODUCTION_STAGES[event.etapa]) return;
   const index=calNotifications.events.findIndex(n=>n.id===event.id);
   const previous=index>=0?calNotifications.events[index]:null;
-  const merged={...event,leida_at:calNotifications.reads[event.id]||event.leida_at||previous?.leida_at||null};
+  const merged={...event,leida_at:calNotifications.reads[event.id]||event.leida_at||previous?.leida_at||null,
+    eliminada_at:calNotifications.deletes[event.id]||event.eliminada_at||previous?.eliminada_at||null};
   if(index>=0) calNotifications.events[index]=merged;
   else calNotifications.events.push(merged);
 }
@@ -2510,12 +2565,15 @@ async function calSyncNotifications(){
       data.forEach(({input_token,notification})=>{
         const provisional=calNotifications.events.find(n=>n.id===input_token && n.pending);
         const readAt=calNotifications.reads[input_token]||provisional?.leida_at;
+        const deletedAt=calNotifications.deletes[input_token]||provisional?.eliminada_at;
         calNotifications.events=calNotifications.events.filter(n=>!(n.id===input_token && n.pending));
         if(notification){
           if(readAt) calNotifications.reads[notification.id]=readAt;
+          if(deletedAt) calNotifications.deletes[notification.id]=deletedAt;
           calMergeNotification(notification);
         }
         if(input_token!==notification?.id) delete calNotifications.reads[input_token];
+        if(input_token!==notification?.id) delete calNotifications.deletes[input_token];
       });
       const acknowledged=new Set(batch.map(o=>o.token));
       calNotifications.queue=calNotifications.queue.filter(o=>!acknowledged.has(o.token));
@@ -2526,6 +2584,13 @@ async function calSyncNotifications(){
       const {error}=await sb.from('calidad_notificaciones').update({leida_at:readAt}).eq('id',id);
       if(error) throw error;
       if(calNotifications.reads[id]===readAt) delete calNotifications.reads[id];
+    }
+    for(const [id,deletedAt] of Object.entries(calNotifications.deletes)){
+      if(calNotifications.events.some(n=>n.id===id && n.pending)) continue;
+      const {data,error}=await sb.from('calidad_notificaciones').update({eliminada_at:deletedAt}).eq('id',id).select('id');
+      if(error) throw error;
+      if(!data?.some(n=>n.id===id)) throw new Error('No se pudo confirmar la eliminación del aviso');
+      if(calNotifications.deletes[id]===deletedAt) delete calNotifications.deletes[id];
     }
     for(let offset=0;;offset+=1000){
       const {data,error}=await sb.from('calidad_notificaciones').select('*').order('detectada_at',{ascending:false}).order('id').range(offset,offset+999);
@@ -2544,7 +2609,7 @@ async function calSyncNotifications(){
   }
 }
 function calRenderNotifications(){
-  const unread=calNotifications.events.filter(n=>!n.leida_at).length;
+  const unread=calNotifications.events.filter(n=>!n.leida_at&&!n.eliminada_at&&!calNotifications.deletes[n.id]).length;
   const badge=document.getElementById('cal-bell-count');
   badge.textContent=unread>99?'99+':String(unread);badge.hidden=!unread;
   document.getElementById('cal-bell').setAttribute('aria-label',`Notificaciones de Calidad: ${unread} no leídas`);
@@ -2555,23 +2620,25 @@ function calRenderNotifications(){
   const list=document.getElementById('cal-not-list'),scroll=list.scrollTop;
   const focused=document.activeElement?.dataset?.notificationId;
   const stage=document.getElementById('cal-not-stage').value;
-  const events=calNotifications.events.filter(n=>(calNotFilter!=='unread'||!n.leida_at)&&(!stage||n.etapa===stage))
+  const events=calNotifications.events.filter(n=>!n.eliminada_at&&!calNotifications.deletes[n.id]&&(calNotFilter!=='unread'||!n.leida_at)&&(!stage||n.etapa===stage))
     .sort((a,b)=>b.detectada_at.localeCompare(a.detectada_at)||a.id.localeCompare(b.id));
   list.innerHTML=events.slice(0,calNotLimit).map(n=>{
     const def=CAL_PRODUCTION_STAGES[n.etapa],m=n.maquina||{};
     const time=new Date(n.detectada_at).toLocaleString('es-CO',{timeZone:'America/Bogota',year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    return `<button class="cal-not-row${n.leida_at?'':' unread'}" data-stage="${n.etapa}" data-notification-id="${escapeHtml(n.id)}" type="button">
+    return `<div class="cal-not-entry"><button class="cal-not-row${n.leida_at?'':' unread'}" data-stage="${n.etapa}" data-notification-id="${escapeHtml(n.id)}" type="button">
       <i class="ti ${def.icon} cal-not-icon" aria-hidden="true"></i><span class="cal-not-copy">
       <span class="cal-not-meta">Calidad · ${def.label} (${def.code})</span><strong>${def.label} completado</strong>
       <span>#${escapeHtml(m.serial)} · ${escapeHtml(m.code)} · ${escapeHtml(m.name)}</span>
       <span class="cal-not-meta">${escapeHtml(m.client)}</span><time class="cal-not-meta" datetime="${escapeHtml(n.detectada_at)}">Detectada: ${escapeHtml(time)}</time>
-      </span>${n.leida_at?'':'<span class="cal-not-dot" aria-label="No leída"></span>'}</button>`;
+      </span>${n.leida_at?'':'<span class="cal-not-dot" aria-label="No leída"></span>'}</button>
+      <button class="btn btn-ghost cal-not-delete" type="button" data-delete-notification="${escapeHtml(n.id)}" aria-label="Eliminar notificación de ${def.label}, máquina ${escapeHtml(m.serial)}" data-tip="Eliminar esta notificación"><i class="ti ti-trash" aria-hidden="true"></i></button></div>`;
   }).join('')||'<div class="cal-not-empty">No hay notificaciones'+(calNotFilter==='unread'?' sin leer':'')+'.</div>';
   if(events.length>calNotLimit) list.insertAdjacentHTML('beforeend','<button class="cal-not-more" type="button" onclick="calNotLimit+=50;calRenderNotifications()">Ver más</button>');
   list.querySelectorAll('[data-notification-id]').forEach(el=>{
     el.addEventListener('click',()=>calOpenNotification(el.dataset.notificationId));
     if(el.dataset.notificationId===focused) el.focus({preventScroll:true});
   });
+  list.querySelectorAll('[data-delete-notification]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();calDeleteNotification(el.dataset.deleteNotification);}));
   list.scrollTop=scroll;
 }
 function calToggleNotifications(force){
@@ -2588,7 +2655,7 @@ function calSetNotificationFilter(filter){
   calRenderNotifications();
 }
 function calMarkNotificationRead(notification){
-  if(notification.leida_at) return;
+  if(notification.leida_at||notification.eliminada_at) return;
   notification.leida_at=new Date().toISOString();
   calNotifications.reads[notification.id]=notification.leida_at;
 }
@@ -2596,9 +2663,21 @@ function calMarkAllNotificationsRead(){
   calNotifications.events.forEach(calMarkNotificationRead);
   calSaveNotifications();void calSyncNotifications();
 }
+function calDeleteNotification(id){
+  const notification=calNotifications.events.find(n=>n.id===id&&!n.eliminada_at);
+  if(!notification) return;
+  const stage=CAL_PRODUCTION_STAGES[notification.etapa];
+  if(!confirm(`¿Eliminar la notificación de ${stage.label} de la máquina #${notification.maquina?.serial||''}?\n\nSe quitará de la campanita en los equipos sincronizados. No cambia la producción ni la inspección.`)) return;
+  hideAppTooltip();
+  notification.eliminada_at=new Date().toISOString();
+  calNotifications.deletes[id]=notification.eliminada_at;
+  delete calNotifications.reads[id];
+  calNotCloudOk=false;
+  calSaveNotifications();void calSyncNotifications();
+}
 function calOpenNotification(id){
   const notification=calNotifications.events.find(n=>n.id===id);
-  if(!notification) return;
+  if(!notification||notification.eliminada_at) return;
   calMarkNotificationRead(notification);calSaveNotifications();void calSyncNotifications();
   const machine=MACHINES.find(m=>calProductionKey(m)===notification.machine_key)||
     MACHINES.find(m=>machineQualityId(m)===notification.maquina?._qualityId);
@@ -3538,6 +3617,7 @@ function estInternalData(){
   const findings=calAllFindingLogs(),checks=new Map();
   const known=new Set(findings.map(e=>e.machineKey+'|'+e.itemId));
   const visit=(key,d,history,priority)=>{
+    if(d.statsOnly) return;
     const machine=calStatsMachine(key,d,history||{}),machineKey=calStatsMachineKey(machine,key);
     const stages=getStagesForRecord(history||machine),sd=d.stageData||{};
     const dates=d.resultDates||sd.__quality?.resultDates||{};
@@ -3550,7 +3630,7 @@ function estInternalData(){
         const result=values[id]||'';
         const fecha=dates[stage.key]?.[id]||history?._createdAt||null;
         const checkKey=machineKey+'|'+id;
-        const check={origen:'Interna',tipoReporte:'Inconformidad',machineKey,fecha,cliente:machine.client||'Sin cliente',
+        const check={origen:'Interna',tipoReporte:'Inconformidad',machineKey,itemId:id,fecha,cliente:machine.client||'Sin cliente',
           maquinaCodigo:machine.code||'—',maquinaDesc:machine.name,serial:machine.serial,area:stage.label,defecto:item.item,
           responsable:d.responsables?.[stage.key]||'Sin asignar',estado:result==='fail'?'Pendiente':'Corregida',result,priority};
         const previous=checks.get(checkKey);
@@ -3563,7 +3643,12 @@ function estInternalData(){
   };
   Object.entries(inspData).forEach(([key,d])=>visit(key,d,null,2));
   historico.forEach(h=>visit(h._machineKey||h.serial,{stageData:h.stageData},h,1));
-  return {checks:[...checks.values()].filter(c=>c.result==='ok'||c.result==='fail'),events:calMergeFindings(findings).map(e=>{
+  const logs=calMergeFindings(findings),latest=new Map();
+  logs.forEach(e=>{
+    const key=e.machineKey+'|'+e.itemId,old=latest.get(key);
+    if(!old||(e.cycle||0)>(old.cycle||0)||((e.cycle||0)===(old.cycle||0)&&(e.detectedAt||'')>(old.detectedAt||''))) latest.set(key,e);
+  });
+  return {logs,checks:[...checks.values()].filter(c=>c.result==='ok'||(c.result==='fail'&&!latest.get(c.machineKey+'|'+c.itemId)?.voidedAt)),events:logs.filter(e=>!e.voidedAt).map(e=>{
     const current=checks.get(e.machineKey+'|'+e.itemId);
     const corrected=!!e.closedAt || (e.legacy && current?.result==='ok');
     return {origen:'Interna',tipoReporte:'Inconformidad',eventId:e.id,solId:e.id,machineKey:e.machineKey,
@@ -4086,7 +4171,8 @@ function estRenderTable(){
   const body=document.getElementById('est-table-body');
   const countEl=document.getElementById('est-table-count');
   if(!head||!body) return;
-  head.innerHTML = estTableCols.map(c=>`<th class="est-th-sort" onclick="estSortBy('${c.key}')">${c.label}${estSortCol===c.key?(estSortDir==='asc'?' ▲':' ▼'):''}</th>`).join('');
+  const canDelete=estFilters.origen==='Interna';
+  head.innerHTML = estTableCols.map(c=>`<th class="est-th-sort" onclick="estSortBy('${c.key}')">${c.label}${estSortCol===c.key?(estSortDir==='asc'?' ▲':' ▼'):''}</th>`).join('')+(canDelete?'<th class="est-actions">Acciones</th>':'');
   let rows=estCurrentRows||[];
   const q=(document.getElementById('est-table-search')?.value||'').toLowerCase();
   if(q) rows=rows.filter(r=>estTableCols.some(c=>String(r[c.key]||'').toLowerCase().includes(q)));
@@ -4098,8 +4184,9 @@ function estRenderTable(){
     return estSortDir==='asc'? av.localeCompare(bv) : bv.localeCompare(av);
   });
   const shown=rows.slice(0,300);
-  body.innerHTML = shown.map(r=>`<tr>${estTableCols.map(c=>`<td>${escapeHtml(c.fmt?c.fmt(r[c.key]):(r[c.key]||'—'))}</td>`).join('')}</tr>`).join('')
-    || `<tr><td colspan="${estTableCols.length}" style="text-align:center;color:var(--text3);padding:16px">Sin resultados</td></tr>`;
+  body.innerHTML = shown.map(r=>`<tr>${estTableCols.map(c=>`<td>${escapeHtml(c.fmt?c.fmt(r[c.key]):(r[c.key]||'—'))}</td>`).join('')}${canDelete?`<td class="est-actions"><button class="btn btn-ghost est-delete-finding" type="button" data-delete-finding="${escapeHtml(r.eventId)}" data-tip="Eliminar falla de estadísticas; no cambia la inspección" aria-label="Eliminar falla ${escapeHtml(r.defecto)}, máquina ${escapeHtml(r.serial)}"><i class="ti ti-trash" aria-hidden="true"></i></button></td>`:''}</tr>`).join('')
+    || `<tr><td colspan="${estTableCols.length+(canDelete?1:0)}" style="text-align:center;color:var(--text3);padding:16px">Sin resultados</td></tr>`;
+  body.querySelectorAll('[data-delete-finding]').forEach(el=>el.addEventListener('click',()=>calVoidInternalFinding(el.dataset.deleteFinding)));
   countEl.textContent = `${rows.length} registro(s)${rows.length>300?' — mostrando los primeros 300':''}`;
 }
 function estSortBy(key){

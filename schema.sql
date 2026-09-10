@@ -629,3 +629,55 @@ drop trigger if exists trg_calidad_conservar_hallazgos on public.calidad_inspecc
 create trigger trg_calidad_conservar_hallazgos
   before update on public.calidad_inspecciones
   for each row execute function public.calidad_conservar_hallazgos();
+
+-- Ejecutar despues de notificaciones_calidad.sql y calidad_interna_externa.sql.
+-- Retirar avisos sin perder el ciclo que impide generarlos nuevamente.
+alter table public.calidad_notificaciones add column if not exists eliminada_at timestamptz;
+grant update(eliminada_at) on public.calidad_notificaciones to anon, authenticated;
+
+create or replace function public.calidad_conservar_aviso_eliminado()
+returns trigger language plpgsql set search_path=public
+as $$
+begin
+  new.eliminada_at:=coalesce(old.eliminada_at,new.eliminada_at);
+  return new;
+end;
+$$;
+drop trigger if exists trg_calidad_aviso_eliminado on public.calidad_notificaciones;
+create trigger trg_calidad_aviso_eliminado before update on public.calidad_notificaciones
+  for each row execute function public.calidad_conservar_aviso_eliminado();
+
+-- Conserva correcciones y anulaciones incluso si otro equipo envia una copia vieja.
+-- No se modifica ningun resultado del checklist ni del historial.
+create or replace function public.calidad_conservar_hallazgos()
+returns trigger language plpgsql set search_path=public
+as $$
+declare merged jsonb;
+begin
+  with events as (
+    select value as event,0 as version from jsonb_array_elements(
+      case when jsonb_typeof(old.data->'internalFindings')='array' then old.data->'internalFindings' else '[]'::jsonb end)
+    union all
+    select value as event,1 as version from jsonb_array_elements(
+      case when jsonb_typeof(new.data->'internalFindings')='array' then new.data->'internalFindings' else '[]'::jsonb end)
+  ), latest as (
+    select distinct on (event->>'id') event, event->>'id' as id
+    from events where coalesce(event->>'id','')<>''
+    order by event->>'id',version desc
+  ), milestones as (
+    select event->>'id' as id,min(nullif(event->>'closedAt','')) as closed_at,
+      min(nullif(event->>'voidedAt','')) as voided_at
+    from events group by event->>'id'
+  )
+  select coalesce(jsonb_agg(latest.event||jsonb_build_object('closedAt',milestones.closed_at,'voidedAt',milestones.voided_at)
+    order by latest.id),'[]'::jsonb) into merged
+  from latest join milestones using(id);
+  if jsonb_array_length(merged)>0 then
+    new.data:=jsonb_set(new.data,'{internalFindings}',merged,true);
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists trg_calidad_conservar_hallazgos on public.calidad_inspecciones;
+create trigger trg_calidad_conservar_hallazgos before update on public.calidad_inspecciones
+  for each row execute function public.calidad_conservar_hallazgos();
