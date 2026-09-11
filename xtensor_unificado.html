@@ -878,8 +878,8 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 // ══════════════ SUPABASE CONFIG ══════════════
 // ← Reemplaza estos dos valores con los de tu proyecto Supabase
 // (Project Settings → API → Project URL / anon public key)
-const SUPABASE_URL = 'https://vjmfaegzvrktaeubqcxy.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_qlkyePfVQp_6sr-4nE7zOw_jGclG-Wo';
+const SUPABASE_URL = 'https://lrybwuqmsayhxdvlbiop.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_YwLd03FB7z5dKQ6MN1U-lw_3hP15l_E';
 
 const SUPABASE_CONFIGURED = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_ANON_KEY.includes('YOUR-ANON');
 let sb = null;
@@ -894,11 +894,14 @@ if(!SUPABASE_CONFIGURED){
   document.getElementById('setup-banner').style.display='flex';
 }
 
+let calPendingCount=0,calSyncError='';
 function setDbStatus(online){
   const dot=document.getElementById('db-status-dot');
   const txt=document.getElementById('db-status-txt');
-  if(dot) dot.className='sdot'+(online?'':' stale');
-  if(txt) txt.textContent = online? 'Conectado' : 'Sin conexión';
+  if(dot) dot.className='sdot'+(online&&!calPendingCount&&!calSyncError?'':' stale');
+  if(txt) txt.textContent = calPendingCount? `${calPendingCount} sin sincronizar` : calSyncError?'Error de sincronización':online? 'Conectado' : 'Sin conexión';
+  const status=document.getElementById('db-status');
+  if(status) status.setAttribute('data-tip',calSyncError|| (calPendingCount?'Cambios guardados en este equipo, pendientes de confirmar en la base de datos':'Estado de conexión con la base de datos'));
 }
 
 // Envuelve toda llamada a Supabase: reporta estado de conexión y muestra
@@ -1753,6 +1756,8 @@ function calRecordInternalResult(key,stageKey,itemId,value){
 function calSavePendingInspections(){
   try{localStorage.setItem(CAL_INSP_PENDING_KEY,JSON.stringify(calInspPending));}
   catch(e){showToast('No hay respaldo local disponible para los cambios pendientes','red');}
+  calPendingCount=Object.keys(calInspPending).length;
+  setDbStatus(!calSyncError);
   estNotifyDataChanged();
 }
 function calRestorePendingInspections(){
@@ -1764,23 +1769,72 @@ function calRestorePendingInspections(){
       row.data.internalFindings=calMergeFindings(inspData[key]?.internalFindings||[],row.data.internalFindings||[]);
       inspData[key]=row.data;
     });
+    calPendingCount=Object.keys(calInspPending).length;
+    if(calPendingCount) setDbStatus(false);
   }catch(e){/* Conserva los datos disponibles en memoria. */}
 }
 async function calFlushPendingInspections(){
   if(calInspFlushing||!sb) return;
   calInspFlushing=true;
+  let failure='';
   try{
-    while(Object.keys(calInspPending).length){
-      const [key,row]=Object.entries(calInspPending)[0];
-      const {error}=await sb.from('calidad_inspecciones').upsert(row);
-      if(error) throw error;
-      if(calInspPending[key]===row) delete calInspPending[key];
-      calSavePendingInspections();
+    for(const [key,row] of Object.entries(calInspPending)){
+      try{
+        const rows=await calInspectionRequest(signal=>sb.from('calidad_inspecciones').upsert(row).select('serial').abortSignal(signal));
+        if(!rows?.some(saved=>saved.serial===key)) throw new Error('La base de datos no confirmó el guardado');
+        if(calInspPending[key]===row) delete calInspPending[key];
+      }catch(e){failure=e.message||String(e);}
     }
-  }catch(e){/* La siguiente acción o actualización reintenta el envío guardado. */}
-  finally{calInspFlushing=false;}
+  }finally{
+    if(failure&&failure!==calSyncError) showToast('Calidad: cambios pendientes de guardar. '+failure,'red');
+    calSyncError=failure;
+    calInspFlushing=false;
+    calSavePendingInspections();
+  }
 }
-window.addEventListener('online',()=>{void calFlushPendingInspections();});
+async function calInspectionRequest(request){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),15000);
+  try{
+    const result=await request(controller.signal);
+    if(result.error) throw result.error;
+    return result.data;
+  }finally{clearTimeout(timeout);}
+}
+function calApplyRemoteInspection(row){
+  if(!row?.serial||!row.data||calInspPending[row.serial]) return;
+  const key=row.serial;
+  if(key===currentSerial&&['field-inspector','field-responsable','stage-obs'].includes(document.activeElement?.id)) return;
+  const previous=inspData[key];
+  if(JSON.stringify(previous)===JSON.stringify(row.data)) return;
+  inspData[key]={...row.data,internalFindings:calMergeFindings(previous?.internalFindings||[],row.data.internalFindings||[])};
+  if(key===currentSerial){
+    if(previous) inspData[key].currentStageIdx=previous.currentStageIdx;
+    if(currentView==='checklist') renderInspection();
+    else if(currentView==='summary') renderSummary();
+  }
+}
+let calReconciling=false;
+async function calReconcileInspections(){
+  if(!sb||calReconciling||calInspFlushing) return;
+  calReconciling=true;
+  try{
+    await calFlushPendingInspections();
+    const rows=await calInspectionRequest(signal=>sb.from('calidad_inspecciones').select('*').abortSignal(signal));
+    (rows||[]).forEach(calApplyRemoteInspection);
+    if(!Object.keys(calInspPending).length) calSyncError='';
+    setDbStatus(true);
+    renderList();updateSbStats();estNotifyDataChanged();
+  }catch(e){calSyncError=e.message||String(e);setDbStatus(false);}
+  finally{calReconciling=false;}
+}
+window.addEventListener('online',()=>{void calReconcileInspections();});
+window.addEventListener('focus',()=>{if(calLoaded) void calReconcileInspections();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&calLoaded) void calReconcileInspections();});
+setInterval(()=>{if(calLoaded&&!document.hidden) void calReconcileInspections();},15000);
+['field-inspector','field-responsable','stage-obs'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('input',()=>saveCurrentStage());
+});
 
 async function calFetchAll(){
   try{
@@ -3066,13 +3120,7 @@ function calSubscribeRealtime(){
     }).subscribe();
   sb.channel('calidad_inspecciones_rt')
     .on('postgres_changes', {event:'*', schema:'public', table:'calidad_inspecciones'}, payload=>{
-      const changedSerial = payload.new && payload.new.serial;
-      // No pisamos la máquina que el usuario tiene abierta ahora mismo (evita perder texto sin guardar)
-      if(changedSerial){
-        const events=calMergeFindings(inspData[changedSerial]?.internalFindings||[],payload.new.data?.internalFindings||[]);
-        if(changedSerial!==currentSerial && !calInspPending[changedSerial]) inspData[changedSerial]=payload.new.data;
-        if(inspData[changedSerial]) inspData[changedSerial].internalFindings=events;
-      }
+      calApplyRemoteInspection(payload.new);
       estNotifyDataChanged();
       renderList();
       updateSbStats();
@@ -3107,6 +3155,7 @@ async function calInit(){
     await calFetchAll();
   }catch(e){ /* ya se mostró el toast */ }
   calLoaded=true;
+  void calReconcileInspections();
   setStatus(true);
   filterMachines(document.getElementById('sb-q').value||'');
   updateHistoricoCount();
