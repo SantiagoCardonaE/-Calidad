@@ -361,6 +361,17 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 #qm-assignments{display:grid;grid-template-columns:1fr 1fr;gap:8px;border:1px solid var(--border);padding:12px}
 #qm-assignments label{display:grid;grid-template-columns:minmax(0,1fr) 110px;align-items:center}
 #qm-item-form footer{display:flex;gap:8px;justify-content:flex-end}
+.workflow-dialog{background:var(--bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;width:560px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:18px;overflow:auto;margin:auto}
+.workflow-dialog::backdrop{background:#0009}
+.workflow-dialog h2{font-size:17px;margin-bottom:12px}
+.workflow-dialog form,.workflow-dialog label{display:grid;gap:8px}
+.workflow-dialog form{gap:14px}
+.workflow-dialog input,.workflow-dialog textarea{width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border2);padding:8px;border-radius:4px;font:inherit}
+.workflow-dialog textarea{min-height:88px;resize:vertical}
+.workflow-dialog footer{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.qm-version{display:flex;gap:12px;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.qm-version div{min-width:0;overflow-wrap:anywhere}.qm-version small{display:block;color:var(--text2);margin-top:4px}
+.check-row[tabindex]{cursor:pointer}.check-row[tabindex]:hover{background:var(--surface2)}.check-row[tabindex]:focus-visible{outline:2px solid var(--yellow);outline-offset:-2px}
 @media(max-width:600px){.qm-toolbar{gap:8px;padding:10px}.qm-toolbar h2{font-size:15px}#qm-search{width:100%;flex:1}#qm-assignments{grid-template-columns:1fr}#qm-board th:first-child{width:80px;min-width:80px}}
 </style>
 </head>
@@ -390,7 +401,7 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
     </div>
     <!-- Calidad widgets -->
     <div class="tbr-variant" data-sec="calidad">
-      <span class="sdot" id="sdot"></span>
+      <button id="production-status" class="btn btn-ghost" style="width:24px;height:28px;padding:0;justify-content:center" aria-label="Estado de actualización de Producción" data-tip="Producción: pendiente de comprobar" onclick="alert(this.getAttribute('data-tip'))"><span class="sdot stale" id="sdot"></span></button>
       <span id="t-updated">–</span>
       <span id="t-countdown"></span>
       <button class="btn" id="btn-refresh" onclick="requestRefresh()" data-tip="Actualizar lista de producción">
@@ -909,7 +920,7 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 </div>
 
 <section id="sec-ajustes" class="app-section" aria-label="Ajustes"><div id="qm-dialog" aria-labelledby="qm-title">
-  <header class="qm-toolbar"><h2 id="qm-title">Matriz de calidad</h2><span id="qm-sync" role="status"></span><button class="btn" onclick="qmSync()" aria-label="Sincronizar matriz" title="Sincronizar matriz"><i class="ti ti-refresh"></i></button><button class="btn" onclick="qmEdit()"><i class="ti ti-plus"></i> Nuevo ítem</button></header>
+  <header class="qm-toolbar"><h2 id="qm-title">Matriz de calidad</h2><span id="qm-sync" role="status"></span><button class="btn" onclick="qmSync()" aria-label="Sincronizar matriz" title="Sincronizar matriz"><i class="ti ti-refresh"></i></button><button class="btn" onclick="qmOpenVersions()"><i class="ti ti-history"></i> Versiones</button><button class="btn" onclick="qmEdit()"><i class="ti ti-plus"></i> Nuevo ítem</button></header>
   <div class="qm-toolbar"><input id="qm-search" type="search" placeholder="Buscar ítem o criterio" aria-label="Buscar ítem o criterio" oninput="qmRender()"><select id="qm-stage" aria-label="Etapa" onchange="qmRender()"><option value="">Todas las etapas</option></select><select id="qm-group" aria-label="Clasificación" onchange="qmRender()"><option value="">Todas las clasificaciones</option></select></div>
   <div id="qm-board"></div>
 </div></section>
@@ -925,6 +936,13 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
   <fieldset id="qm-assignments"><legend>Clasificaciones</legend></fieldset>
   <footer><button type="button" class="btn" onclick="document.getElementById('qm-editor').close()">Cancelar</button><button class="btn btn-primary" type="submit"><i class="ti ti-device-floppy"></i> Guardar</button></footer>
  </form>
+</dialog>
+<dialog id="cal-close-dialog" class="workflow-dialog" aria-labelledby="cal-close-title">
+ <h2 id="cal-close-title">Marcar inconformidad como corregida</h2><p id="cal-close-description" style="margin-bottom:12px;color:var(--text2)"></p>
+ <form onsubmit="calCloseFinding(event)"><label>Responsable de la corrección<input id="cal-close-by" required maxlength="120" autocomplete="name"></label><label>Corrección realizada<textarea id="cal-close-note" required maxlength="2000"></textarea></label><footer><button type="button" class="btn" onclick="document.getElementById('cal-close-dialog').close()">Cancelar</button><button class="btn btn-y" type="submit"><i class="ti ti-check"></i> Marcar corregida</button></footer></form>
+</dialog>
+<dialog id="qm-versions-dialog" class="workflow-dialog" aria-labelledby="qm-versions-title">
+ <h2 id="qm-versions-title">Versiones de la matriz</h2><form onsubmit="qmSaveVersion(event)"><label>Nombre de la versión<input id="qm-version-name" required maxlength="120" placeholder="Ej. Checklist aprobado en reunión"></label><label>Guardada por<input id="qm-version-author" required maxlength="120" autocomplete="name"></label><button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Guardar versión actual</button></form><div id="qm-versions-list"></div><footer><button class="btn" onclick="document.getElementById('qm-versions-dialog').close()">Cerrar</button></footer>
 </dialog>
 <script>
 // ══════════════ SUPABASE CONFIG ══════════════
@@ -1434,12 +1452,12 @@ const COMMON_STAGE_ITEMS={
     {id:'a10',item:'Alineación general',criterio:'Desalineación dentro de la tolerancia definida en plano',herramienta:'Láser / Nivel / Visual',ideal:'Según plano',sup:'1'}
   ],
   resoldado:[
-    {id:'a6',item:'Soldaduras completas',criterio:'Cordón continuo, sin porosidad ni grietas, buen acabado',herramienta:'Visual',ideal:'',sup:'2'},
-    {id:'r1',item:'Cordones repasados',criterio:'Sin porosidad, sin grietas, sin socavado',herramienta:'Visual',ideal:'Cordón continuo y uniforme',sup:'2'},
-    {id:'r2',item:'Puntos de soldadura completos',criterio:'Todos los puntos indicados en plano quedan soldados',herramienta:'Visual / Plano',ideal:'Sin puntos faltantes',sup:'1'},
+    {id:'a6',item:'Cobertura de las uniones soldadas',criterio:'Todas las uniones indicadas en el plano están soldadas en su ubicación y longitud; no quedan uniones solo punteadas ni tramos faltantes',herramienta:'Visual / Plano',ideal:'Uniones completas según plano',sup:'2'},
+    {id:'r1',item:'Defectos superficiales del cordón',criterio:'Revisar grietas, poros visibles, socavados y otros defectos superficiales conforme a los criterios de aceptación del procedimiento',herramienta:'Inspección visual / Procedimiento',ideal:'Sin defectos fuera de especificación',sup:'2'},
+    {id:'r-dimensions',item:'Dimensiones del cordón',criterio:'Comprobar tamaño y geometría del cordón según el plano y procedimiento de soldadura aplicables',herramienta:'Galgas / Plano / Procedimiento',ideal:'Dimensiones según especificación',sup:'1'},
     {id:'r3',item:'Deformación por calor',criterio:'Sin alabeo ni deformación visible en piezas resoldadas',herramienta:'Visual / Escuadra',ideal:'Pieza recta, sin pandeo',sup:'2'},
     {id:'r4',item:'Salpicaduras y rebabas de soldadura',criterio:'Superficie libre de salpicaduras y rebabas de soldadura',herramienta:'Tacto-Visual',ideal:'Superficie limpia',sup:'2'},
-    {id:'r5',item:'Resistencia del punto resoldado',criterio:'Sin fractura ni movimiento al aplicar fuerza moderada',herramienta:'Prueba manual',ideal:'Punto firme',sup:'1'}
+    {id:'r-verification',item:'Verificación de la unión según especificación',criterio:'Verificar el cumplimiento del procedimiento y los registros de ensayos cuando el plano o plan de calidad los exija; una revisión visual o fuerza manual no acredita la resistencia de la soldadura',herramienta:'Procedimiento / Registros de ensayos exigidos',ideal:'Evidencia conforme al plan de calidad',sup:'1'}
   ],
   pulido:[
     {id:'pu1',item:'Superficie libre de rebabas',criterio:'Sin bordes cortantes ni rebabas metálicas',herramienta:'Tacto-Visual',ideal:'Sin filos',sup:'2'},
@@ -1536,7 +1554,7 @@ const GROUP_STAGE_ITEMS={
       {id:'gj-a3',item:'Anclajes y estabilidad',criterio:'Bases y puntos de anclaje completos, firmes y correctamente ubicados',herramienta:'Visual / Nivel / Flexómetro',ideal:'Estabilidad total',sup:'3'}
     ],
     resoldado:[
-      {id:'gj-a2',item:'Soldaduras y uniones estructurales',criterio:'Uniones completas, sin grietas, porosidad, bordes cortantes ni elementos sueltos',herramienta:'Visual / Tacto',ideal:'Uniones firmes y seguras',sup:'3'}
+      {id:'gj-r-access',item:'Acceso a uniones del juego infantil',criterio:'Verificar que las uniones próximas a zonas de paso, agarre o contacto del usuario no dejen puntos de enganche o atrapamiento conforme al diseño',herramienta:'Plano / Inspección visual',ideal:'Zonas de contacto seguras según diseño',sup:'3'}
     ],
     ensamble:[
       {id:'gj-e1',item:'Plataformas, escaleras y accesos',criterio:'Elementos completos, firmes, alineados y sin bordes peligrosos',herramienta:'Visual / Tacto',ideal:'Accesos seguros',sup:'3'},
@@ -1648,6 +1666,13 @@ function featureItems(profile){
   return items;
 }
 const QM_PREFIX='quality_matrix:v1:';
+const QM_LEGACY_WELDING={
+ a6:{item:'Soldaduras completas',criterio:'Cordón continuo, sin porosidad ni grietas, buen acabado',herramienta:'Visual',ideal:'',sup:'2'},
+ r1:{item:'Cordones repasados',criterio:'Sin porosidad, sin grietas, sin socavado',herramienta:'Visual',ideal:'Cordón continuo y uniforme',sup:'2'},
+ r2:{item:'Puntos de soldadura completos',criterio:'Todos los puntos indicados en plano quedan soldados',herramienta:'Visual / Plano',ideal:'Sin puntos faltantes',sup:'1'},
+ r5:{item:'Resistencia del punto resoldado',criterio:'Sin fractura ni movimiento al aplicar fuerza moderada',herramienta:'Prueba manual',ideal:'Punto firme',sup:'1'},
+ 'gj-a2':{item:'Soldaduras y uniones estructurales',criterio:'Uniones completas, sin grietas, porosidad, bordes cortantes ni elementos sueltos',herramienta:'Visual / Tacto',ideal:'Uniones firmes y seguras',sup:'3'}
+};
 const QM_STORAGE='xtensor_matrix_v1:'+SUPABASE_URL;
 let qmValues={},qmPending={},qmBusy=false,qmError='',qmEditing=null,qmDragged=null;
 const QM_STAGES=[['armado','Armado'],['resoldado','Resoldado'],['pulido','Pulido'],['pintado','Pintado'],['ensamble','Ensamble'],['empacado','Empacado']];
@@ -1660,7 +1685,7 @@ function qmCatalog(){
   const add=(stage,item)=>{if(!items.has(item.id))items.set(item.id,{...item,stage});};
   [COMMON_STAGE_ITEMS,...Object.values(GROUP_STAGE_ITEMS),...PRODUCT_STAGE_RULES.map(r=>r.items)].forEach(def=>Object.entries(def).forEach(([s,list])=>list.forEach(i=>add(s,i))));
   featureItems({features:{cushion:true,bearing:true,shaft:true,cable:true,portapeso:true}}).forEach(i=>add('ensamble',i));
-  Object.entries(qmValues).forEach(([key,item])=>{if(key.startsWith('item:')&&item?.id&&QM_STAGES.some(s=>s[0]===item.stage))items.set(item.id,{...item});});
+  Object.entries(qmValues).forEach(([key,item])=>{if(key.startsWith('item:')&&item?.id&&QM_STAGES.some(s=>s[0]===item.stage)){if(item.archived)items.delete(item.id);else items.set(item.id,{...item});}});
   return items;
 }
 function qmApply(items,stage,profile){
@@ -1671,7 +1696,41 @@ function qmApply(items,stage,profile){
     if(mode==='off')map.delete(item.id);
     if(mode==='on')map.set(item.id,item);
   });
-  return [...map.values()].map(i=>({...i,...(qmValues['item:'+i.id]||{})}));
+  return [...map.values()].filter(i=>!qmValues['item:'+i.id]?.archived).map(i=>({...i,...(qmValues['item:'+i.id]||{})}));
+}
+function qmSnapshot(){
+  const items=Object.fromEntries(qmCatalog());
+  const assignments={};
+  Object.keys(items).forEach(id=>QM_GROUPS.forEach(([g])=>{const key='assign:'+g+':'+id;assignments[key]={mode:qmValues[key]?.mode||'auto'};}));
+  return JSON.parse(JSON.stringify({items,assignments}));
+}
+function qmVersion(name,author){return {id:crypto.randomUUID(),name,author,createdAt:new Date().toISOString(),snapshot:qmSnapshot()};}
+function qmOpenVersions(){qmRenderVersions();document.getElementById('qm-versions-dialog').showModal();void qmSync();}
+function qmRenderVersions(){
+  const versions=Object.entries(qmValues).filter(([key,v])=>key.startsWith('version:')&&v?.snapshot?.items).map(([key,v])=>({key,...v})).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const el=document.getElementById('qm-versions-list');
+  el.innerHTML=versions.map(v=>`<div class="qm-version"><div><strong>${escapeHtml(v.name)}</strong><small>${escapeHtml(v.author)} · ${escapeHtml(new Date(v.createdAt).toLocaleString('es-CO'))}</small><small>${Object.keys(v.snapshot.items).length} ítems${qmPending[v.key]?' · Pendiente de sincronizar':''}</small></div><button class="btn" data-restore-version="${escapeHtml(v.key)}"><i class="ti ti-restore"></i> Restaurar</button></div>`).join('')||'<p class="qm-empty">No hay versiones guardadas</p>';
+  el.querySelectorAll('[data-restore-version]').forEach(btn=>btn.addEventListener('click',()=>qmRestoreVersion(btn.dataset.restoreVersion)));
+}
+function qmSaveVersion(event){
+  event.preventDefault();
+  const name=document.getElementById('qm-version-name').value.trim(),author=document.getElementById('qm-version-author').value.trim();
+  if(!name||!author)return;
+  const version=qmVersion(name,author);
+  if(qmChange({['version:'+version.id]:version}))document.getElementById('qm-version-name').value='';
+  qmRenderVersions();
+}
+function qmRestoreVersion(key){
+  const version=qmValues[key];if(!version?.snapshot?.items||!version.snapshot.assignments)return;
+  if(!confirm(`¿Restaurar la versión "${version.name}"? Se guardará una copia de la matriz actual. Las respuestas y el historial de inspecciones se conservan.`))return;
+  const backup=qmVersion('Antes de restaurar: '+version.name,'Respaldo automático');
+  const changes={['version:'+backup.id]:backup},current=qmCatalog();
+  current.forEach((item,id)=>{if(!version.snapshot.items[id])changes['item:'+id]={...item,archived:true};});
+  Object.entries(version.snapshot.items).forEach(([id,item])=>{
+    if(JSON.stringify(current.get(id))!==JSON.stringify(item))changes['item:'+id]={...item,archived:false};
+  });
+  Object.entries(version.snapshot.assignments).forEach(([k,value])=>{if((qmValues[k]?.mode||'auto')!==value.mode)changes[k]=value;});
+  qmChange(changes);qmRenderVersions();
 }
 function qmPersist(){
   try{localStorage.setItem(QM_STORAGE,JSON.stringify({values:qmValues,pending:qmPending}));}
@@ -1682,6 +1741,7 @@ function qmStatus(){
   const count=Object.keys(qmPending).length;
   const el=document.getElementById('qm-sync');
   if(el)el.textContent=qmBusy?'Sincronizando…':qmError?`${count} pendientes · ${qmError}`:count?`${count} cambios pendientes`:'Matriz sincronizada';
+  if(document.getElementById('qm-versions-dialog')?.open)qmRenderVersions();
 }
 function qmRefresh(){
   if(currentSerial){const m=MACHINES.find(m=>machineQualityId(m)===currentSerial);if(m)setCurrentQualityProfile(m);}
@@ -1692,8 +1752,11 @@ function qmRefresh(){
   if(document.getElementById('sec-ajustes').classList.contains('active'))qmRender();
 }
 function qmChange(changes){
-  Object.entries(changes).forEach(([key,value])=>{qmValues[key]=value;qmPending[key]={key:QM_PREFIX+key,value};});
-  qmPersist();qmRefresh();void qmSync();
+  const values={...qmValues},pending={...qmPending};
+  Object.entries(changes).forEach(([key,value])=>{values[key]=value;pending[key]={key:QM_PREFIX+key,value};});
+  try{localStorage.setItem(QM_STORAGE,JSON.stringify({values,pending}));}
+  catch(e){qmError='No se pudo guardar el respaldo local';qmStatus();showToast('No se aplicó el cambio: '+qmError,'red');return false;}
+  qmValues=values;qmPending=pending;qmStatus();qmRefresh();void qmSync();return true;
 }
 async function qmSync(){
   if(qmBusy)return;
@@ -1832,6 +1895,7 @@ const WELDING_STAGE_MOVES=[{id:'a6',before:'a7'},{id:'gj-a2',before:'gj-a3'}];
 function getStagesForRecord(record){
   if(record?.stageData?.__quality?.checklist) return JSON.parse(JSON.stringify(record.stageData.__quality.checklist));
   const stages=buildStagesForProfile(resolveProductProfile(record),!!record?.stageData);
+  if(record?.stageData)stages.forEach(s=>{s.items=s.items.map(i=>{const id=({'r-dimensions':'r2','r-verification':'r5','gj-r-access':'gj-a2'})[i.id]||i.id;return {...i,id,...(QM_LEGACY_WELDING[id]||{})};});});
   // El histórico conserva la etapa original de las respuestas anteriores al cambio.
   if(Object.prototype.hasOwnProperty.call(record?.stageData?.armado||{},'a6')){
     const armado=stages.find(s=>s.key==='armado');
@@ -1887,7 +1951,7 @@ function calMergeFindings(...lists){
   lists.flat().forEach(event=>{
     if(!event?.id) return;
     const old=map.get(event.id);
-    map.set(event.id,{...old,...event,closedAt:event.closedAt||old?.closedAt||null,voidedAt:event.voidedAt||old?.voidedAt||null});
+    map.set(event.id,{...old,...event,closedAt:event.closedAt||old?.closedAt||null,closure:old?.closure||event.closure||null,voidedAt:event.voidedAt||old?.voidedAt||null});
   });
   return [...map.values()];
 }
@@ -1926,6 +1990,27 @@ function calLegacyFinding(key,machine,stage,item,fecha=null){
     stage:stage.key,area:stage.label,item:item.item,criterio:item.criterio,detectedAt:fecha,closedAt:null,
     inspector:'',responsable:'',legacy:true};
 }
+let calClosingFinding=null;
+function calOpenCloseFinding(id){
+  const event=estInternalData().logs.find(e=>e.id===id&&!e.voidedAt&&!e.closedAt);if(!event)return;
+  calClosingFinding=id;
+  document.getElementById('cal-close-description').textContent=`#${event.machine?.serial||''} · ${event.item}`;
+  document.getElementById('cal-close-by').value='';document.getElementById('cal-close-note').value='';
+  document.getElementById('cal-close-dialog').showModal();
+}
+async function calCloseFinding(formEvent){
+  formEvent.preventDefault();
+  const event=estInternalData().logs.find(e=>e.id===calClosingFinding&&!e.voidedAt&&!e.closedAt);if(!event)return;
+  const by=document.getElementById('cal-close-by').value.trim(),note=document.getElementById('cal-close-note').value.trim();
+  if(!by||!note)return;
+  const key=Object.keys(inspData).find(k=>calStatsMachineKey(calStatsMachine(k,inspData[k]),k)===event.machineKey)||'stats-audit:'+encodeURIComponent(event.machineKey);
+  if(!inspData[key])inspData[key]={statsOnly:true,stageData:{},inspectors:{},responsables:{},stageObs:{},machineSnapshot:event.machine};
+  const at=new Date().toISOString();
+  inspData[key].internalFindings=calMergeFindings(inspData[key].internalFindings||[],[{...event,closedAt:at,closure:{at,by,note}}]);
+  calClosingFinding=null;document.getElementById('cal-close-dialog').close();
+  await calUpsertInsp(key);estRenderFilters();estApplyFilters();
+  showToast(calInspPending[key]?'Corrección registrada en este equipo':'Corrección registrada','green');
+}
 async function calVoidInternalFinding(id){
   const event=estInternalData().logs.find(e=>e.id===id&&!e.voidedAt);
   if(!event) return;
@@ -1948,7 +2033,7 @@ function calRecordInternalResult(key,stageKey,itemId,value){
   d.machineSnapshot=machine;
   d.internalFindings=calMergeFindings(d.internalFindings||[],calAllFindingLogs().filter(e=>e.machineKey===machineKey));
   let open=d.internalFindings.find(e=>e.itemId===itemId&&!e.closedAt);
-  if(!open && d.stageData[stageKey]?.[itemId]==='fail'){
+  if(!open && d.stageData[stageKey]?.[itemId]==='fail'&&!d.internalFindings.some(e=>e.itemId===itemId)){
     open=calLegacyFinding(key,machine,stage,item);
     d.internalFindings.push(open);
   }
@@ -2522,8 +2607,8 @@ function renderInspection(){
 function renderChecklist(stage,d){
   document.getElementById('checklist-items').innerHTML=stage.items.map(it=>{
     const val=(d.stageData[stage.key]||{})[it.id]||'';
-    return`<div class="check-row">
-      <div class="check-circle ${val}" onclick="toggleItem('${stage.key}','${it.id}',this)">
+    return`<div class="check-row" role="group" tabindex="0" aria-label="${escapeHtml(it.item)}: ${val==='ok'?'Cumple':val==='fail'?'No cumple':'Pendiente'}" onclick="calActivateRow(event,'${stage.key}','${it.id}')" onkeydown="calRowKey(event,'${stage.key}','${it.id}')">
+      <div class="check-circle ${val}" aria-hidden="true">
         ${val==='ok'?'<i class="ti ti-check" style="font-size:11px;color:#fff"></i>':val==='fail'?'<i class="ti ti-x" style="font-size:11px;color:#fff"></i>':''}
       </div>
       <div style="flex:1;min-width:0">
@@ -2546,6 +2631,16 @@ function renderChecklist(stage,d){
   }).join('');
 }
 
+function calActivateRow(event,sk,id){
+  if(event.target.closest('select,input,textarea,button,a,[contenteditable="true"]'))return;
+  if(event.type==='click'&&window.getSelection()?.toString())return;
+  const circle=event.currentTarget.querySelector('.check-circle');
+  if(circle)toggleItem(sk,id,circle);
+}
+function calRowKey(event,sk,id){
+  if(event.target!==event.currentTarget||!['Enter',' '].includes(event.key))return;
+  event.preventDefault();event.stopPropagation();calActivateRow(event,sk,id);
+}
 function toggleItem(sk,id,el){
   const d=getInsp(currentSerial);
   const cur=(d.stageData[sk]||{})[id]||'';
@@ -2555,6 +2650,8 @@ function toggleItem(sk,id,el){
   el.className='check-circle '+next;
   el.innerHTML=next==='ok'?'<i class="ti ti-check" style="font-size:11px;color:#fff"></i>':next==='fail'?'<i class="ti ti-x" style="font-size:11px;color:#fff"></i>':'';
   el.parentElement.querySelector('.result-select').value=next;
+  const label=STAGES.find(s=>s.key===sk)?.items.find(i=>i.id===id)?.item||id;
+  el.parentElement.setAttribute('aria-label',label+': '+(next==='ok'?'Cumple':next==='fail'?'No cumple':'Pendiente'));
   updateProgress(STAGES[d.currentStageIdx],d);
   renderList();
   checkAndArchive(currentSerial);
@@ -2703,7 +2800,7 @@ function updateBBPos(){
 // ── KEYBOARD ── (solo activo cuando la sección Calidad está visible)
 document.addEventListener('keydown',e=>{
   if(!document.getElementById('sec-calidad').classList.contains('active')) return;
-  if(document.getElementById('qm-editor').open) return;
+  if(document.querySelector('dialog[open]')) return;
   if(!document.getElementById('cal-notifications').hidden || document.activeElement.id==='cal-bell') return;
   const tag=document.activeElement.tagName;
   if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
@@ -3056,7 +3153,7 @@ function loadMachinesFromCache(){
 }
 
 // ── REFRESH — trae producción desde el panel admin ──
-window.loadMachines=function(json){
+window.loadMachines=function(json,quiet=false){
   try{
     const data=typeof json==='string'?JSON.parse(json):json;
     if(!Array.isArray(data)||!data.length) throw new Error('Sin datos');
@@ -3066,7 +3163,7 @@ window.loadMachines=function(json){
     saveMachinesCache();
     filterMachines(document.getElementById('sb-q').value||'');
     startCountdown();
-    showToast(`${data.length} máquinas cargadas`,'green');
+    if(!quiet) showToast(`${data.length} máquinas cargadas`,'green');
   }catch(e){
     showToast('Error al cargar: '+e.message,'red');
   }
@@ -3085,6 +3182,7 @@ async function requestRefresh(silent){
     {key:'admin',url:'https://xtensor-one.vercel.app/admin'},
     {key:'terminados',url:'https://xtensor-one.vercel.app/admin/terminados'}
   ];
+  let retrySeconds=120;
 
   try{
     const cachedSources=readMachineSourcesCache();
@@ -3105,22 +3203,27 @@ async function requestRefresh(silent){
       }
     }));
     const successful=results.filter(result=>!result.error);
-    if(!successful.length) throw new Error('No se pudo actualizar ninguna fuente');
+    const failures=results.filter(result=>result.error);
+    const detail=failures.map(result=>`${result.source.key}: ${result.error.message||result.error}`).join(' | ');
+    if(!successful.length) throw new Error(detail||'No se pudo actualizar ninguna fuente');
     const machines=consolidateMachines(results.flatMap(result=>result.machines));
     if(!machines.length) throw new Error('No se encontraron máquinas en las fuentes disponibles');
-    window.loadMachines(machines);
+    window.loadMachines(machines,true);
     calObserveProduction(successful.flatMap(result=>result.machines),observedAt);
-    const failures=results.filter(result=>result.error);
-    if(failures.length) setStatus(true,`Actualización parcial: ${failures.map(result=>result.source.key).join(', ')}`);
+    if(failures.length){
+      retrySeconds=30;
+      setStatus(true,detail);
+    }else{
+      setStatus(true);
+      if(!silent) showToast(`${machines.length} máquinas actualizadas desde ambas fuentes`,'green');
+    }
   }catch(e){
-    // No se muestra ningún aviso emergente al fallar la actualización (ni manual ni
-    // automática): solo cambia el punto de estado a "Sin conexión" (con el detalle en
-    // el tooltip), para no interrumpir el trabajo con mensajes de error repetidos.
+    retrySeconds=30;
     setStatus(false, e.message);
   }finally{
     btn.innerHTML='<i class="ti ti-refresh"></i> Actualizar';
     btn.disabled=false;
-    startCountdown();
+    startCountdown(retrySeconds);
     void calSyncNotifications();
     void calFlushPendingInspections();
   }
@@ -3186,15 +3289,26 @@ function handleAdminFileUpload(event){
 }
 
 async function fetchAdminHtml(url){
+  async function read(endpoint){
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),12000);
+    try{
+      const response=await fetch(endpoint,{cache:'no-store',signal:controller.signal});
+      if(!response.ok) throw new Error('HTTP '+response.status);
+      const html=await response.text();
+      if(!parseMachinesFromHtml(html).length) throw new Error('Página sin filas de máquinas');
+      return html;
+    }catch(e){
+      if(controller.signal.aborted) throw new Error('Tiempo de espera agotado (12 s)');
+      throw e;
+    }finally{clearTimeout(timer);}
+  }
   try{
-    const r=await fetch(url,{cache:'no-store'});
-    if(r.ok) return await r.text();
-    throw new Error('HTTP '+r.status);
+    return await read(url);
   }catch(directErr){
     const proxied='https://api.allorigins.win/raw?url='+encodeURIComponent(url);
-    const r2=await fetch(proxied,{cache:'no-store'});
-    if(!r2.ok) throw new Error('No se pudo acceder a la página del admin (directo ni por proxy)');
-    return await r2.text();
+    try{return await read(proxied);}
+    catch(proxyErr){throw new Error(`Acceso directo: ${directErr.message}; intermediario: ${proxyErr.message}`);}
   }
 }
 
@@ -3283,15 +3397,18 @@ function parseMachinesFromHtml(html){
 
 function setStatus(live, errMsg){
   const dot=document.getElementById('sdot');
-  dot.className='sdot'+(live?'':' stale');
-  dot.title = live
-    ?(errMsg?`Conectado con actualización parcial: ${errMsg}`:'Conectado')
-    :`Sin conexión con el admin${errMsg?': '+errMsg:''} — mostrando la última actualización guardada`;
+  dot.className='sdot'+(live&&!errMsg?'':' stale');
+  const detail=live
+    ?(errMsg?`Producción: actualización parcial. ${errMsg}. Se conservan los datos de la fuente que falló. Reintento en 30 segundos.`:'Producción: última carga completada.')
+    :`Producción: no se pudo actualizar. ${errMsg||'Pendiente de comprobar'}. Se conserva la última lista. Reintento en 30 segundos.`;
+  dot.removeAttribute('title');
+  document.getElementById('production-status').setAttribute('data-tip',detail);
+  document.getElementById('t-updated').setAttribute('data-tip',detail);
   document.getElementById('t-updated').textContent=lastUpdate
     ?`${lastUpdate.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}`:'–';
 }
-function startCountdown(){
-  clearInterval(countdownInterval);countdownSec=120;updateCountdown();
+function startCountdown(seconds=120){
+  clearInterval(countdownInterval);countdownSec=seconds;updateCountdown();
   countdownInterval=setInterval(()=>{
     countdownSec--;updateCountdown();
     if(countdownSec<=0) requestRefresh(true);
@@ -3887,7 +4004,7 @@ function estInternalData(){
       const values=sd[stage.key]||{};
       const ids=new Set([...stage.items.map(i=>i.id),...Object.keys(values)]);
       ids.forEach(id=>{
-        const item=allItems.find(i=>i.id===id)||qmCatalog().get(id)||{id,item:id,criterio:''};
+        const item=allItems.find(i=>i.id===id)||qmCatalog().get(id)||(QM_LEGACY_WELDING[id]?{id,...QM_LEGACY_WELDING[id]}:{id,item:id,criterio:''});
         const result=values[id]||'';
         const fecha=dates[stage.key]?.[id]||history?._createdAt||null;
         const checkKey=machineKey+'|'+id;
@@ -3913,7 +4030,7 @@ function estInternalData(){
     const current=checks.get(e.machineKey+'|'+e.itemId);
     const corrected=!!e.closedAt || (e.legacy && current?.result==='ok');
     return {origen:'Interna',tipoReporte:'Inconformidad',eventId:e.id,solId:e.id,machineKey:e.machineKey,
-      fecha:e.detectedAt,fechaTipo:e.legacy?'Registro previo':'Inspección',fechaCierre:e.closedAt,
+      fecha:e.detectedAt,fechaTipo:e.legacy?'Registro previo':'Inspección',fechaCierre:e.closedAt,corregidaPor:e.closure?.by||'',correccion:e.closure?.note||'',
       cliente:e.machine?.client||'Sin cliente',maquinaCodigo:e.machine?.code||'—',maquinaDesc:e.machine?.name||'',serial:e.machine?.serial||'',
       area:e.area,defecto:e.item,criterio:e.criterio||'',responsable:e.responsable||'Sin asignar',inspector:e.inspector||'',
       estado:corrected?'Corregida':'Pendiente',corregido:corrected,severidad:'',causa:'',costo:0,esDefecto:true,
@@ -4425,8 +4542,14 @@ const estTableCols=[
   {key:'fechaTipo',label:'Origen de fecha'},
   {key:'responsable', label:'Responsable'},
   {key:'estado', label:'Estado'},
+  {key:'fechaCierre',label:'Fecha de corrección',fmt:v=>v?new Date(v).toLocaleString('es-CO',{timeZone:'America/Bogota'}):'—'},
+  {key:'corregidaPor',label:'Corregida por'},
+  {key:'correccion',label:'Corrección realizada'},
   {key:'tiempoCierreDias', label:'Tiempo de cierre', fmt:v=>v!=null?Math.round(v)+' d':'—'},
 ];
+function estFindingActions(r){
+  return `<td class="est-actions">${r.estado==='Pendiente'?`<button class="btn btn-ghost" type="button" data-close-finding="${escapeHtml(r.eventId)}" data-tip="Marcar como corregida y conservar el historial" aria-label="Marcar corregida ${escapeHtml(r.defecto)}"><i class="ti ti-check"></i></button>`:''}<button class="btn btn-ghost est-delete-finding" type="button" data-delete-finding="${escapeHtml(r.eventId)}" data-tip="Eliminar falla de estadísticas; no cambia la inspección" aria-label="Eliminar falla ${escapeHtml(r.defecto)}, máquina ${escapeHtml(r.serial)}"><i class="ti ti-trash" aria-hidden="true"></i></button></td>`;
+}
 function estRenderTable(){
   const head=document.getElementById('est-table-head');
   const body=document.getElementById('est-table-body');
@@ -4445,9 +4568,10 @@ function estRenderTable(){
     return estSortDir==='asc'? av.localeCompare(bv) : bv.localeCompare(av);
   });
   const shown=rows.slice(0,300);
-  body.innerHTML = shown.map(r=>`<tr>${estTableCols.map(c=>`<td>${escapeHtml(c.fmt?c.fmt(r[c.key]):(r[c.key]||'—'))}</td>`).join('')}${canDelete?`<td class="est-actions"><button class="btn btn-ghost est-delete-finding" type="button" data-delete-finding="${escapeHtml(r.eventId)}" data-tip="Eliminar falla de estadísticas; no cambia la inspección" aria-label="Eliminar falla ${escapeHtml(r.defecto)}, máquina ${escapeHtml(r.serial)}"><i class="ti ti-trash" aria-hidden="true"></i></button></td>`:''}</tr>`).join('')
+  body.innerHTML = shown.map(r=>`<tr>${estTableCols.map(c=>`<td>${escapeHtml(c.fmt?c.fmt(r[c.key]):(r[c.key]||'—'))}</td>`).join('')}${canDelete?estFindingActions(r):''}</tr>`).join('')
     || `<tr><td colspan="${estTableCols.length+(canDelete?1:0)}" style="text-align:center;color:var(--text3);padding:16px">Sin resultados</td></tr>`;
   body.querySelectorAll('[data-delete-finding]').forEach(el=>el.addEventListener('click',()=>calVoidInternalFinding(el.dataset.deleteFinding)));
+  body.querySelectorAll('[data-close-finding]').forEach(el=>el.addEventListener('click',()=>calOpenCloseFinding(el.dataset.closeFinding)));
   countEl.textContent = `${rows.length} registro(s)${rows.length>300?' — mostrando los primeros 300':''}`;
 }
 function estSortBy(key){

@@ -666,10 +666,11 @@ begin
     order by event->>'id',version desc
   ), milestones as (
     select event->>'id' as id,min(nullif(event->>'closedAt','')) as closed_at,
-      min(nullif(event->>'voidedAt','')) as voided_at
+      min(nullif(event->>'voidedAt','')) as voided_at,
+      (jsonb_agg(event->'closure' order by version) filter (where jsonb_typeof(event->'closure')='object'))->0 as closure
     from events group by event->>'id'
   )
-  select coalesce(jsonb_agg(latest.event||jsonb_build_object('closedAt',milestones.closed_at,'voidedAt',milestones.voided_at)
+  select coalesce(jsonb_agg(latest.event||jsonb_build_object('closedAt',milestones.closed_at,'voidedAt',milestones.voided_at,'closure',milestones.closure)
     order by latest.id),'[]'::jsonb) into merged
   from latest join milestones using(id);
   if jsonb_array_length(merged)>0 then
