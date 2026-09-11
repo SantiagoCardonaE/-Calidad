@@ -330,6 +330,39 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
   .print-only{display:inline-block!important}
 }
 </style>
+<style>
+#qm-dialog,#qm-editor{background:var(--bg);color:var(--text);border:1px solid var(--border2);padding:0;border-radius:6px;max-width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}
+#qm-dialog{width:100%;height:100%;max-width:none;max-height:none;display:flex;flex-direction:column;border:0;border-radius:0;min-height:0}
+#qm-dialog::backdrop,#qm-editor::backdrop{background:#0009}
+.qm-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.qm-toolbar h2{font-size:17px;margin:0;flex:1}
+.qm-toolbar input,.qm-toolbar select,#qm-editor input,#qm-editor textarea,#qm-editor select{background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:4px;padding:8px;min-width:0;font:inherit;max-width:100%}
+#qm-search{width:230px}
+#qm-sync{font-size:12px;color:var(--text2);overflow-wrap:anywhere}
+#qm-board{overflow:auto;flex:1;min-height:0}
+#qm-board table{border-collapse:separate;border-spacing:0;table-layout:fixed;width:max-content}
+#qm-board th,#qm-board td{width:230px;min-width:230px;vertical-align:top;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:9px}
+#qm-board thead th{position:sticky;top:0;background:var(--surface2);z-index:3;font-size:13px;text-align:left}
+#qm-board th:first-child{width:105px;min-width:105px;position:sticky;left:0;background:var(--surface2);z-index:2}
+#qm-board thead th:first-child{z-index:4}
+#qm-board tbody th{font-size:13px;color:var(--yellow)}
+.qm-zone{min-height:90px;max-height:320px;overflow:auto;padding:2px}
+.qm-zone.qm-over{outline:2px solid var(--yellow);background:var(--surface2)}
+.qm-card{border:1px solid var(--border2);background:var(--surface);border-radius:4px;margin-bottom:7px;padding:8px;overflow-wrap:anywhere;cursor:grab}
+.qm-card p{font-size:12px;line-height:1.4;margin:0 0 5px}
+.qm-card small{color:var(--text2);font-size:10px}
+.qm-card-foot{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.qm-card button{min-width:28px;height:28px;padding:3px}
+.qm-empty{color:var(--text3);font-size:12px;margin:12px 0}
+#qm-editor{width:560px;overflow:auto}
+#qm-item-form{padding:16px;display:grid;gap:12px}
+#qm-item-form label{display:grid;gap:5px;font-size:12px}
+#qm-item-form textarea{resize:vertical;min-height:65px}
+#qm-assignments{display:grid;grid-template-columns:1fr 1fr;gap:8px;border:1px solid var(--border);padding:12px}
+#qm-assignments label{display:grid;grid-template-columns:minmax(0,1fr) 110px;align-items:center}
+#qm-item-form footer{display:flex;gap:8px;justify-content:flex-end}
+@media(max-width:600px){.qm-toolbar{gap:8px;padding:10px}.qm-toolbar h2{font-size:15px}#qm-search{width:100%;flex:1}#qm-assignments{grid-template-columns:1fr}#qm-board th:first-child{width:80px;min-width:80px}}
+</style>
 </head>
 <body>
 
@@ -345,6 +378,7 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
     <div class="mtab" data-sec="calidad" onclick="switchSection('calidad')"><i class="ti ti-clipboard-check"></i> <span class="mtab-lbl">Calidad</span></div>
     <div class="mtab" data-sec="garantias" onclick="switchSection('garantias')"><i class="ti ti-tools"></i> <span class="mtab-lbl">Garantías</span></div>
     <div class="mtab" data-sec="estadisticas" onclick="switchSection('estadisticas');renderEstadisticas()"><i class="ti ti-chart-dots"></i> <span class="mtab-lbl">Estadísticas</span></div>
+    <button class="mtab" data-sec="ajustes" onclick="qmOpen()" aria-label="Ajustes" title="Ajustes"><i class="ti ti-settings"></i> <span class="mtab-lbl">Ajustes</span></button>
   </div>
 
   <div class="t-right">
@@ -874,6 +908,24 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
   </div>
 </div>
 
+<section id="sec-ajustes" class="app-section" aria-label="Ajustes"><div id="qm-dialog" aria-labelledby="qm-title">
+  <header class="qm-toolbar"><h2 id="qm-title">Matriz de calidad</h2><span id="qm-sync" role="status"></span><button class="btn" onclick="qmSync()" aria-label="Sincronizar matriz" title="Sincronizar matriz"><i class="ti ti-refresh"></i></button><button class="btn" onclick="qmEdit()"><i class="ti ti-plus"></i> Nuevo ítem</button></header>
+  <div class="qm-toolbar"><input id="qm-search" type="search" placeholder="Buscar ítem o criterio" aria-label="Buscar ítem o criterio" oninput="qmRender()"><select id="qm-stage" aria-label="Etapa" onchange="qmRender()"><option value="">Todas las etapas</option></select><select id="qm-group" aria-label="Clasificación" onchange="qmRender()"><option value="">Todas las clasificaciones</option></select></div>
+  <div id="qm-board"></div>
+</div></section>
+<dialog id="qm-editor" aria-labelledby="qm-editor-title">
+ <form id="qm-item-form" onsubmit="qmSaveItem(event)">
+  <h2 id="qm-editor-title" style="font-size:17px;margin:0">Ítem de calidad</h2>
+  <label>Nombre<input id="qm-name" required maxlength="180"></label>
+  <label>Etapa<select id="qm-item-stage"></select></label>
+  <label>Criterio de aceptación<textarea id="qm-criterion" required maxlength="2000"></textarea></label>
+  <label>Herramienta<input id="qm-tool" maxlength="200"></label>
+  <label>Condición ideal<input id="qm-ideal" maxlength="400"></label>
+  <label>Supervisor<select id="qm-supervisor"><option value="1">Supervisor 1</option><option value="2">Supervisor 2</option><option value="3">Supervisor 3</option></select></label>
+  <fieldset id="qm-assignments"><legend>Clasificaciones</legend></fieldset>
+  <footer><button type="button" class="btn" onclick="document.getElementById('qm-editor').close()">Cancelar</button><button class="btn btn-primary" type="submit"><i class="ti ti-device-floppy"></i> Guardar</button></footer>
+ </form>
+</dialog>
 <script>
 // ══════════════ SUPABASE CONFIG ══════════════
 // ← Reemplaza estos dos valores con los de tu proyecto Supabase
@@ -976,6 +1028,7 @@ function switchSection(sec){
   document.querySelectorAll('.mtab').forEach(el=>el.classList.toggle('active', el.dataset.sec===sec));
   document.querySelectorAll('.tbr-variant').forEach(el=>el.classList.toggle('show', el.dataset.sec===sec));
   try{ localStorage.setItem('xtensor_app_lastsection', sec); }catch(e){}
+  if(sec==='ajustes'){qmRender();void qmSync();}
 }
 </script>
 
@@ -1594,7 +1647,127 @@ function featureItems(profile){
   if(f.portapeso) items.push({id:'pf-weight',item:'Portapesos del producto',criterio:'Cantidad, posición y fijación conforme a BOM/plano',herramienta:'Visual / BOM',ideal:'Según BOM',sup:'3'});
   return items;
 }
-function buildStagesForProfile(profile){
+const QM_PREFIX='quality_matrix:v1:';
+const QM_STORAGE='xtensor_matrix_v1:'+SUPABASE_URL;
+let qmValues={},qmPending={},qmBusy=false,qmError='',qmEditing=null,qmDragged=null;
+const QM_STAGES=[['armado','Armado'],['resoldado','Resoldado'],['pulido','Pulido'],['pintado','Pintado'],['ensamble','Ensamble'],['empacado','Empacado']];
+const QM_GROUPS=Object.entries(QUALITY_GROUPS).map(([key,label])=>[key.toLowerCase(),label]);
+function qmGroup(profile){
+  return QM_GROUPS.find(([,label])=>label===profile?.group)?.[0]||null;
+}
+function qmCatalog(){
+  const items=new Map();
+  const add=(stage,item)=>{if(!items.has(item.id))items.set(item.id,{...item,stage});};
+  [COMMON_STAGE_ITEMS,...Object.values(GROUP_STAGE_ITEMS),...PRODUCT_STAGE_RULES.map(r=>r.items)].forEach(def=>Object.entries(def).forEach(([s,list])=>list.forEach(i=>add(s,i))));
+  featureItems({features:{cushion:true,bearing:true,shaft:true,cable:true,portapeso:true}}).forEach(i=>add('ensamble',i));
+  Object.entries(qmValues).forEach(([key,item])=>{if(key.startsWith('item:')&&item?.id&&QM_STAGES.some(s=>s[0]===item.stage))items.set(item.id,{...item});});
+  return items;
+}
+function qmApply(items,stage,profile){
+  const group=qmGroup(profile),catalog=qmCatalog(),map=new Map(items.map(i=>[i.id,i]));
+  if(group)catalog.forEach(item=>{
+    if(item.stage!==stage)return;
+    const mode=qmValues['assign:'+group+':'+item.id]?.mode;
+    if(mode==='off')map.delete(item.id);
+    if(mode==='on')map.set(item.id,item);
+  });
+  return [...map.values()].map(i=>({...i,...(qmValues['item:'+i.id]||{})}));
+}
+function qmPersist(){
+  try{localStorage.setItem(QM_STORAGE,JSON.stringify({values:qmValues,pending:qmPending}));}
+  catch(e){qmError='No se pudo guardar el respaldo local';showToast(qmError,'red');}
+  qmStatus();
+}
+function qmStatus(){
+  const count=Object.keys(qmPending).length;
+  const el=document.getElementById('qm-sync');
+  if(el)el.textContent=qmBusy?'Sincronizando…':qmError?`${count} pendientes · ${qmError}`:count?`${count} cambios pendientes`:'Matriz sincronizada';
+}
+function qmRefresh(){
+  if(currentSerial){const m=MACHINES.find(m=>machineQualityId(m)===currentSerial);if(m)setCurrentQualityProfile(m);}
+  else STAGES=buildStagesForProfile(CURRENT_PROFILE);
+  if(currentSerial&&currentView==='checklist')renderInspection();
+  if(currentSerial&&currentView==='summary')renderSummary();
+  if(calLoaded){renderList();updateSbStats();estNotifyDataChanged();}
+  if(document.getElementById('sec-ajustes').classList.contains('active'))qmRender();
+}
+function qmChange(changes){
+  Object.entries(changes).forEach(([key,value])=>{qmValues[key]=value;qmPending[key]={key:QM_PREFIX+key,value};});
+  qmPersist();qmRefresh();void qmSync();
+}
+async function qmSync(){
+  if(qmBusy)return;
+  if(!sb){qmError='Base de datos no disponible';qmStatus();return;}
+  qmBusy=true;qmStatus();
+  try{
+    for(const [key,row] of Object.entries(qmPending)){
+      const saved=await calInspectionRequest(signal=>sb.from('app_settings').upsert(row).select('key').abortSignal(signal));
+      if(!saved?.some(r=>r.key===row.key))throw new Error('Guardado sin confirmar');
+      if(qmPending[key]===row)delete qmPending[key];
+      qmPersist();
+    }
+    const rows=await calInspectionRequest(signal=>sb.from('app_settings').select('key,value').like('key',QM_PREFIX+'%').abortSignal(signal));
+    let changed=false;
+    (rows||[]).forEach(row=>{
+      if(!row.key.startsWith(QM_PREFIX))return;
+      const key=row.key.slice(QM_PREFIX.length);
+      if(!qmPending[key]&&JSON.stringify(qmValues[key])!==JSON.stringify(row.value)){qmValues[key]=row.value;changed=true;}
+    });
+    qmError='';qmPersist();if(changed)qmRefresh();
+  }catch(e){qmError=e.message||String(e);}
+  finally{qmBusy=false;qmStatus();}
+}
+function qmDefaults(){
+  const groups=new Map(QM_GROUPS.map(([key])=>[key,new Set()]));
+  const profiles=Object.values(PRODUCT_CATALOG).map(p=>resolveProductProfile(p));
+  QM_GROUPS.forEach(([key,label])=>{if(!profiles.some(p=>qmGroup(p)===key))profiles.push({group:label,checklistGroup:label,features:{}});});
+  profiles.forEach(p=>{const ids=groups.get(qmGroup(p));if(ids)buildStagesForProfile(p,true).forEach(s=>s.items.forEach(i=>ids.add(i.id)));});
+  return groups;
+}
+function qmRender(){
+  const query=normProductText(document.getElementById('qm-search').value);
+  const stageFilter=document.getElementById('qm-stage').value,groupFilter=document.getElementById('qm-group').value;
+  const groups=QM_GROUPS.filter(([key])=>!groupFilter||key===groupFilter),defaults=qmDefaults();
+  const catalog=[...qmCatalog().values()].filter(i=>!query||normProductText(i.item+' '+i.criterio).includes(query));
+  const card=(item,group)=>{
+    const id=escapeHtml(item.id),mode=qmValues['assign:'+group+':'+item.id]?.mode||'auto';
+    return `<article class="qm-card" draggable="true" data-id="${id}" data-group="${group}" data-stage="${item.stage}"><p>${escapeHtml(item.item)}</p><div class="qm-card-foot"><small>${group?(mode==='auto'?'Regla de producto / BOM':'Asignado'):'Disponible'}</small><span><button class="btn btn-ghost" data-edit="${id}" aria-label="Editar ${escapeHtml(item.item)}" title="Editar y asignar"><i class="ti ti-pencil"></i></button>${group?`<button class="btn btn-ghost" data-remove="${id}" data-group="${group}" aria-label="Retirar ${escapeHtml(item.item)}" title="Retirar de esta clasificación"><i class="ti ti-arrow-back-up"></i></button>`:''}</span></div></article>`;
+  };
+  document.getElementById('qm-board').innerHTML=`<table><thead><tr><th>Etapa</th><th>Ítems disponibles</th>${groups.map(([,label])=>`<th>${escapeHtml(label)}</th>`).join('')}</tr></thead><tbody>${QM_STAGES.filter(([s])=>!stageFilter||s===stageFilter).map(([stage,label])=>{
+    const items=catalog.filter(i=>i.stage===stage);
+    const cell=(group,list)=>`<td><div class="qm-zone" data-group="${group}" data-stage="${stage}">${list.map(i=>card(i,group)).join('')||'<p class="qm-empty">Sin ítems</p>'}</div></td>`;
+    return `<tr><th>${label}</th>${cell('',items)}${groups.map(([g])=>cell(g,items.filter(i=>{const mode=qmValues['assign:'+g+':'+i.id]?.mode||'auto';return mode==='on'||mode==='auto'&&defaults.get(g).has(i.id);}))).join('')}</tr>`;
+  }).join('')}</tbody></table>`;
+}
+function qmOpen(){
+  switchSection('ajustes');
+}
+function qmAssign(id,group,mode){
+  if(!qmCatalog().has(id)||!QM_GROUPS.some(([g])=>g===group)||!['on','off','auto'].includes(mode))return;
+  qmChange({['assign:'+group+':'+id]:{mode}});
+}
+function qmEdit(id){
+  qmEditing=id||null;
+  const item=qmCatalog().get(id)||{item:'',stage:document.getElementById('qm-stage').value||'armado',criterio:'',herramienta:'',ideal:'',sup:'2'};
+  document.getElementById('qm-editor-title').textContent=id?'Editar ítem':'Nuevo ítem';
+  for(const [field,key] of [['name','item'],['criterion','criterio'],['tool','herramienta'],['ideal','ideal'],['supervisor','sup'],['item-stage','stage']])document.getElementById('qm-'+field).value=item[key]||'';
+  document.getElementById('qm-item-stage').disabled=!!id;
+  document.getElementById('qm-assignments').innerHTML='<legend>Clasificaciones</legend>'+QM_GROUPS.map(([g,label])=>{
+    const mode=qmValues['assign:'+g+':'+id]?.mode||'auto';
+    return `<label>${escapeHtml(label)}<select data-assignment="${g}" aria-label="${escapeHtml(label)}"><option value="auto" ${mode==='auto'?'selected':''}>Automático</option><option value="on" ${mode==='on'?'selected':''}>Incluir</option><option value="off" ${mode==='off'?'selected':''}>Excluir</option></select></label>`;
+  }).join('');
+  document.getElementById('qm-editor').showModal();
+}
+function qmSaveItem(event){
+  event.preventDefault();
+  const item={id:qmEditing||'custom-'+crypto.randomUUID()};
+  for(const [field,key] of [['name','item'],['criterion','criterio'],['tool','herramienta'],['ideal','ideal'],['supervisor','sup'],['item-stage','stage']])item[key]=document.getElementById('qm-'+field).value.trim();
+  if(!item.item||!item.criterio)return;
+  const changes={['item:'+item.id]:item};
+  document.querySelectorAll('[data-assignment]').forEach(select=>{const key='assign:'+select.dataset.assignment+':'+item.id;if(select.value!==(qmValues[key]?.mode||'auto'))changes[key]={mode:select.value};});
+  document.getElementById('qm-editor').close();qmChange(changes);
+}
+function buildStagesForProfile(profile,baseOnly=false){
   const group=profile?.checklistGroup||profile?.group||'Sin clasificar';
   const groupDef=GROUP_STAGE_ITEMS[group]||{};
   const productDef=productSpecificItems(profile);
@@ -1610,10 +1783,46 @@ function buildStagesForProfile(profile){
     // Evita duplicados si un control común/grupal y uno específico coinciden.
     const seen=new Set();
     items=items.filter(it=>{ if(seen.has(it.id)) return false; seen.add(it.id); return true; });
-    return {key,label,icon,items};
+    return {key,label,icon,items:baseOnly?items:qmApply(items,key,profile)};
   });
 }
 let STAGES=buildStagesForProfile(null);
+document.getElementById('app-body').appendChild(document.getElementById('sec-ajustes'));
+try{
+  const saved=JSON.parse(localStorage.getItem(QM_STORAGE)||'{}');
+  qmValues=saved.values||{};qmPending=saved.pending||{};
+}catch(e){qmError='No se pudo leer el respaldo de la matriz';}
+QM_STAGES.forEach(([key,label])=>{
+  ['qm-stage','qm-item-stage'].forEach(id=>document.getElementById(id).insertAdjacentHTML('beforeend',`<option value="${key}">${label}</option>`));
+});
+QM_GROUPS.forEach(([key,label])=>document.getElementById('qm-group').insertAdjacentHTML('beforeend',`<option value="${key}">${label}</option>`));
+const qmBoard=document.getElementById('qm-board');
+qmBoard.addEventListener('click',event=>{
+  const edit=event.target.closest('[data-edit]'),remove=event.target.closest('[data-remove]');
+  if(edit)qmEdit(edit.dataset.edit);
+  if(remove)qmAssign(remove.dataset.remove,remove.dataset.group,'off');
+});
+qmBoard.addEventListener('dragstart',event=>{
+  const card=event.target.closest('.qm-card');if(!card)return;
+  qmDragged={id:card.dataset.id,group:card.dataset.group,stage:card.dataset.stage};
+  event.dataTransfer.setData('text/plain',qmDragged.id);event.dataTransfer.effectAllowed='copyMove';
+});
+qmBoard.addEventListener('dragover',event=>{
+  const zone=event.target.closest('.qm-zone');if(!zone||!qmDragged||zone.dataset.stage!==qmDragged.stage)return;
+  event.preventDefault();zone.classList.add('qm-over');event.dataTransfer.dropEffect=zone.dataset.group?'copy':'move';
+});
+qmBoard.addEventListener('dragleave',event=>{event.target.closest('.qm-zone')?.classList.remove('qm-over');});
+qmBoard.addEventListener('drop',event=>{
+  const zone=event.target.closest('.qm-zone'),drag=qmDragged;
+  event.preventDefault();qmDragged=null;
+  if(!zone||!drag||zone.dataset.stage!==drag.stage)return;
+  zone.classList.remove('qm-over');
+  if(zone.dataset.group)qmAssign(drag.id,zone.dataset.group,'on');
+  else if(drag.group)qmAssign(drag.id,drag.group,'off');
+});
+qmBoard.addEventListener('dragend',()=>{qmDragged=null;qmBoard.querySelectorAll('.qm-over').forEach(z=>z.classList.remove('qm-over'));});
+window.addEventListener('online',()=>{void qmSync();});
+setInterval(()=>{if(calLoaded&&!document.hidden)void qmSync();},15000);
 function setCurrentQualityProfile(m){
   CURRENT_PROFILE=resolveProductProfile(m);
   STAGES=buildStagesForProfile(CURRENT_PROFILE);
@@ -1621,7 +1830,8 @@ function setCurrentQualityProfile(m){
 }
 const WELDING_STAGE_MOVES=[{id:'a6',before:'a7'},{id:'gj-a2',before:'gj-a3'}];
 function getStagesForRecord(record){
-  const stages=buildStagesForProfile(resolveProductProfile(record));
+  if(record?.stageData?.__quality?.checklist) return JSON.parse(JSON.stringify(record.stageData.__quality.checklist));
+  const stages=buildStagesForProfile(resolveProductProfile(record),!!record?.stageData);
   // El histórico conserva la etapa original de las respuestas anteriores al cambio.
   if(Object.prototype.hasOwnProperty.call(record?.stageData?.armado||{},'a6')){
     const armado=stages.find(s=>s.key==='armado');
@@ -2008,20 +2218,20 @@ function getInspPct(machineId){
   const d=getInsp(machineId),m=MACHINES.find(x=>machineQualityId(x)===machineId);
   const stages=m?getStagesForRecord(m):STAGES;
   let tot=0,ok=0;
-  stages.forEach(s=>{tot+=s.items.length;ok+=Object.values(d.stageData[s.key]||{}).filter(v=>v==='ok').length;});
+  stages.forEach(s=>{tot+=s.items.length;ok+=s.items.filter(i=>d.stageData[s.key]?.[i.id]==='ok').length;});
   return tot>0?Math.round(ok/tot*100):0;
 }
 function getInspFails(machineId){
   const d=getInsp(machineId),m=MACHINES.find(x=>machineQualityId(x)===machineId);
   const stages=m?getStagesForRecord(m):STAGES;
-  let f=0;stages.forEach(s=>{f+=Object.values(d.stageData[s.key]||{}).filter(v=>v==='fail').length;});
+  let f=0;stages.forEach(s=>{f+=s.items.filter(i=>d.stageData[s.key]?.[i.id]==='fail').length;});
   return f;
 }
 function getInspDone(machineId){
   const d=getInsp(machineId),m=MACHINES.find(x=>machineQualityId(x)===machineId);
   const stages=m?getStagesForRecord(m):STAGES;
   let tot=0,done=0;
-  stages.forEach(s=>{const items=s.items.length;tot+=items;done+=Object.values(d.stageData[s.key]||{}).filter(v=>v!=='').length;});
+  stages.forEach(s=>{const items=s.items.length;tot+=items;done+=s.items.filter(i=>['ok','fail'].includes(d.stageData[s.key]?.[i.id])).length;});
   return tot>0?done===tot:'pending';
 }
 
@@ -2174,20 +2384,20 @@ async function checkAndArchive(machineId){
   let totalItems=0,totalDone=0;
   STAGES.forEach(s=>{
     totalItems+=s.items.length;
-    totalDone+=Object.values(d.stageData[s.key]||{}).filter(v=>v!=='').length;
+    totalDone+=s.items.filter(i=>['ok','fail'].includes(d.stageData[s.key]?.[i.id])).length;
   });
   if(totalDone===totalItems&&totalItems>0){
     const m=MACHINES.find(x=>machineQualityId(x)===machineId);
     if(!m) return;
     let tok=0,tof=0;
-    STAGES.forEach(s=>{const dd=d.stageData[s.key]||{};tok+=Object.values(dd).filter(v=>v==='ok').length;tof+=Object.values(dd).filter(v=>v==='fail').length;});
+    STAGES.forEach(s=>{const dd=d.stageData[s.key]||{};tok+=s.items.filter(i=>dd[i.id]==='ok').length;tof+=s.items.filter(i=>dd[i.id]==='fail').length;});
     const entry={
       _machineKey:machineId,machineKey:machineId,serial:m.serial,code:m.code,name:m.name,client:m.client,prometido:m.prometido,color:m.color,
       fechaInsp:new Date().toLocaleString('es-CO',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
       conformes:tok,noConformes:tof,total:totalItems,
       pct:Math.round(tok/totalItems*100),
       inspectors:Object.values(d.inspectors).filter(Boolean).join(', ')||'—',
-      stageData:JSON.parse(JSON.stringify({...d.stageData,__quality:{events:d.internalFindings||[],machine:d.machineSnapshot||m,resultDates:d.resultDates||{}}})),
+      stageData:JSON.parse(JSON.stringify({...d.stageData,__quality:{checklist:STAGES,events:d.internalFindings||[],machine:d.machineSnapshot||m,resultDates:d.resultDates||{}}})),
     };
     historico.unshift(entry);
     updateHistoricoCount();
@@ -2235,8 +2445,8 @@ function renderHistorico(list){
       <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
         ${recordStages.map(s=>{
           const dd=h.stageData[s.key]||{};
-          const ok=Object.values(dd).filter(v=>v==='ok').length;
-          const fail=Object.values(dd).filter(v=>v==='fail').length;
+          const ok=s.items.filter(i=>dd[i.id]==='ok').length;
+          const fail=s.items.filter(i=>dd[i.id]==='fail').length;
           const p=s.items.length>0?Math.round(ok/s.items.length*100):0;
           return`<div style="flex:1;min-width:60px">
             <div style="font-size:10px;color:var(--text3);margin-bottom:2px">${s.label}</div>
@@ -2318,13 +2528,13 @@ function renderChecklist(stage,d){
       </div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
-          <span style="font-size:13px;font-weight:500">${it.item}</span>
+          <span style="font-size:13px;font-weight:500">${escapeHtml(it.item)}</span>
           <span class="sup-badge sup${it.sup}">Sup ${it.sup}</span>
         </div>
-        <div style="font-size:12px;color:var(--text2);margin-top:1px">${it.criterio}</div>
-        ${it.ideal?`<div style="font-size:11px;color:var(--text3)">Ideal: ${it.ideal}</div>`:''}
+        <div style="font-size:12px;color:var(--text2);margin-top:1px">${escapeHtml(it.criterio)}</div>
+        ${it.ideal?`<div style="font-size:11px;color:var(--text3)">Ideal: ${escapeHtml(it.ideal)}</div>`:''}
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
-          <span style="font-size:11px;color:var(--text3)"><i class="ti ti-tool" style="font-size:10px"></i> ${it.herramienta}</span>
+          <span style="font-size:11px;color:var(--text3)"><i class="ti ti-tool" style="font-size:10px"></i> ${escapeHtml(it.herramienta)}</span>
           <select class="result-select" onchange="selectResult('${stage.key}','${it.id}',this.value)">
             <option value="">Resultado…</option>
             <option value="ok" ${val==='ok'?'selected':''}>✓ Cumple</option>
@@ -2364,14 +2574,14 @@ function selectResult(sk,id,val){
 
 function updateProgress(stage,d){
   const sd=d.stageData[stage.key]||{};
-  const total=stage.items.length,done=Object.values(sd).filter(v=>v!=='').length,fail=Object.values(sd).filter(v=>v==='fail').length;
+  const total=stage.items.length,done=stage.items.filter(i=>['ok','fail'].includes(sd[i.id])).length,fail=stage.items.filter(i=>sd[i.id]==='fail').length;
   const pct=total>0?Math.round(done/total*100):0;
   const bar=document.getElementById('stage-bar');
   bar.style.width=pct+'%';bar.className='prog-fill '+(fail>0?'r':pct===100?'g':'');
   document.getElementById('stage-pl').textContent=`${done}/${total} revisados`;
   document.getElementById('stage-pct').textContent=pct+'%';
   let tok=0,tof=0;
-  STAGES.forEach(s=>{const dd=d.stageData[s.key]||{};tok+=Object.values(dd).filter(v=>v==='ok').length;tof+=Object.values(dd).filter(v=>v==='fail').length;});
+  STAGES.forEach(s=>{const dd=d.stageData[s.key]||{};tok+=s.items.filter(i=>dd[i.id]==='ok').length;tof+=s.items.filter(i=>dd[i.id]==='fail').length;});
   document.getElementById('bb-counts').innerHTML=
     `<span class="badge badge-g"><i class="ti ti-check"></i>${tok} conformes</span>`+
     (tof>0?`<span class="badge badge-r"><i class="ti ti-x"></i>${tof} no conformes</span>`:'');
@@ -2440,7 +2650,7 @@ function renderSummary(){
       </div>
     </div>`;
   let ti=0,tok=0,tof=0;
-  STAGES.forEach(s=>{ti+=s.items.length;const dd=d.stageData[s.key]||{};tok+=Object.values(dd).filter(v=>v==='ok').length;tof+=Object.values(dd).filter(v=>v==='fail').length;});
+  STAGES.forEach(s=>{ti+=s.items.length;const dd=d.stageData[s.key]||{};tok+=s.items.filter(i=>dd[i.id]==='ok').length;tof+=s.items.filter(i=>dd[i.id]==='fail').length;});
   const pct=ti>0?Math.round(tok/ti*100):0;
   document.getElementById('sum-metrics').innerHTML=`
     <div class="metric-card"><div class="metric-num">${ti}</div><div class="metric-lbl">Total ítems</div></div>
@@ -2449,7 +2659,7 @@ function renderSummary(){
     <div class="metric-card"><div class="metric-num" style="color:var(--yellow)">${pct}%</div><div class="metric-lbl">Cumplimiento</div></div>`;
   document.getElementById('sum-stages').innerHTML=STAGES.map(s=>{
     const dd=d.stageData[s.key]||{};
-    const ok=Object.values(dd).filter(v=>v==='ok').length,fail=Object.values(dd).filter(v=>v==='fail').length,pend=s.items.length-ok-fail;
+    const ok=s.items.filter(i=>dd[i.id]==='ok').length,fail=s.items.filter(i=>dd[i.id]==='fail').length,pend=s.items.length-ok-fail;
     const p=s.items.length>0?Math.round(ok/s.items.length*100):0;
     const fails=s.items.filter(it=>(dd[it.id]||'')==='fail');
     return`<div class="sum-stage">
@@ -2469,7 +2679,7 @@ function renderSummary(){
       </div>
       ${fails.length>0?`<div style="margin-top:7px;padding:7px;background:var(--red-bg);border:1px solid var(--red-border);border-radius:var(--r)">
         <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:3px"><i class="ti ti-alert-triangle"></i> Ítems fallidos:</div>
-        ${fails.map(it=>`<div style="font-size:11px;color:var(--red);margin:1px 0">• ${it.item} — ${it.criterio}</div>`).join('')}
+        ${fails.map(it=>`<div style="font-size:11px;color:var(--red);margin:1px 0">• ${escapeHtml(it.item)} — ${escapeHtml(it.criterio)}</div>`).join('')}
       </div>`:''}
       ${d.stageObs[s.key]?`<div style="font-size:11px;color:var(--text2);margin-top:6px"><i class="ti ti-notes"></i> ${d.stageObs[s.key]}</div>`:''}
     </div>`;
@@ -2493,6 +2703,7 @@ function updateBBPos(){
 // ── KEYBOARD ── (solo activo cuando la sección Calidad está visible)
 document.addEventListener('keydown',e=>{
   if(!document.getElementById('sec-calidad').classList.contains('active')) return;
+  if(document.getElementById('qm-editor').open) return;
   if(!document.getElementById('cal-notifications').hidden || document.activeElement.id==='cal-bell') return;
   const tag=document.activeElement.tagName;
   if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
@@ -3145,6 +3356,7 @@ function calSubscribeRealtime(){
 
 // ── INIT CALIDAD (llamado desde el bloque de init general) ──
 async function calInit(){
+  await qmSync();
   loadMachinesFromCache();
   calRestorePendingInspections();
   if(MACHINES[0]) setCurrentQualityProfile(MACHINES[0]);
@@ -3272,7 +3484,7 @@ function garProcesoChanged(){
   txtWrap.style.display='none';
   const stage=STAGES.find(s=>s.key===proc);
   if(!stage){ sel.innerHTML='<option value="">Selecciona un proceso primero…</option>'; return; }
-  sel.innerHTML='<option value="">Selecciona ítem…</option>'+stage.items.map(it=>`<option value="${it.id}">${it.item}</option>`).join('');
+  sel.innerHTML='<option value="">Selecciona ítem…</option>'+stage.items.map(it=>`<option value="${it.id}">${escapeHtml(it.item)}</option>`).join('');
 }
 function garItemChanged(){
   const proc=document.getElementById('gf-defProceso').value;
@@ -3675,7 +3887,7 @@ function estInternalData(){
       const values=sd[stage.key]||{};
       const ids=new Set([...stage.items.map(i=>i.id),...Object.keys(values)]);
       ids.forEach(id=>{
-        const item=allItems.find(i=>i.id===id)||{id,item:id,criterio:''};
+        const item=allItems.find(i=>i.id===id)||qmCatalog().get(id)||{id,item:id,criterio:''};
         const result=values[id]||'';
         const fecha=dates[stage.key]?.[id]||history?._createdAt||null;
         const checkKey=machineKey+'|'+id;
