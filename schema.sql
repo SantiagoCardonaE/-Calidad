@@ -682,3 +682,40 @@ $$;
 drop trigger if exists trg_calidad_conservar_hallazgos on public.calidad_inspecciones;
 create trigger trg_calidad_conservar_hallazgos before update on public.calidad_inspecciones
   for each row execute function public.calidad_conservar_hallazgos();
+
+-- Elimina el contenido de una version y evita que un cliente antiguo lo restaure.
+create or replace function public.calidad_eliminar_version_matriz(p_key text)
+returns void language plpgsql security invoker set search_path=public
+as $$
+declare marker text;
+begin
+  if p_key is null or p_key !~ '^quality_matrix:v1:version:[0-9a-f-]{36}$' then
+    raise exception 'Clave de version no valida';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended(p_key,0));
+  marker := replace(p_key,'quality_matrix:v1:version:','quality_matrix:v1:deleted-version:');
+  insert into public.app_settings(key,value) values(marker,jsonb_build_object('deletedAt',now())) on conflict(key) do nothing;
+  delete from public.app_settings where key=p_key;
+end;
+$$;
+revoke all on function public.calidad_eliminar_version_matriz(text) from public;
+grant execute on function public.calidad_eliminar_version_matriz(text) to anon,authenticated;
+
+create or replace function public.calidad_proteger_version_eliminada()
+returns trigger language plpgsql set search_path=public
+as $$
+begin
+  if strpos(new.key,'quality_matrix:v1:version:')=1 then
+    perform pg_advisory_xact_lock(hashtextextended(new.key,0));
+    if exists(select 1 from public.app_settings where key=replace(new.key,'quality_matrix:v1:version:','quality_matrix:v1:deleted-version:')) then
+      raise exception 'Esta version fue eliminada';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists trg_calidad_version_eliminada on public.app_settings;
+create trigger trg_calidad_version_eliminada before insert or update on public.app_settings
+for each row execute function public.calidad_proteger_version_eliminada();
+
+NOTIFY pgrst, 'reload schema';

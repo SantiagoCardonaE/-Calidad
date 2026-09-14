@@ -361,6 +361,17 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 #qm-assignments{display:grid;grid-template-columns:1fr 1fr;gap:8px;border:1px solid var(--border);padding:12px}
 #qm-assignments label{display:grid;grid-template-columns:minmax(0,1fr) 110px;align-items:center}
 #qm-item-form footer{display:flex;gap:8px;justify-content:flex-end}
+#workspace{position:relative}
+#sidebar.collapsed.peek{position:absolute;left:0;top:0;bottom:0;width:var(--sidebar-w);min-width:var(--sidebar-w);max-width:calc(100vw - 24px);z-index:60;border-right:1px solid var(--border2);box-shadow:8px 0 20px #0005}
+#sidebar-edge{display:none;position:absolute;left:0;top:0;bottom:0;width:12px;z-index:59;background:var(--bg2);border:0;border-right:2px solid var(--border2);color:var(--yellow);cursor:pointer;padding:0}
+#sidebar.collapsed~#sidebar-edge{display:block}
+.cal-info-btn{width:28px;height:28px;min-width:28px;padding:0;justify-content:center;color:var(--text2);flex-shrink:0}
+#cal-info{position:fixed;inset:auto;margin:0;width:350px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:14px;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:6px;box-shadow:0 6px 24px #0008;overflow:auto;font-size:13px}
+#cal-info header{display:flex;gap:8px;align-items:flex-start;margin-bottom:10px}#cal-info h3{font-size:14px;line-height:1.4;flex:1;overflow-wrap:anywhere}
+#cal-info dl{display:grid;gap:5px}#cal-info dt{font-size:11px;color:var(--text2);margin-top:5px}#cal-info dd{margin:0;overflow-wrap:anywhere;white-space:pre-wrap;line-height:1.45}
+.mr-top .cal-info-btn{margin-left:auto}.mr-client{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.check-row .cal-info-btn{margin-left:auto}
+#qm-version-preview{width:1120px}#qm-preview-scroll{overflow:auto;max-height:65dvh}#qm-preview-scroll table{table-layout:fixed;width:100%;min-width:800px;border-collapse:collapse}#qm-preview-scroll th,#qm-preview-scroll td{padding:9px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;white-space:normal;overflow-wrap:anywhere}#qm-preview-scroll th{position:sticky;top:0;background:var(--surface)}
+.qm-version-actions{display:flex;gap:4px;flex-shrink:0}.qm-version-actions .btn{width:30px;height:30px;padding:0;justify-content:center}
 .workflow-dialog{background:var(--bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;width:560px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:18px;overflow:auto;margin:auto}
 .workflow-dialog::backdrop{background:#0009}
 .workflow-dialog h2{font-size:17px;margin-bottom:12px}
@@ -487,6 +498,7 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
       </div>
 
       <!-- RESIZE -->
+      <button id="sidebar-edge" type="button" aria-label="Mostrar máquinas temporalmente" onclick="calPeekSidebar()"><i class="ti ti-chevron-right"></i></button>
       <div id="resize-handle"></div>
 
       <!-- MAIN -->
@@ -944,6 +956,8 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 <dialog id="qm-versions-dialog" class="workflow-dialog" aria-labelledby="qm-versions-title">
  <h2 id="qm-versions-title">Versiones de la matriz</h2><form onsubmit="qmSaveVersion(event)"><label>Nombre de la versión<input id="qm-version-name" required maxlength="120" placeholder="Ej. Checklist aprobado en reunión"></label><label>Guardada por<input id="qm-version-author" required maxlength="120" autocomplete="name"></label><button class="btn" type="submit"><i class="ti ti-device-floppy"></i> Guardar versión actual</button></form><div id="qm-versions-list"></div><footer><button class="btn" onclick="document.getElementById('qm-versions-dialog').close()">Cerrar</button></footer>
 </dialog>
+<div id="cal-info" popover="auto" role="dialog" aria-labelledby="cal-info-title"><header><h3 id="cal-info-title"></h3><button type="button" class="btn btn-ghost cal-info-btn" onclick="calCloseInfo()" aria-label="Cerrar información"><i class="ti ti-x"></i></button></header><dl id="cal-info-details"></dl></div>
+<dialog id="qm-version-preview" class="workflow-dialog" aria-labelledby="qm-preview-title"><h2 id="qm-preview-title"></h2><p id="qm-preview-meta"></p><div id="qm-preview-scroll"></div><footer><button class="btn" onclick="document.getElementById('qm-version-preview').close()">Cerrar vista</button></footer></dialog>
 <script>
 // ══════════════ SUPABASE CONFIG ══════════════
 // ← Reemplaza estos dos valores con los de tu proyecto Supabase
@@ -1674,7 +1688,7 @@ const QM_LEGACY_WELDING={
  'gj-a2':{item:'Soldaduras y uniones estructurales',criterio:'Uniones completas, sin grietas, porosidad, bordes cortantes ni elementos sueltos',herramienta:'Visual / Tacto',ideal:'Uniones firmes y seguras',sup:'3'}
 };
 const QM_STORAGE='xtensor_matrix_v1:'+SUPABASE_URL;
-let qmValues={},qmPending={},qmBusy=false,qmError='',qmEditing=null,qmDragged=null;
+let qmValues={},qmPending={},qmDeleted={},qmBusy=false,qmError='',qmEditing=null,qmDragged=null,qmPreviewKey=null;
 const QM_STAGES=[['armado','Armado'],['resoldado','Resoldado'],['pulido','Pulido'],['pintado','Pintado'],['ensamble','Ensamble'],['empacado','Empacado']];
 const QM_GROUPS=Object.entries(QUALITY_GROUPS).map(([key,label])=>[key.toLowerCase(),label]);
 function qmGroup(profile){
@@ -1709,8 +1723,53 @@ function qmOpenVersions(){qmRenderVersions();document.getElementById('qm-version
 function qmRenderVersions(){
   const versions=Object.entries(qmValues).filter(([key,v])=>key.startsWith('version:')&&v?.snapshot?.items).map(([key,v])=>({key,...v})).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
   const el=document.getElementById('qm-versions-list');
-  el.innerHTML=versions.map(v=>`<div class="qm-version"><div><strong>${escapeHtml(v.name)}</strong><small>${escapeHtml(v.author)} · ${escapeHtml(new Date(v.createdAt).toLocaleString('es-CO'))}</small><small>${Object.keys(v.snapshot.items).length} ítems${qmPending[v.key]?' · Pendiente de sincronizar':''}</small></div><button class="btn" data-restore-version="${escapeHtml(v.key)}"><i class="ti ti-restore"></i> Restaurar</button></div>`).join('')||'<p class="qm-empty">No hay versiones guardadas</p>';
+  el.innerHTML=versions.map(v=>`<div class="qm-version"><div><strong>${escapeHtml(v.name)}</strong><small>${escapeHtml(v.author)} · ${escapeHtml(new Date(v.createdAt).toLocaleString('es-CO'))}</small><small>${Object.keys(v.snapshot.items).length} ítems${qmPending[v.key]?' · Pendiente de sincronizar':''}</small></div><div class="qm-version-actions"><button class="btn" data-view-version="${escapeHtml(v.key)}" aria-label="Ver versión ${escapeHtml(v.name)}" title="Ver versión"><i class="ti ti-eye"></i></button><button class="btn" data-restore-version="${escapeHtml(v.key)}" aria-label="Restaurar" title="Restaurar versión"><i class="ti ti-restore"></i></button><button class="btn" data-delete-version="${escapeHtml(v.key)}" aria-label="Eliminar versión ${escapeHtml(v.name)}" title="Eliminar definitivamente"><i class="ti ti-trash"></i></button></div></div>`).join('')||'<p class="qm-empty">No hay versiones guardadas</p>';
   el.querySelectorAll('[data-restore-version]').forEach(btn=>btn.addEventListener('click',()=>qmRestoreVersion(btn.dataset.restoreVersion)));
+  el.querySelectorAll('[data-view-version]').forEach(btn=>btn.addEventListener('click',()=>qmViewVersion(btn.dataset.viewVersion)));
+  el.querySelectorAll('[data-delete-version]').forEach(btn=>btn.addEventListener('click',()=>qmDeleteVersion(btn.dataset.deleteVersion)));
+}
+function qmViewVersion(key){
+  const v=qmValues[key];if(!v?.snapshot?.items)return;
+  qmPreviewKey=key;
+  document.getElementById('qm-preview-title').textContent=v.name;
+  document.getElementById('qm-preview-meta').textContent=`${v.author} · ${new Date(v.createdAt).toLocaleString('es-CO')}`;
+  const defaults=qmDefaults();
+  const items=Object.values(v.snapshot.items).sort((a,b)=>a.item.localeCompare(b.item,'es',{sensitivity:'base',numeric:true}));
+  document.getElementById('qm-preview-scroll').innerHTML=`<table><thead><tr><th>Etapa</th><th>Ítem</th><th>Criterio de aceptación</th><th>Condición ideal</th><th>Clasificaciones</th></tr></thead><tbody>${items.map(item=>{
+    const groups=QM_GROUPS.flatMap(([g,label])=>{const mode=v.snapshot.assignments?.['assign:'+g+':'+item.id]?.mode||'auto';return mode==='on'?[label]:mode==='auto'&&defaults.get(g)?.has(item.id)?[label+' (según producto)']:[];});
+    return `<tr><td>${escapeHtml(QM_STAGES.find(s=>s[0]===item.stage)?.[1]||item.stage)}</td><td>${escapeHtml(item.item)}</td><td>${escapeHtml(item.criterio)}</td><td>${escapeHtml(item.ideal||'No especificado')}</td><td>${escapeHtml(groups.join(', ')||'Sin asignaciones')}</td></tr>`;
+  }).join('')}</tbody></table>`;
+  document.getElementById('qm-version-preview').showModal();
+}
+function qmDeleteVersion(key){
+  const version=qmValues[key];if(!version?.snapshot||!key.startsWith('version:'))return;
+  if(!confirm(`¿Eliminar definitivamente la versión "${version.name}"? No podrás restaurar este respaldo. La matriz actual y las inspecciones no cambiarán.`))return;
+  const values={...qmValues},pending={...qmPending},deletes={...qmDeleted,[key]:new Date().toISOString()};
+  delete values[key];delete pending[key];values['deleted-'+key]={deletedAt:deletes[key]};
+  try{localStorage.setItem(QM_STORAGE,JSON.stringify({values,pending,deletes}));}
+  catch(e){showToast('No se pudo guardar la eliminación pendiente','red');return;}
+  qmValues=values;qmPending=pending;qmDeleted=deletes;qmForgetVersionView(key);qmRenderVersions();qmStatus();void qmSync();
+}
+function qmForgetVersionView(key){
+  if(qmPreviewKey!==key)return;
+  document.getElementById('qm-version-preview').close();document.getElementById('qm-preview-scroll').textContent='';qmPreviewKey=null;
+}
+function qmIngest(rows){
+  let changed=false;
+  const incoming=(rows||[]).filter(r=>r.key.startsWith(QM_PREFIX));
+  incoming.filter(r=>r.key.startsWith(QM_PREFIX+'deleted-version:')).forEach(row=>{
+    const marker=row.key.slice(QM_PREFIX.length),key=marker.slice('deleted-'.length);
+    qmValues[marker]=row.value;delete qmDeleted[key];
+  });
+  Object.keys(qmValues).filter(k=>k.startsWith('deleted-version:')).forEach(marker=>{
+    const key=marker.slice('deleted-'.length);if(qmValues[key])changed=true;delete qmValues[key];delete qmPending[key];qmForgetVersionView(key);
+  });
+  incoming.forEach(row=>{
+    const key=row.key.slice(QM_PREFIX.length);
+    if(qmDeleted[key]||key.startsWith('version:')&&qmValues['deleted-'+key])return;
+    if(!qmPending[key]&&JSON.stringify(qmValues[key])!==JSON.stringify(row.value)){qmValues[key]=row.value;changed=true;}
+  });
+  return changed;
 }
 function qmSaveVersion(event){
   event.preventDefault();
@@ -1733,12 +1792,12 @@ function qmRestoreVersion(key){
   qmChange(changes);qmRenderVersions();
 }
 function qmPersist(){
-  try{localStorage.setItem(QM_STORAGE,JSON.stringify({values:qmValues,pending:qmPending}));}
+  try{localStorage.setItem(QM_STORAGE,JSON.stringify({values:qmValues,pending:qmPending,deletes:qmDeleted}));}
   catch(e){qmError='No se pudo guardar el respaldo local';showToast(qmError,'red');}
   qmStatus();
 }
 function qmStatus(){
-  const count=Object.keys(qmPending).length;
+  const count=Object.keys(qmPending).length+Object.keys(qmDeleted).length;
   const el=document.getElementById('qm-sync');
   if(el)el.textContent=qmBusy?'Sincronizando…':qmError?`${count} pendientes · ${qmError}`:count?`${count} cambios pendientes`:'Matriz sincronizada';
   if(document.getElementById('qm-versions-dialog')?.open)qmRenderVersions();
@@ -1754,7 +1813,7 @@ function qmRefresh(){
 function qmChange(changes){
   const values={...qmValues},pending={...qmPending};
   Object.entries(changes).forEach(([key,value])=>{values[key]=value;pending[key]={key:QM_PREFIX+key,value};});
-  try{localStorage.setItem(QM_STORAGE,JSON.stringify({values,pending}));}
+  try{localStorage.setItem(QM_STORAGE,JSON.stringify({values,pending,deletes:qmDeleted}));}
   catch(e){qmError='No se pudo guardar el respaldo local';qmStatus();showToast('No se aplicó el cambio: '+qmError,'red');return false;}
   qmValues=values;qmPending=pending;qmStatus();qmRefresh();void qmSync();return true;
 }
@@ -1763,19 +1822,19 @@ async function qmSync(){
   if(!sb){qmError='Base de datos no disponible';qmStatus();return;}
   qmBusy=true;qmStatus();
   try{
+    const read=()=>calInspectionRequest(signal=>sb.from('app_settings').select('key,value').like('key',QM_PREFIX+'%').abortSignal(signal));
+    let changed=qmIngest(await read());
+    for(const [key] of Object.entries(qmDeleted)){
+      await calInspectionRequest(signal=>sb.rpc('calidad_eliminar_version_matriz',{p_key:QM_PREFIX+key}).abortSignal(signal));
+      delete qmDeleted[key];qmPersist();
+    }
     for(const [key,row] of Object.entries(qmPending)){
       const saved=await calInspectionRequest(signal=>sb.from('app_settings').upsert(row).select('key').abortSignal(signal));
       if(!saved?.some(r=>r.key===row.key))throw new Error('Guardado sin confirmar');
       if(qmPending[key]===row)delete qmPending[key];
       qmPersist();
     }
-    const rows=await calInspectionRequest(signal=>sb.from('app_settings').select('key,value').like('key',QM_PREFIX+'%').abortSignal(signal));
-    let changed=false;
-    (rows||[]).forEach(row=>{
-      if(!row.key.startsWith(QM_PREFIX))return;
-      const key=row.key.slice(QM_PREFIX.length);
-      if(!qmPending[key]&&JSON.stringify(qmValues[key])!==JSON.stringify(row.value)){qmValues[key]=row.value;changed=true;}
-    });
+    changed=qmIngest(await read())||changed;
     qmError='';qmPersist();if(changed)qmRefresh();
   }catch(e){qmError=e.message||String(e);}
   finally{qmBusy=false;qmStatus();}
@@ -1791,7 +1850,7 @@ function qmRender(){
   const query=normProductText(document.getElementById('qm-search').value);
   const stageFilter=document.getElementById('qm-stage').value,groupFilter=document.getElementById('qm-group').value;
   const groups=QM_GROUPS.filter(([key])=>!groupFilter||key===groupFilter),defaults=qmDefaults();
-  const catalog=[...qmCatalog().values()].filter(i=>!query||normProductText(i.item+' '+i.criterio).includes(query));
+  const catalog=[...qmCatalog().values()].filter(i=>!query||normProductText(i.item+' '+i.criterio).includes(query)).sort((a,b)=>a.item.localeCompare(b.item,'es',{sensitivity:'base',numeric:true})||a.id.localeCompare(b.id));
   const card=(item,group)=>{
     const id=escapeHtml(item.id),mode=qmValues['assign:'+group+':'+item.id]?.mode||'auto';
     return `<article class="qm-card" draggable="true" data-id="${id}" data-group="${group}" data-stage="${item.stage}"><p>${escapeHtml(item.item)}</p><div class="qm-card-foot"><small>${group?(mode==='auto'?'Regla de producto / BOM':'Asignado'):'Disponible'}</small><span><button class="btn btn-ghost" data-edit="${id}" aria-label="Editar ${escapeHtml(item.item)}" title="Editar y asignar"><i class="ti ti-pencil"></i></button>${group?`<button class="btn btn-ghost" data-remove="${id}" data-group="${group}" aria-label="Retirar ${escapeHtml(item.item)}" title="Retirar de esta clasificación"><i class="ti ti-arrow-back-up"></i></button>`:''}</span></div></article>`;
@@ -1853,7 +1912,7 @@ let STAGES=buildStagesForProfile(null);
 document.getElementById('app-body').appendChild(document.getElementById('sec-ajustes'));
 try{
   const saved=JSON.parse(localStorage.getItem(QM_STORAGE)||'{}');
-  qmValues=saved.values||{};qmPending=saved.pending||{};
+  qmValues=saved.values||{};qmPending=saved.pending||{};qmDeleted=saved.deletes||{};qmIngest([]);
 }catch(e){qmError='No se pudo leer el respaldo de la matriz';}
 QM_STAGES.forEach(([key,label])=>{
   ['qm-stage','qm-item-stage'].forEach(id=>document.getElementById(id).insertAdjacentHTML('beforeend',`<option value="${key}">${label}</option>`));
@@ -2201,8 +2260,63 @@ function getInsp(serial){
 }
 
 // ── SIDEBAR ──
+let calInfoAnchor=null,calInfoOpen=false,calPeekTimer=null;
+function calCloseInfo(){
+  if(calInfoOpen)document.getElementById('cal-info').hidePopover();
+  calInfoOpen=false;calInfoAnchor?.setAttribute('aria-expanded','false');calInfoAnchor=null;
+}
+function calShowInfo(event,title,fields){
+  event.preventDefault();event.stopPropagation();
+  const anchor=event.currentTarget;
+  if(calInfoOpen&&calInfoAnchor===anchor){calCloseInfo();return;}
+  calCloseInfo();calInfoAnchor=anchor;
+  document.getElementById('cal-info-title').textContent=title;
+  document.getElementById('cal-info-details').innerHTML=fields.map(([label,value])=>`<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value==null||value===''?'No especificado':value)}</dd>`).join('');
+  const popup=document.getElementById('cal-info');popup.style.left='12px';popup.style.top='12px';popup.showPopover();calInfoOpen=true;anchor.setAttribute('aria-expanded','true');
+  const r=anchor.getBoundingClientRect(),p=popup.getBoundingClientRect(),width=document.documentElement.clientWidth,height=document.documentElement.clientHeight;
+  popup.style.left=Math.max(12,Math.min(r.left,width-p.width-12))+'px';
+  const top=r.bottom+8+p.height<=height-12?r.bottom+8:r.top-p.height-8;
+  popup.style.top=Math.max(12,Math.min(top,height-p.height-12))+'px';
+}
+function calItemInfo(event,stage,id){
+  const item=STAGES.find(s=>s.key===stage)?.items.find(i=>i.id===id);if(!item)return;
+  calShowInfo(event,item.item,[['Criterio de aceptación',item.criterio],['Condición ideal',item.ideal]]);
+}
+function calMachineInfo(event,id){
+  const m=MACHINES.find(m=>machineQualityId(m)===id);if(!m)return;
+  calShowInfo(event,`#${m.serial} · ${m.name}`,[['Cliente',m.client],['Clasificación',resolveProductProfile(m).group],['Avance de producción',m.pct+'%'],['Avance de inspección',getInspPct(id)+'%'],['Color',m.color],['Entrega prometida',m.prometido],['Inconformidades',getInspFails(id)],['Estado de producción',m.terminated?'TERMINADA':'En producción']]);
+}
+function calHistoryInfo(event,index){
+  const h=historico[index];if(!h)return;
+  const checked=parseFechaInspDate(h.fechaInsp),due=parsePrometido(h.prometido);
+  calShowInfo(event,`#${h.serial} · ${h.name}`,[['Cliente',h.client],['Clasificación',resolveProductProfile(h).group],['Conformidad registrada',h.pct+'%'],['Color',h.color],['Entrega prometida',h.prometido],['Inspeccionada',h.fechaInsp],['Cumplimiento de fecha',checked&&due?(checked>due?'Fuera de tiempo':'A tiempo'):'Sin fecha comparable'],['Inconformidades registradas',h.noConformes],['Inspector',h.inspectors]]);
+}
+function calPeekSidebar(){
+  clearTimeout(calPeekTimer);if(!sidebarOpen)document.getElementById('sidebar').classList.add('peek');
+}
+function calEndPeek(){
+  clearTimeout(calPeekTimer);calPeekTimer=setTimeout(()=>{
+    if(sidebarOpen)return;
+    if(calInfoOpen&&document.getElementById('sidebar').contains(calInfoAnchor))return;
+    document.getElementById('sidebar').classList.remove('peek');
+  },140);
+}
+document.getElementById('sidebar-edge').addEventListener('pointerenter',event=>{if(event.pointerType==='mouse')calPeekSidebar();});
+document.getElementById('sidebar-edge').addEventListener('focus',calPeekSidebar);
+document.getElementById('sidebar-edge').addEventListener('pointerleave',calEndPeek);
+document.getElementById('sidebar').addEventListener('pointerenter',()=>clearTimeout(calPeekTimer));
+document.getElementById('sidebar').addEventListener('pointerleave',calEndPeek);
+document.addEventListener('pointerdown',event=>{
+  if(!sidebarOpen&&!event.target.closest('#sidebar,#sidebar-edge,#cal-info'))document.getElementById('sidebar').classList.remove('peek');
+});
+document.getElementById('cal-info').addEventListener('toggle',event=>{
+  if(event.newState==='closed'){calInfoOpen=false;calInfoAnchor?.setAttribute('aria-expanded','false');calInfoAnchor=null;if(!document.getElementById('sidebar').matches(':hover'))calEndPeek();}
+});
+window.addEventListener('resize',calCloseInfo);
+document.addEventListener('scroll',event=>{if(calInfoOpen&&!document.getElementById('cal-info').contains(event.target))calCloseInfo();},true);
 function toggleSidebar(){
   sidebarOpen=!sidebarOpen;
+  clearTimeout(calPeekTimer);document.getElementById('sidebar').classList.remove('peek');calCloseInfo();
   document.getElementById('sidebar').classList.toggle('collapsed',!sidebarOpen);
   document.getElementById('sb-icon').className=sidebarOpen?'ti ti-layout-sidebar-left-collapse':'ti ti-layout-sidebar-left-expand';
 }
@@ -2355,26 +2469,19 @@ function filterMachines(q){
 
 function renderList(){
   const el=document.getElementById('sb-list');
+  if(calInfoOpen&&el.contains(calInfoAnchor))calCloseInfo();
   if(activeFilter==='historico'){
     if(!filteredHistorico.length){el.innerHTML=`<div style="text-align:center;padding:20px;font-size:12px;color:var(--text3)">Sin resultados en histórico</div>`;return;}
     el.innerHTML=filteredHistorico.map(h=>{
-      const fechaInspDate=parseFechaInspDate(h.fechaInsp);
-      const prom=parsePrometido(h.prometido);
-      const late = fechaInspDate&&prom ? fechaInspDate>prom : null;
       return`<div class="mrow" data-serial="${h.serial}" onclick="focusHistoricoEntry('${h.serial}')">
         <div class="mr-top">
           <span class="mr-serial">#${h.serial}</span>
           <span class="mr-code">${h.code}</span>
           <span class="mr-name">${h.name}</span>
+          <button class="btn btn-ghost cal-info-btn" onclick="calHistoryInfo(event,${historico.indexOf(h)})" aria-label="Información del histórico ${escapeHtml(h.serial)}" aria-expanded="false" aria-controls="cal-info"><i class="ti ti-info-circle"></i></button>
         </div>
         <div class="mr-meta">
           <span class="mr-client">${h.client}</span>
-          <span class="mr-date">Prometido: ${h.prometido}</span>
-        </div>
-        <div class="mr-badges">
-          <span class="mrbadge ${h.noConformes>0?'mb-alert':'mb-ok'}">${h.pct}% calidad</span>
-          ${h.noConformes>0?`<span class="mrbadge mb-alert"><i class="ti ti-alert-triangle" style="font-size:9px"></i>${h.noConformes} NC</span>`:''}
-          ${late===true?`<span class="mrbadge mb-alert" title="Se inspeccionó después de la fecha prometida"><i class="ti ti-clock-exclamation" style="font-size:9px"></i> Fuera de tiempo</span>`:late===false?`<span class="mrbadge mb-ok"><i class="ti ti-clock-check" style="font-size:9px"></i> A tiempo</span>`:''}
         </div>
       </div>`;
     }).join('');
@@ -2391,28 +2498,18 @@ function renderList(){
     return;
   }
   el.innerHTML=filteredList.map(m=>{
-    const machineId=machineQualityId(m),ip=getInspPct(machineId),fails=getInspFails(machineId);
-    const pctCls=m.pct>=70?'hi':m.pct>=30?'':'lo';
-    const fillCls=ip>=100?'g':fails>0?'r':'';
+    const machineId=machineQualityId(m);
     const sel=machineId===currentSerial?'selected':'';
-    return`<div class="mrow ${sel}" data-machine-id="${machineId}" onclick="selectMachine('${machineId}')">
+    return`<div class="mrow ${sel}" data-machine-id="${escapeHtml(machineId)}" onclick="selectMachine(this.dataset.machineId)">
       <div class="mr-top">
         <span class="mr-serial">#${m.serial}</span>
         <span class="mr-code">${m.code}</span>
-        <span class="cal-group-badge ${resolveProductProfile(m).group==='Sin clasificar'?'cal-group-unknown':''}">${resolveProductProfile(m).group}</span>
         <span class="mr-name">${m.name}</span>
+        <button class="btn btn-ghost cal-info-btn" data-machine="${escapeHtml(machineId)}" onclick="calMachineInfo(event,this.dataset.machine)" aria-label="Información de máquina ${escapeHtml(m.serial)}" aria-expanded="false" aria-controls="cal-info"><i class="ti ti-info-circle"></i></button>
       </div>
-      <div class="mr-pct-bar"><div class="mr-pct-fill ${fillCls}" style="width:${ip}%"></div></div>
       <div class="mr-meta">
         <span class="mr-client">${m.client}</span>
-        <span class="mr-date ${urgencyMeta(m.prometido).cls}" ${urgencyMeta(m.prometido).tip?`title="${urgencyMeta(m.prometido).tip}"`:''}>${urgencyMeta(m.prometido).icon?`<i class="ti ${urgencyMeta(m.prometido).icon}" style="font-size:11px"></i> ${urgencyMeta(m.prometido).label}: `:''}${m.prometido}</span>
-      </div>
-      <div class="mr-badges">
-        <span class="mrbadge mb-pct ${pctCls}">${m.pct}% prod.</span>
         ${m.terminated?'<span class="mrbadge mb-terminated">TERMINADA</span>':''}
-        ${ip>0?`<span class="mrbadge ${ip>=100?'mb-ok':'mb-color'}">${ip}% insp.</span>`:''}
-        ${fails>0?`<span class="mrbadge mb-alert"><i class="ti ti-alert-triangle" style="font-size:9px"></i>${fails} NC</span>`:''}
-        ${m.color&&m.color!=='—'?`<span class="mrbadge mb-color">${m.color}</span>`:''}
       </div>
     </div>`;
   }).join('');
@@ -2432,6 +2529,7 @@ function updateSbStats(){
 
 // ── SELECT MACHINE ──
 function selectMachine(machineId,skipSave){
+  calCloseInfo();
   if(currentSerial&&!skipSave) saveCurrentStage();
   currentSerial=machineId;
   const m=MACHINES.find(x=>machineQualityId(x)===machineId);
@@ -2444,12 +2542,10 @@ function selectMachine(machineId,skipSave){
   hdr.innerHTML=`
     <span class="mh-serial">#${m.serial}</span>
     <span class="mh-code">${m.code}</span>
-    <span class="cal-group-badge ${CURRENT_PROFILE.group==='Sin clasificar'?'cal-group-unknown':''}">${CURRENT_PROFILE.group}</span>
     <span class="mh-name">${m.name}</span>
     <span class="mh-client">${m.client}</span>
     ${m.terminated?'<span class="mrbadge mb-terminated">TERMINADA</span>':''}
-    ${m.color&&m.color!=='—'?`<span class="mh-color"><i class="ti ti-palette" style="font-size:11px"></i> ${m.color}</span>`:''}
-    <span class="mh-date ${urgencyMeta(m.prometido).cls}" ${urgencyMeta(m.prometido).tip?`title="${urgencyMeta(m.prometido).tip}"`:''}><i class="ti ${urgencyMeta(m.prometido).icon||'ti-calendar'}" style="font-size:11px"></i> ${urgencyMeta(m.prometido).label?urgencyMeta(m.prometido).label+': ':''}${m.prometido}</span>
+    <button class="btn btn-ghost cal-info-btn" data-machine="${escapeHtml(machineId)}" onclick="calMachineInfo(event,this.dataset.machine)" aria-label="Información de máquina ${escapeHtml(m.serial)}" aria-expanded="false" aria-controls="cal-info"><i class="ti ti-info-circle"></i></button>
     <div class="mh-nav">
       <button class="btn btn-ghost" style="padding:3px 7px" onclick="prevMachine()" data-tip="Anterior (←)"><i class="ti ti-chevron-left"></i></button>
       <button class="btn btn-ghost" style="padding:3px 7px" onclick="nextMachine()" data-tip="Siguiente (→)"><i class="ti ti-chevron-right"></i></button>
@@ -2605,6 +2701,7 @@ function renderInspection(){
 }
 
 function renderChecklist(stage,d){
+  if(calInfoOpen&&document.getElementById('checklist-items').contains(calInfoAnchor))calCloseInfo();
   document.getElementById('checklist-items').innerHTML=stage.items.map(it=>{
     const val=(d.stageData[stage.key]||{})[it.id]||'';
     return`<div class="check-row" role="group" tabindex="0" aria-label="${escapeHtml(it.item)}: ${val==='ok'?'Cumple':val==='fail'?'No cumple':'Pendiente'}" onclick="calActivateRow(event,'${stage.key}','${it.id}')" onkeydown="calRowKey(event,'${stage.key}','${it.id}')">
@@ -2615,9 +2712,8 @@ function renderChecklist(stage,d){
         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
           <span style="font-size:13px;font-weight:500">${escapeHtml(it.item)}</span>
           <span class="sup-badge sup${it.sup}">Sup ${it.sup}</span>
+          <button class="btn btn-ghost cal-info-btn" onclick="calItemInfo(event,'${stage.key}','${it.id}')" aria-label="Información de ${escapeHtml(it.item)}" aria-expanded="false" aria-controls="cal-info"><i class="ti ti-info-circle"></i></button>
         </div>
-        <div style="font-size:12px;color:var(--text2);margin-top:1px">${escapeHtml(it.criterio)}</div>
-        ${it.ideal?`<div style="font-size:11px;color:var(--text3)">Ideal: ${escapeHtml(it.ideal)}</div>`:''}
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
           <span style="font-size:11px;color:var(--text3)"><i class="ti ti-tool" style="font-size:10px"></i> ${escapeHtml(it.herramienta)}</span>
           <select class="result-select" onchange="selectResult('${stage.key}','${it.id}',this.value)">
@@ -2800,7 +2896,7 @@ function updateBBPos(){
 // ── KEYBOARD ── (solo activo cuando la sección Calidad está visible)
 document.addEventListener('keydown',e=>{
   if(!document.getElementById('sec-calidad').classList.contains('active')) return;
-  if(document.querySelector('dialog[open]')) return;
+  if(document.querySelector('dialog[open]')||calInfoOpen) return;
   if(!document.getElementById('cal-notifications').hidden || document.activeElement.id==='cal-bell') return;
   const tag=document.activeElement.tagName;
   if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
