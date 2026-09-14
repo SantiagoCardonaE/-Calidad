@@ -3,6 +3,7 @@
 -- Pega este archivo completo en: Supabase → SQL Editor → New query → Run
 -- ═══════════════════════════════════════════════════════════════════════
 
+begin;
 create extension if not exists "pgcrypto";  -- para gen_random_uuid()
 
 -- ───────────────────────────────────────────────────────────────────────
@@ -718,4 +719,177 @@ drop trigger if exists trg_calidad_version_eliminada on public.app_settings;
 create trigger trg_calidad_version_eliminada before insert or update on public.app_settings
 for each row execute function public.calidad_proteger_version_eliminada();
 
+-- Acceso por seccion. Crear primero la cuenta admin en Authentication > Users
+-- con correo confirmado. Este bloque no crea usuarios ni cambia contrasenas.
+create table if not exists public.calidad_usuarios (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  rol text not null check (rol in ('admin','armado','resoldado','pulido','pintado','ensamble','empacado')),
+  activo boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+create table if not exists public.calidad_accesos_auditoria (
+  id uuid primary key default gen_random_uuid(), actor uuid, usuario uuid,
+  anterior jsonb, nuevo jsonb, fecha timestamptz not null default now()
+);
+create or replace function public.calidad_rol() returns text
+language sql stable security definer set search_path = '' as $$
+  select rol from public.calidad_usuarios where user_id=auth.uid() and activo;
+$$;
+create or replace function public.calidad_etapa_usuario() returns text
+language sql stable security definer set search_path = '' as $$
+  select case public.calidad_rol() when 'armado' then 'material' when 'resoldado' then 'armado'
+    when 'pulido' then 'resoldado' when 'pintado' then 'pulido' when 'ensamble' then 'pintado'
+    when 'empacado' then 'ensamble' end;
+$$;
+do $$
+declare u uuid;
+begin
+  if not exists(select 1 from public.calidad_usuarios where rol='admin' and activo) then
+    select id into u from auth.users where lower(email)='santiagocardona.15.98@gmail.com' and email_confirmed_at is not null;
+    if u is null then raise exception 'Cree primero el usuario admin santiagocardona.15.98@gmail.com con correo confirmado en Authentication > Users y ejecute nuevamente TODO schema.sql. No se aplicaron cambios.'; end if;
+    insert into public.calidad_usuarios(user_id,rol) values(u,'admin') on conflict(user_id) do update set rol='admin',activo=true;
+  end if;
+end $$;
+
+-- Sustituye las politicas anonimas anteriores solo en las tablas de esta app.
+do $$
+declare t text; p record;
+begin
+  foreach t in array array['rec_registros','calidad_inspecciones','calidad_historico','calidad_productos',
+    'garantias_solicitudes','garantias_maquinas','garantias_defectos','app_settings',
+    'calidad_etapas_produccion','calidad_notificaciones','calidad_usuarios','calidad_accesos_auditoria'] loop
+    execute format('alter table public.%I enable row level security',t);
+    for p in select policyname from pg_policies where schemaname='public' and tablename=t loop
+      execute format('drop policy %I on public.%I',p.policyname,t);
+    end loop;
+    execute format('revoke all on public.%I from anon',t);
+    execute format('grant select,insert,update,delete on public.%I to authenticated',t);
+    execute format('create policy acceso_admin on public.%I for all to authenticated using ((select public.calidad_rol())=''admin'') with check ((select public.calidad_rol())=''admin'')',t);
+  end loop;
+end $$;
+-- Los roles solo se cambian mediante la funcion auditada.
+revoke insert,update,delete on public.calidad_usuarios from authenticated;
+revoke insert,update,delete on public.calidad_accesos_auditoria from authenticated;
+create policy perfil_propio on public.calidad_usuarios for select to authenticated using(user_id=auth.uid());
+create policy catalogo_operario on public.calidad_productos for select to authenticated using(public.calidad_rol() is not null);
+create policy matriz_operario on public.app_settings for select to authenticated using(
+  public.calidad_etapa_usuario() is not null and
+  (key like 'quality_matrix:v1:item:%' or key like 'quality_matrix:v1:assign:%' or key like 'quality_matrix:v1:order:%')
+);
+create or replace function public.calidad_listar_usuarios() returns table(user_id uuid,email text,rol text,activo boolean)
+language plpgsql security definer set search_path = '' as $$
+begin
+  if public.calidad_rol() is distinct from 'admin' then raise exception 'Acceso restringido'; end if;
+  return query select u.id,u.email::text,p.rol,coalesce(p.activo,false) from auth.users u
+    left join public.calidad_usuarios p on p.user_id=u.id order by u.email;
+end $$;
+create or replace function public.calidad_asignar_usuario(p_user uuid,p_rol text,p_activo boolean) returns void
+language plpgsql security definer set search_path = '' as $$
+declare previo jsonb;
+begin
+  perform pg_advisory_xact_lock(730214);
+  if public.calidad_rol() is distinct from 'admin' then raise exception 'Acceso restringido'; end if;
+  if p_user=auth.uid() then raise exception 'No puede modificar su propio acceso'; end if;
+  if p_rol is null or p_rol not in ('admin','armado','resoldado','pulido','pintado','ensamble','empacado') or p_activo is null then raise exception 'Rol no valido'; end if;
+  select to_jsonb(p) into previo from public.calidad_usuarios p where user_id=p_user;
+  insert into public.calidad_usuarios(user_id,rol,activo) values(p_user,p_rol,p_activo)
+    on conflict(user_id) do update set rol=excluded.rol,activo=excluded.activo,updated_at=now();
+  insert into public.calidad_accesos_auditoria(actor,usuario,anterior,nuevo)
+    values(auth.uid(),p_user,previo,jsonb_build_object('rol',p_rol,'activo',p_activo));
+end $$;
+
+-- Proyeccion privada: nunca entrega al operario respuestas de otras etapas.
+create or replace function public.calidad_datos_etapa(d jsonb,s text) returns jsonb
+language sql immutable set search_path = '' as $$
+  select jsonb_build_object('stageData',jsonb_build_object(s,coalesce(d->'stageData'->s,'{}'::jsonb)),
+    'inspectors',jsonb_build_object(s,coalesce(d->'inspectors'->s,'""'::jsonb)),
+    'responsables',jsonb_build_object(s,coalesce(d->'responsables'->s,'""'::jsonb)),
+    'stageObs',jsonb_build_object(s,coalesce(d->'stageObs'->s,'""'::jsonb)),
+    'resultDates',jsonb_build_object(s,coalesce(d->'resultDates'->s,'{}'::jsonb)),
+    'stageRevision',coalesce(d->'stageRevisions'->s,'0'::jsonb),'currentStageIdx',0,
+    'internalFindings',coalesce((select jsonb_agg(e) from jsonb_array_elements(coalesce(d->'internalFindings','[]'::jsonb)) e where e->>'stage'=s),'[]'::jsonb));
+$$;
+create or replace function public.calidad_leer_mi_etapa() returns table(serial text,data jsonb,updated_at timestamptz)
+language plpgsql security definer set search_path = '' as $$
+declare s text:=public.calidad_etapa_usuario();
+begin
+  if s is null then raise exception 'Sin etapa autorizada'; end if;
+  return query select i.serial,public.calidad_datos_etapa(i.data,s),i.updated_at from public.calidad_inspecciones i;
+end $$;
+create or replace function public.calidad_guardar_mi_etapa(p_serial text,p_data jsonb,p_revision bigint)
+returns table(serial text,data jsonb,updated_at timestamptz)
+language plpgsql security definer set search_path = '' as $$
+declare s text:=public.calidad_etapa_usuario(); d jsonb; campo text; respuestas jsonb; eventos jsonb;
+  it record; ev jsonb; candidato jsonb; correo text; oldval text;
+begin
+  if s is null then raise exception 'Sin etapa autorizada'; end if;
+  if p_serial is null or length(p_serial)>2000 or p_serial='' or jsonb_typeof(p_data)<>'object' then raise exception 'Inspeccion no valida'; end if;
+  respuestas:=p_data->'stageData'->s;
+  if jsonb_typeof(respuestas) is distinct from 'object' then raise exception 'Respuestas no validas'; end if;
+  if exists(select 1 from jsonb_object_keys(p_data->'stageData') k where k<>s) then raise exception 'No puede modificar otra etapa'; end if;
+  if exists(select 1 from jsonb_each_text(respuestas) x where x.value is null or x.value not in ('','ok','fail')) then raise exception 'Resultado no valido'; end if;
+  perform pg_advisory_xact_lock(hashtextextended(p_serial,730215));
+  select i.data into d from public.calidad_inspecciones i where i.serial=p_serial for update;
+  d:=coalesce(d,'{}'::jsonb);
+  if p_revision is distinct from coalesce((d->'stageRevisions'->>s)::bigint,0) then raise exception 'Esta etapa cambio en otro equipo. Revise los cambios antes de reintentar.'; end if;
+  select u.email into correo from auth.users u where u.id=auth.uid();
+  eventos:=coalesce(d->'internalFindings','[]'::jsonb);
+  for it in select * from jsonb_each_text(respuestas) loop
+    oldval:=d->'stageData'->s->>it.key;
+    if it.value='fail' and oldval is distinct from 'fail' and not exists(select 1 from jsonb_array_elements(eventos) e where e->>'stage'=s and e->>'itemId'=it.key and nullif(e->>'closedAt','') is null) then
+      select e into candidato from jsonb_array_elements(coalesce(p_data->'internalFindings','[]'::jsonb)) e where e->>'stage'=s and e->>'itemId'=it.key order by e->>'detectedAt' desc limit 1;
+      ev:=jsonb_build_object('id','finding:'||gen_random_uuid()::text,'machineKey',p_serial,
+        'machine',coalesce(d->'machineSnapshot',p_data->'machineSnapshot','{}'::jsonb),'stage',s,'area',initcap(s),
+        'itemId',it.key,'item',coalesce(candidato->>'item',it.key),'criterio',coalesce(candidato->>'criterio',''),
+        'detectedAt',now(),'closedAt',null,'inspector',correo,'actor',auth.uid());
+      eventos:=eventos||jsonb_build_array(ev);
+    elsif it.value='ok' and oldval='fail' then
+      select coalesce(jsonb_agg(case when e->>'stage'=s and e->>'itemId'=it.key and nullif(e->>'closedAt','') is null
+        then e||jsonb_build_object('closedAt',now(),'closure',jsonb_build_object('at',now(),'by',correo,'note','Corregido durante la inspeccion')) else e end),'[]'::jsonb)
+        into eventos from jsonb_array_elements(eventos) e;
+    end if;
+  end loop;
+  foreach campo in array array['stageData','responsables','stageObs','resultDates'] loop
+    d:=jsonb_set(d,array[campo],coalesce(d->campo,'{}'::jsonb)||jsonb_build_object(s,coalesce(p_data->campo->s,case when campo in ('stageData','resultDates') then '{}'::jsonb else '""'::jsonb end)),true);
+  end loop;
+  d:=jsonb_set(d,'{inspectors}',coalesce(d->'inspectors','{}'::jsonb)||jsonb_build_object(s,correo),true);
+  d:=jsonb_set(d,'{stageRevisions}',coalesce(d->'stageRevisions','{}'::jsonb)||jsonb_build_object(s,p_revision+1),true);
+  d:=jsonb_set(d,'{internalFindings}',eventos,true);
+  if not(d ? 'machineSnapshot') then d:=d||jsonb_build_object('machineSnapshot',coalesce(p_data->'machineSnapshot','{}'::jsonb)); end if;
+  insert into public.calidad_inspecciones as dest(serial,data,updated_at) values(p_serial,d,now())
+    on conflict on constraint calidad_inspecciones_pkey do update set data=excluded.data,updated_at=excluded.updated_at;
+  return query select i.serial,public.calidad_datos_etapa(i.data,s),i.updated_at from public.calidad_inspecciones i where i.serial=p_serial;
+end $$;
+-- Nada de estas funciones queda accesible con la clave publica sin sesion.
+revoke all on function public.calidad_rol(),public.calidad_etapa_usuario(),public.calidad_listar_usuarios(),
+  public.calidad_asignar_usuario(uuid,text,boolean),public.calidad_leer_mi_etapa(),public.calidad_guardar_mi_etapa(text,jsonb,bigint),
+  public.calidad_datos_etapa(jsonb,text) from public,anon;
+grant execute on function public.calidad_rol(),public.calidad_etapa_usuario(),public.calidad_listar_usuarios(),
+  public.calidad_asignar_usuario(uuid,text,boolean),public.calidad_leer_mi_etapa(),public.calidad_guardar_mi_etapa(text,jsonb,bigint) to authenticated;
+grant usage,select on sequence public.garantias_solicitudes_numero_seq to authenticated;
+-- Evita que una copia antigua del admin reemplace avances recientes de un operario.
+create or replace function public.calidad_validar_revision() returns trigger
+language plpgsql set search_path = '' as $$
+declare s text;
+begin
+  if public.calidad_rol()='admin' then
+    foreach s in array array['material','armado','resoldado','pulido','pintado','ensamble','empacado'] loop
+      if coalesce(new.data->'stageRevisions'->s,'0'::jsonb)<>coalesce(old.data->'stageRevisions'->s,'0'::jsonb) then
+        raise exception 'Esta etapa cambio en otro equipo. Revise los cambios antes de reintentar.';
+      end if;
+      if (new.data->'stageData'->s) is distinct from (old.data->'stageData'->s)
+         or (new.data->'stageObs'->s) is distinct from (old.data->'stageObs'->s)
+         or (new.data->'responsables'->s) is distinct from (old.data->'responsables'->s) then
+        if coalesce(new.data->'stageRevisions'->s,'0'::jsonb)<>coalesce(old.data->'stageRevisions'->s,'0'::jsonb) then
+          raise exception 'Esta etapa cambio en otro equipo. Revise los cambios antes de reintentar.';
+        end if;
+        new.data:=jsonb_set(new.data,'{stageRevisions}',coalesce(new.data->'stageRevisions','{}'::jsonb)||jsonb_build_object(s,coalesce((old.data->'stageRevisions'->>s)::bigint,0)+1),true);
+      end if;
+    end loop;
+  end if;
+  return new;
+end $$;
+drop trigger if exists trg_calidad_revision on public.calidad_inspecciones;
+create trigger trg_calidad_revision before update on public.calidad_inspecciones for each row execute function public.calidad_validar_revision();
 NOTIFY pgrst, 'reload schema';
+commit;

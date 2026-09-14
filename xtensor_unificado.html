@@ -346,7 +346,12 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 #qm-board th:first-child{width:105px;min-width:105px;position:sticky;left:0;background:var(--surface2);z-index:2}
 #qm-board thead th:first-child{z-index:4}
 #qm-board tbody th{font-size:13px;color:var(--yellow)}
-.qm-zone{min-height:90px;max-height:320px;overflow:auto;padding:2px}
+.qm-zone{min-height:90px;height:var(--qm-height,420px);overflow:auto;padding:2px;resize:vertical}
+#qm-board table{width:100%}
+#qm-board td,#qm-board th:not(:first-child){width:var(--qm-width,280px);min-width:var(--qm-width,280px)}
+.qm-sizing{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:12px}
+.qm-sizing label{display:flex;gap:6px;align-items:center}
+.qm-sizing input{width:100px}
 .qm-zone.qm-over{outline:2px solid var(--yellow);background:var(--surface2)}
 .qm-card{border:1px solid var(--border2);background:var(--surface);border-radius:4px;margin-bottom:7px;padding:8px;overflow-wrap:anywhere;cursor:grab}
 .qm-card p{font-size:12px;line-height:1.4;margin:0 0 5px}
@@ -385,8 +390,55 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 .check-row[tabindex]{cursor:pointer}.check-row[tabindex]:hover{background:var(--surface2)}.check-row[tabindex]:focus-visible{outline:2px solid var(--yellow);outline-offset:-2px}
 @media(max-width:600px){.qm-toolbar{gap:8px;padding:10px}.qm-toolbar h2{font-size:15px}#qm-search{width:100%;flex:1}#qm-assignments{grid-template-columns:1fr}#qm-board th:first-child{width:80px;min-width:80px}}
 </style>
+<style>
+body:not([data-access]) #topbar,body:not([data-access]) #app-body{visibility:hidden}
+body[data-worker] .mtab:not([data-sec="calidad"]),body[data-worker] #cal-bell,body[data-worker] #sb-filters .sf:last-child,body[data-worker] button:has(.ti-upload){display:none!important}
+body[data-worker] .app-section:not(#sec-calidad){display:none!important}
+#access-screen{position:fixed;inset:0;z-index:20000;background:var(--bg);display:grid;place-items:center;padding:20px}
+#access-screen[hidden]{display:none}
+#access-form{width:100%;max-width:360px;display:grid;gap:14px}
+#access-form h1{font-size:24px;margin:0;color:var(--yellow)}
+#access-form label{display:grid;gap:6px}
+#access-form input,#access-users select{width:100%;min-width:0;border:1px solid var(--border2);border-radius:4px;padding:10px;background:var(--surface);color:var(--text);font:inherit}
+#access-message{font-size:13px;line-height:1.5;min-height:20px}
+#access-users,#access-review{background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;width:min(720px,calc(100vw - 24px));max-height:85vh;padding:16px}
+#access-pending[hidden]{display:none}
+.access-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px}.access-compare pre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
+#access-review select{background:var(--surface);color:var(--text);max-width:100%;padding:8px}
+#qm-guide{width:min(1000px,calc(100vw - 24px));height:min(820px,calc(100dvh - 24px));max-height:calc(100dvh - 24px);margin:auto;padding:0;border:1px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text);overflow:hidden}
+#qm-guide[open]{display:flex;flex-direction:column}
+#qm-guide::backdrop{background:#0009}
+#qm-guide header{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+#qm-guide h2{font-size:18px;margin:0;flex:1}
+#qm-guide-controls{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+#qm-guide-controls select,#qm-guide-controls input{min-width:0;max-width:100%;padding:8px;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:4px;font:inherit}
+#qm-guide-search{flex:1;min-width:160px!important}
+#qm-guide-content{overflow:auto;padding:0 16px 16px;line-height:1.55;min-height:0;overflow-wrap:anywhere}
+#qm-guide-content section{padding:14px 0;border-bottom:1px solid var(--border)}
+#qm-guide-content h3{font-size:16px;margin:0 0 8px}#qm-guide-content h4{font-size:13px;margin:12px 0 4px}
+#qm-guide-content p{margin:6px 0}#qm-guide-content ul,#qm-guide-content ol{padding-left:22px;margin:6px 0}
+#qm-guide-content a{color:#79c8ff;text-decoration:underline}
+#qm-guide-content .guide-note{color:var(--text2);font-size:12px}
+#qm-guide-content dt{font-weight:600;margin-top:8px}#qm-guide-content dd{margin:2px 0 10px}
+@media(max-width:600px){#qm-guide-controls input,#qm-guide-controls select{width:100%}#qm-guide header{padding:10px}#qm-guide-controls{padding:10px}#qm-guide-content{padding:0 12px 12px}}
+.access-user{display:grid;grid-template-columns:minmax(120px,1fr) 130px auto auto;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.access-user span{overflow-wrap:anywhere}.access-user label{white-space:nowrap}
+@media(max-width:520px){.access-user{grid-template-columns:1fr 1fr}.access-user span{grid-column:1/-1}}
+</style>
 </head>
 <body>
+<section id="access-screen" aria-label="Acceso a XTENSOR">
+  <form id="access-form" onsubmit="appLogin(event)">
+    <h1>XTENSOR</h1><h2 style="font-size:18px;margin:0">Iniciar sesión</h2>
+    <label>Correo<input id="access-email" type="email" autocomplete="username" required></label>
+    <label>Contraseña<input id="access-password" type="password" autocomplete="current-password" required></label>
+    <button class="btn btn-primary" type="submit" id="access-submit">Entrar</button>
+    <p id="access-message" role="status"></p>
+    <button class="btn" type="button" onclick="appLogout()">Cerrar sesión / Cambiar cuenta</button>
+  </form>
+</section>
+<dialog id="access-users"><header style="display:flex;justify-content:space-between;align-items:center"><h2 style="font-size:18px">Usuarios</h2><button class="btn" onclick="document.getElementById('access-users').close()" aria-label="Cerrar"><i class="ti ti-x"></i></button></header><div id="access-users-list"></div><p id="access-users-status" role="status"></p></dialog>
+<dialog id="access-review"><h2 id="access-review-title" style="font-size:18px">Revisar pendientes</h2><div id="access-review-body"></div><footer style="display:flex;gap:8px;margin-top:12px"><button class="btn" onclick="document.getElementById('access-review').close()">Cancelar</button><button class="btn" onclick="appPendingSave()">Aplicar selección</button></footer></dialog>
 
 <!-- ═══ TOPBAR ═══ -->
 <div id="topbar">
@@ -437,6 +489,8 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
       <i class="ti ti-bell" aria-hidden="true"></i><span id="cal-bell-count" hidden>0</span>
     </button>
     <span id="cal-not-live" class="cal-not-sr" aria-live="polite"></span>
+    <button class="btn btn-ghost" id="access-account" onclick="appLogout()" aria-label="Cerrar sesión" data-tip="Cerrar sesión"><i class="ti ti-logout"></i></button>
+    <button class="btn btn-ghost" id="access-pending" onclick="appPendingOpen()" aria-label="Revisar cambios pendientes" data-tip="Revisar cambios pendientes" hidden><i class="ti ti-cloud-exclamation"></i></button>
   </div>
 </div>
 
@@ -934,11 +988,13 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 <section id="sec-ajustes" class="app-section" aria-label="Ajustes"><div id="qm-dialog" aria-labelledby="qm-title">
   <header class="qm-toolbar"><h2 id="qm-title">Matriz de calidad</h2><span id="qm-sync" role="status"></span><button class="btn" onclick="qmSync()" aria-label="Sincronizar matriz" title="Sincronizar matriz"><i class="ti ti-refresh"></i></button><button class="btn" onclick="qmOpenVersions()"><i class="ti ti-history"></i> Versiones</button><button class="btn" onclick="qmEdit()"><i class="ti ti-plus"></i> Nuevo ítem</button></header>
   <div class="qm-toolbar"><input id="qm-search" type="search" placeholder="Buscar ítem o criterio" aria-label="Buscar ítem o criterio" oninput="qmRender()"><select id="qm-stage" aria-label="Etapa" onchange="qmRender()"><option value="">Todas las etapas</option></select><select id="qm-group" aria-label="Clasificación" onchange="qmRender()"><option value="">Todas las clasificaciones</option></select></div>
+  <div class="qm-toolbar qm-sizing"><label>Ancho de columnas <input id="qm-width" type="range" min="230" max="650" step="10" value="280" oninput="qmLayout()"></label><label>Alto de etapas <input id="qm-height" type="range" min="180" max="900" step="20" value="420" oninput="qmLayout()"></label><button class="btn" onclick="appUsersOpen()"><i class="ti ti-users"></i> Usuarios</button><button type="button" class="btn" onclick="qmGuideOpen()"><i class="ti ti-book"></i> Manual de calidad</button></div>
   <div id="qm-board"></div>
 </div></section>
 <dialog id="qm-editor" aria-labelledby="qm-editor-title">
  <form id="qm-item-form" onsubmit="qmSaveItem(event)">
   <h2 id="qm-editor-title" style="font-size:17px;margin:0">Ítem de calidad</h2>
+  <button type="button" class="btn" onclick="qmGuideOpen(true)"><i class="ti ti-book"></i> Consultar manual</button>
   <label>Nombre<input id="qm-name" required maxlength="180"></label>
   <label>Etapa<select id="qm-item-stage"></select></label>
   <label>Criterio de aceptación<textarea id="qm-criterion" required maxlength="2000"></textarea></label>
@@ -958,6 +1014,11 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 </dialog>
 <div id="cal-info" popover="auto" role="dialog" aria-labelledby="cal-info-title"><header><h3 id="cal-info-title"></h3><button type="button" class="btn btn-ghost cal-info-btn" onclick="calCloseInfo()" aria-label="Cerrar información"><i class="ti ti-x"></i></button></header><dl id="cal-info-details"></dl></div>
 <dialog id="qm-version-preview" class="workflow-dialog" aria-labelledby="qm-preview-title"><h2 id="qm-preview-title"></h2><p id="qm-preview-meta"></p><div id="qm-preview-scroll"></div><footer><button class="btn" onclick="document.getElementById('qm-version-preview').close()">Cerrar vista</button></footer></dialog>
+<dialog id="qm-guide" aria-labelledby="qm-guide-title">
+ <header><h2 id="qm-guide-title">Manual de calidad</h2><button type="button" class="btn" onclick="document.getElementById('qm-guide').close()" aria-label="Cerrar manual" title="Cerrar manual"><i class="ti ti-x"></i></button></header>
+ <div id="qm-guide-controls"><select id="qm-guide-view" aria-label="Tema del manual" onchange="qmGuideRender()"><option value="products">Normas por producto</option><option value="stages">Controles por etapa</option><option value="criteria">Criterios de aceptación</option></select><select id="qm-guide-group" aria-label="Clasificación del manual" onchange="qmGuideRender()"></select><select id="qm-guide-stage" aria-label="Etapa del manual" onchange="qmGuideRender()"></select><input type="search" id="qm-guide-search" placeholder="Buscar norma o control" aria-label="Buscar en el manual" oninput="qmGuideRender()"></div>
+ <div id="qm-guide-content" tabindex="0"></div>
+</dialog>
 <script>
 // ══════════════ SUPABASE CONFIG ══════════════
 // ← Reemplaza estos dos valores con los de tu proyecto Supabase
@@ -967,6 +1028,113 @@ const SUPABASE_ANON_KEY = 'sb_publishable_YwLd03FB7z5dKQ6MN1U-lw_3hP15l_E';
 
 const SUPABASE_CONFIGURED = !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_ANON_KEY.includes('YOUR-ANON');
 let sb = null;
+let appAccess={ready:false,role:null,user:null},appStarted=false,appClosing=false;
+let appPendingReview=null;
+const APP_ROLES=['admin','armado','resoldado','pulido','pintado','ensamble','empacado'];
+function appIsAdmin(){return appAccess.ready&&appAccess.role==='admin';}
+function appStage(){return ({armado:'material',resoldado:'armado',pulido:'resoldado',pintado:'pulido',ensamble:'pintado',empacado:'ensamble'})[appAccess.role]||null;}
+function appInspectionRead(){return appIsAdmin()?sb.from('calidad_inspecciones').select('*'):sb.rpc('calidad_leer_mi_etapa');}
+function appLock(message){
+  appAccess.ready=false;document.body.removeAttribute('data-access');
+  document.getElementById('app-body').inert=true;document.getElementById('topbar').inert=true;
+  document.querySelectorAll('dialog[open]').forEach(d=>d.close());
+  calCloseInfo();hideAppTooltip();document.getElementById('cal-notifications').hidden=true;
+  document.getElementById('access-screen').hidden=false;document.getElementById('access-message').textContent=message||'';
+}
+async function appLogin(event){
+  event.preventDefault();appClosing=false;const button=document.getElementById('access-submit');button.disabled=true;
+  try{
+    if(!sb)throw new Error('No se pudo conectar. Comprueba la conexión y recarga.');
+    const {data,error}=await sb.auth.signInWithPassword({email:document.getElementById('access-email').value.trim(),password:document.getElementById('access-password').value});
+    document.getElementById('access-password').value='';if(error)throw error;
+    await appAuthorize(data.session);
+  }catch(e){document.getElementById('access-message').textContent=e.message||'No se pudo iniciar sesión';}
+  finally{button.disabled=false;}
+}
+async function appAuthorize(session){
+  if(!session?.user){appLock('');return;}
+  const {data,error}=await sb.from('calidad_usuarios').select('rol,activo').eq('user_id',session.user.id).maybeSingle();
+  if(error){appLock('No se pudo validar el acceso. Verifica que se haya ejecutado el schema.sql actualizado.');return;}
+  if(!data?.activo||!APP_ROLES.includes(data.rol)){appLock('Cuenta sin acceso asignado. Solicita a admin que habilite tu sección.');return;}
+  if(appStarted&&(appAccess.user?.id!==session.user.id||appAccess.role!==data.rol)){location.reload();return;}
+  appAccess={ready:true,role:data.rol,user:session.user};
+  document.body.setAttribute('data-access',data.rol);document.body.toggleAttribute('data-worker',data.rol!=='admin');
+  document.getElementById('app-body').inert=false;document.getElementById('topbar').inert=false;
+  document.getElementById('access-screen').hidden=true;
+  document.getElementById('access-account').setAttribute('data-tip',session.user.email+' · '+data.rol+' · Cerrar sesión');
+  if(appStarted)return;
+  appStarted=true;
+  // Los pendientes de cuentas distintas nunca se mezclan ni se envian con otro rol.
+  if(!appIsAdmin()){
+    CAL_INSP_PENDING_KEY+=':'+session.user.id+':'+data.rol;
+    QM_STORAGE+=':'+session.user.id+':'+data.rol;
+    qmValues={};qmPending={};qmDeleted={};
+    try{qmValues=JSON.parse(localStorage.getItem(QM_STORAGE)||'{}').values||{};}catch(e){}
+  }else{
+    const legacy=CAL_INSP_PENDING_KEY;CAL_INSP_PENDING_KEY+=':'+session.user.id+':admin';
+    // Solo el primer admin indicado puede recuperar la cola anterior a la autenticacion.
+    if(session.user.email?.toLowerCase()==='santiagocardona.15.98@gmail.com'){
+      try{if(!localStorage.getItem(CAL_INSP_PENDING_KEY))localStorage.setItem(CAL_INSP_PENDING_KEY,localStorage.getItem(legacy)||'{}');}catch(e){}
+    }
+  }
+  await appBoot();
+}
+async function appLogout(){
+  if(appAccess.ready&&(Object.keys(calInspPending).length||Object.keys(qmPending).length||Object.keys(qmDeleted).length)){
+    if(!confirm('Hay cambios pendientes guardados en este equipo. Solo se enviarán al volver a entrar con esta cuenta. ¿Cerrar sesión?'))return;
+  }
+  appClosing=true;appLock('Cerrando sesión…');
+  if(sb){const {error}=await sb.auth.signOut({scope:'local'});if(error){document.getElementById('access-message').textContent=error.message;return;}}
+  location.reload();
+}
+async function appUsersOpen(){
+  if(!appIsAdmin())return;
+  const dialog=document.getElementById('access-users'),list=document.getElementById('access-users-list');dialog.showModal();list.textContent='Cargando…';
+  try{
+    const rows=await sbCall(()=>sb.rpc('calidad_listar_usuarios'));
+    list.innerHTML=rows.map(u=>`<div class="access-user" data-user="${escapeHtml(u.user_id)}"><span>${escapeHtml(u.email)}</span><select aria-label="Sección de ${escapeHtml(u.email)}" ${u.user_id===appAccess.user.id?'disabled':''}><option value="">Sin asignar</option>${APP_ROLES.map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${r}</option>`).join('')}</select><label><input type="checkbox" ${u.activo?'checked':''} ${u.user_id===appAccess.user.id?'disabled':''}> Activo</label><button class="btn" onclick="appUserSave(this)" ${u.user_id===appAccess.user.id?'disabled':''} aria-label="Guardar acceso" title="Guardar acceso"><i class="ti ti-device-floppy"></i></button></div>`).join('');
+  }catch(e){list.textContent=e.message;}
+}
+async function appUserSave(button){
+  if(!appIsAdmin())return;const row=button.closest('[data-user]'),role=row.querySelector('select').value;
+  if(!role)return;button.disabled=true;
+  try{await sbCall(()=>sb.rpc('calidad_asignar_usuario',{p_user:row.dataset.user,p_rol:role,p_activo:row.querySelector('input').checked}));document.getElementById('access-users-status').textContent='Acceso guardado';}
+  catch(e){document.getElementById('access-users-status').textContent=e.message;}
+  finally{button.disabled=false;}
+}
+async function appPendingOpen(){
+  if(!appAccess.ready||calInspFlushing)return;
+  const entry=Object.entries(calInspPending)[0];if(!entry)return;
+  const [key,row]=entry,dialog=document.getElementById('access-review');
+  try{
+    const rows=await calInspectionRequest(signal=>appInspectionRead().abortSignal(signal));
+    const remote=rows?.find(r=>r.serial===key)?.data||{},local=row.data;
+    const stages=appIsAdmin()?QM_STAGES:QM_STAGES.filter(([s])=>s===appStage());
+    appPendingReview={key,row,remote,stages};
+    const details=(d,s)=>{
+      const cat=qmCatalog();return Object.entries(d.stageData?.[s]||{}).map(([id,v])=>(cat.get(id)?.item||id)+': '+(v==='ok'?'Cumple':v==='fail'?'No cumple':'Pendiente')).join('\n')+'\nObservaciones: '+(d.stageObs?.[s]||'')+'\nResponsable: '+(d.responsables?.[s]||'');
+    };
+    document.getElementById('access-review-title').textContent='Revisar pendientes · #'+(calStatsMachine(key,local).serial||key);
+    document.getElementById('access-review-body').innerHTML=stages.map(([s,label])=>`<section style="border-bottom:1px solid var(--border);padding:10px 0"><h3 style="font-size:14px">${escapeHtml(label)}</h3><div class="access-compare"><div><b>Este equipo</b><pre>${escapeHtml(details(local,s))}</pre></div><div><b>Base de datos</b><pre>${escapeHtml(details(remote,s))}</pre></div></div><select data-resolve-stage="${s}" aria-label="Versión de ${escapeHtml(label)}"><option value="">Seleccionar versión</option><option value="local">Conservar la de este equipo</option><option value="remote">Conservar la de la base de datos</option></select></section>`).join('');
+    dialog.showModal();
+  }catch(e){showToast('No se pudo cargar la comparación. Los pendientes se conservan.','yellow');}
+}
+async function appPendingSave(){
+  const review=appPendingReview;if(!review||!appAccess.ready)return;
+  const choices=[...document.querySelectorAll('[data-resolve-stage]')];if(choices.some(s=>!s.value)){showToast('Selecciona una versión para cada etapa','yellow');return;}
+  if(calInspPending[review.key]!==review.row){document.getElementById('access-review').close();return;}
+  if(!confirm('¿Aplicar las versiones seleccionadas? Se conservarán los históricos ya guardados.'))return;
+  const data=JSON.parse(JSON.stringify(review.remote)),local=review.row.data;
+  for(const select of choices){if(select.value!=='local')continue;const s=select.dataset.resolveStage;
+    for(const field of ['stageData','stageObs','responsables','inspectors','resultDates']){data[field]||={};data[field][s]=local[field]?.[s]??(['stageData','resultDates'].includes(field)?{}:'');}
+    data.internalFindings=calMergeFindings(data.internalFindings||[],(local.internalFindings||[]).filter(e=>e.stage===s));
+  }
+  data.machineSnapshot||=local.machineSnapshot;data.currentStageIdx=0;
+  const pending={...calInspPending,[review.key]:{serial:review.key,data,updated_at:new Date().toISOString()}};
+  try{localStorage.setItem(CAL_INSP_PENDING_KEY,JSON.stringify(pending));}catch(e){showToast('No se pudo guardar. Se conservan los pendientes anteriores.','yellow');return;}
+  calInspPending=pending;inspData[review.key]=data;document.getElementById('access-review').close();appPendingReview=null;
+  await calFlushPendingInspections();if(currentSerial===review.key)renderInspection();
+}
 try{
   sb = SUPABASE_CONFIGURED && typeof supabase!=='undefined' ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 }catch(e){
@@ -980,6 +1148,7 @@ if(!SUPABASE_CONFIGURED){
 
 let calPendingCount=0,calSyncError='';
 function setDbStatus(online){
+  const pendingButton=document.getElementById('access-pending');if(pendingButton)pendingButton.hidden=!calPendingCount||!appAccess.ready;
   const dot=document.getElementById('db-status-dot');
   const txt=document.getElementById('db-status-txt');
   if(dot) dot.className='sdot'+(online&&!calPendingCount&&!calSyncError?'':' stale');
@@ -1056,6 +1225,8 @@ function showToast(msg,type='green'){
   setTimeout(()=>t.remove(),3000);
 }
 function switchSection(sec){
+  if(!appAccess.ready)return;
+  if(!appIsAdmin())sec='calidad';
   document.querySelectorAll('.app-section').forEach(el=>el.classList.toggle('active', el.id==='sec-'+sec));
   document.querySelectorAll('.mtab').forEach(el=>el.classList.toggle('active', el.dataset.sec===sec));
   document.querySelectorAll('.tbr-variant').forEach(el=>el.classList.toggle('show', el.dataset.sec===sec));
@@ -1687,16 +1858,87 @@ const QM_LEGACY_WELDING={
  r5:{item:'Resistencia del punto resoldado',criterio:'Sin fractura ni movimiento al aplicar fuerza moderada',herramienta:'Prueba manual',ideal:'Punto firme',sup:'1'},
  'gj-a2':{item:'Soldaduras y uniones estructurales',criterio:'Uniones completas, sin grietas, porosidad, bordes cortantes ni elementos sueltos',herramienta:'Visual / Tacto',ideal:'Uniones firmes y seguras',sup:'3'}
 };
-const QM_STORAGE='xtensor_matrix_v1:'+SUPABASE_URL;
+let QM_STORAGE='xtensor_matrix_v1:'+SUPABASE_URL;
 let qmValues={},qmPending={},qmDeleted={},qmBusy=false,qmError='',qmEditing=null,qmDragged=null,qmPreviewKey=null;
-const QM_STAGES=[['armado','Armado'],['resoldado','Resoldado'],['pulido','Pulido'],['pintado','Pintado'],['ensamble','Ensamble'],['empacado','Empacado']];
+const MATERIAL_RECEIVED_ITEMS=[
+  {id:'mat-identidad',item:'Material recibido conforme a la máquina',criterio:'Las referencias y dimensiones del material entregado corresponden al plano o BOM de esta máquina.',ideal:'Referencias y dimensiones conformes',herramienta:'Plano / BOM / Medición',sup:'2'},
+  {id:'mat-cantidad',item:'Cantidad de material recibido',criterio:'La cantidad entregada coincide con la requerida para este trabajo; registrar los faltantes en observaciones.',ideal:'Entrega completa',herramienta:'Conteo / BOM',sup:'2'},
+  {id:'mat-estado',item:'Estado del material recibido',criterio:'El material entregado no presenta daños, deformaciones ni corrosión que impidan su uso.',ideal:'Material apto para el trabajo',herramienta:'Visual',sup:'2'}
+];
+const QM_STAGES=[['material','Material recibido'],['armado','Armado'],['resoldado','Resoldado'],['pulido','Pulido'],['pintado','Pintado'],['ensamble','Ensamble'],['empacado','Empacado']];
 const QM_GROUPS=Object.entries(QUALITY_GROUPS).map(([key,label])=>[key.toLowerCase(),label]);
 function qmGroup(profile){
   return QM_GROUPS.find(([,label])=>label===profile?.group)?.[0]||null;
 }
+// Guia editorial de consulta. No modifica asignaciones ni acredita conformidad.
+const QM_GUIDE_STANDARDS={
+ general:{name:'ISO 20957-1:2024',url:'https://www.iso.org/standard/81908.html',text:'Seguridad general y métodos de ensayo de equipos fijos de entrenamiento de interior. No cubre equipos destinados al exterior. La selección requiere identificar uso, usuarios y clase del equipo; no basta con el prefijo XM.'},
+ strength:{name:'ISO 20957-2:2024',url:'https://www.iso.org/standard/83392.html',text:'Requisitos adicionales para equipos fijos de fuerza con placas y otros medios de resistencia, incluidos pesos externos. Su referencia general publicada es ISO 20957-1:2013: el responsable técnico debe verificar las referencias fechadas y la compatibilidad de ediciones; no sustituirlas automáticamente por la edición más reciente.'},
+ benches:{name:'ISO 20957-4:2016',url:'https://www.iso.org/standard/66870.html',text:'Requisitos adicionales para bancos de entrenamiento y soportes independientes para barras. Se consulta junto con la parte general. No permite atribuir cobertura automática a cualquier accesorio vendido como peso libre.'},
+ outdoor:{name:'EN 16630:2015',url:'https://www.nen.nl/en/nen-en-16630-2015-en-206168',text:'Referencia para equipos de ejercicio exterior permanentemente instalados y de libre acceso: fabricación, instalación, inspección y mantenimiento. Su ámbito es distinto al de los juegos infantiles y los equipos fijos de interior. Confirmar que el modelo, los usuarios y la instalación estén dentro de su alcance.'},
+ playground:{name:'UNE-EN 1176-1:2018+A1:2024',url:'https://www.en.une.org/encuentra-tu-norma/busca-tu-norma/norma?c=N0072712',text:'Seguridad general y ensayos para equipamiento de áreas de juego y superficies. Equivale a EN 1176-1:2017+A1:2023. La evaluación del conjunto requiere identificar también las partes específicas de la serie correspondientes a los juegos presentes.'},
+ surfacing:{name:'UNE-EN 1177:2018+A1:2024',url:'https://tienda.aenor.com/en/p/norma-une-en-1177-2018-a1-2024-n0073243',text:'Métodos de ensayo de la atenuación del impacto en superficies de áreas de juego. El revestimiento y la instalación necesitan su propia evidencia; un checklist de fabricación de la estructura no la reemplaza.'},
+ welding:{name:'ISO 5817:2023',url:'https://www.iso.org/standard/80209.html',text:'Niveles de calidad de imperfecciones en determinadas uniones soldadas por fusión de acero, níquel, titanio y sus aleaciones; excluye soldadura por haz. El diseño o la especificación debe establecer el nivel aplicable. No elegir un nivel por defecto ni usar apariencia visual como demostración de resistencia estructural.'}
+};
+const QM_GUIDE_PRODUCTS={
+ musculacion:{refs:['general'],text:'Clasificación pendiente de detalle. Identificar si el producto es máquina, banco, soporte, accesorio o repuesto y si se utilizará en interior o exterior antes de seleccionar la norma y sus partes.',checks:['Registrar uso previsto y modelo en la ficha técnica.','No asignar ensayos de una máquina completa a una placa adicional o repuesto sin revisar su función.']},
+ placas:{refs:['general','strength'],text:'Para equipos fijos de fuerza de interior con resistencia por placas, estas son referencias candidatas. El BOM determina cuáles mecanismos existen en cada modelo.',checks:['Guías, selección y retención de placas; recorrido sin interferencias.','Guayas, poleas, terminales y resguardos, cuando existan.','Percutores y sus alojamientos desde Armado cuando figuren en el BOM; función final en Ensamble.']},
+ discos:{refs:['general','strength'],text:'Para equipos fijos de fuerza de interior cargados con discos. La resistencia externa no convierte por sí sola un equipo en bioparque ni excluye los requisitos de la máquina.',checks:['Portadiscos, retención y topes según diseño aprobado.','Recorridos, apoyos, estabilidad y fijaciones.','Carga de ensayo y procedimiento definidos por ingeniería, no por una prueba improvisada del operario.']},
+ peso_libre:{refs:['general','benches'],text:'Separar bancos y soportes de barras de otros productos de peso libre. Los artículos fuera de ese alcance necesitan una evaluación propia, no una declaración genérica ISO 20957-4.',checks:['Apoyos, ajustes y bloqueos según el modelo.','Retención de barras y estabilidad bajo el procedimiento aprobado, cuando corresponda.']},
+ bio:{refs:['outdoor'],text:'Si el bioparque es de ejercicio exterior fijo y libre acceso, evaluar EN 16630. ISO 20957-1:2024 no es una referencia general para exterior.',checks:['Anclajes e instalación conforme al diseño aprobado.','Movimiento, uniones, protección frente al ambiente y señalización según ficha técnica.','Usuarios previstos y entorno real de instalación.']},
+ bio_discos:{refs:['outdoor'],text:'La presencia de discos no cambia el uso exterior. Confirmar el alcance para el diseño concreto y evaluar los riesgos introducidos por discos desmontables o cargables; no asumir que una referencia cubre todas las configuraciones.',checks:['Retención y acceso a los discos según diseño.','Riesgos de caída, manipulación y atrapamiento evaluados por el responsable técnico.']},
+ circuitos:{refs:['outdoor','general','strength'],text:'Un circuito puede reunir equipos distintos. Seleccionar la referencia por estación y por uso interior/exterior; las referencias mostradas son alternativas condicionadas, no un paquete que aplique completo a todo circuito.',checks:['Identificar cada estación y sus mecanismos en el BOM.','Validar la disposición e interacción entre estaciones con el diseño de instalación.']},
+ parques:{refs:['playground','surfacing'],text:'Evaluar el conjunto infantil, cada tipo de juego y su superficie de instalación. No tratar un parque infantil como equipo de musculación ni como bioparque para adultos.',checks:['Relacionar cada juego con la parte específica aplicable de la serie EN 1176.','Identificar riesgos de atrapamiento, caídas, salientes y deterioro en la evaluación técnica.','Separar evidencia de fabricación de la evidencia de instalación y superficie.']},
+ servicios:{refs:[],text:'XS identifica un servicio, no una familia normativa de equipos. La instalación, reparación o mantenimiento debe referenciar el producto intervenido, el alcance contratado y el procedimiento aprobado.',checks:['Registrar producto, intervención, repuestos y responsable.','Conservar evidencia antes/después y comprobaciones finales del trabajo.','No declarar certificado el equipo completo por haber realizado una reparación.']}
+};
+const QM_GUIDE_STAGE_NOTES={
+ material:['Armado revisa únicamente el material que recibe para el trabajo.','Controlar identificación, cantidad y estado contra la orden, plano o BOM. Registrar faltantes y no confundir esta revisión con todos los registros de Recepción.'],
+ armado:['Resoldado revisa lo que recibe de Armado: el conjunto está punteado, no soldado definitivamente.','Controlar posición, escuadras, alineación, fijación provisional y presencia de componentes según plano. Incluir percutores si el BOM los contempla. No exigir aquí cordones definitivos ni el acabado final de soldadura.'],
+ resoldado:['Pulido revisa lo que recibe de Resoldado: aquí se terminan los cordones y las uniones pendientes.','Separar cobertura de las uniones previstas, imperfecciones de la soldadura y geometría después de soldar. Evitar tres ítems distintos que comprueben solamente la misma continuidad del cordón. La resistencia se respalda con el procedimiento de verificación aprobado, no con el aspecto ni con fuerza manual arbitraria.'],
+ pulido:['Pintado revisa lo que recibe de Pulido.','Controlar rebabas, bordes, salpicaduras y preparación de superficie; no eliminar material que comprometa una unión. Un acabado liso no demuestra que una soldadura sea estructuralmente aceptable.'],
+ pintado:['Ensamble revisa lo que recibe de Pintado.','Controlar cobertura, acabado, color y curado conforme a la especificación de pintura aprobada. El espesor, método y límites deben venir del sistema de recubrimiento definido. Las verificaciones previas al pintado requieren evidencia del proceso; no pueden deducirse viendo solamente la pieza ya pintada.'],
+ ensamble:['Empacado revisa lo que recibe de Ensamble.','Controlar componentes y cantidades según BOM, fijaciones, ajustes, resguardos y función. Separar la comprobación rutinaria de los ensayos de diseño o validación que deban hacerse con medios especializados.'],
+ empacado:['Admin revisa Empacado.','Controlar integridad, accesorios, identificación, protección, instrucciones y trazabilidad de la entrega. La conformidad del empaque no reemplaza la conformidad del equipo ni la verificación de la instalación.']
+};
+function qmGuideOpen(fromEditor=false){
+  if(!appIsAdmin())return;
+  document.getElementById('qm-guide-group').innerHTML='<option value="">Todas las clasificaciones</option>'+QM_GROUPS.map(([key,label])=>`<option value="${key}">${escapeHtml(label)}</option>`).join('');
+  document.getElementById('qm-guide-stage').innerHTML='<option value="">Todas las etapas</option>'+QM_STAGES.map(([key,label])=>`<option value="${key}">${escapeHtml(label)}</option>`).join('');
+  document.getElementById('qm-guide-group').value=document.getElementById('qm-group').value;
+  document.getElementById('qm-guide-stage').value=document.getElementById(fromEditor?'qm-item-stage':'qm-stage').value;
+  document.getElementById('qm-guide-view').value=fromEditor?'criteria':'products';
+  document.getElementById('qm-guide-search').value='';qmGuideRender();document.getElementById('qm-guide').showModal();
+}
+function qmGuideRender(){
+  const view=document.getElementById('qm-guide-view').value,group=document.getElementById('qm-guide-group').value,stage=document.getElementById('qm-guide-stage').value;
+  const query=normProductText(document.getElementById('qm-guide-search').value);
+  document.getElementById('qm-guide-group').hidden=view!=='products';document.getElementById('qm-guide-stage').hidden=view!=='stages';
+  const list=items=>'<ul>'+items.map(t=>`<li>${escapeHtml(t)}</li>`).join('')+'</ul>';
+  const ref=id=>{const r=QM_GUIDE_STANDARDS[id];return `<h4><a href="${r.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.name)} · Fuente oficial</a></h4><p>${escapeHtml(r.text)}</p>`;};
+  let sections=[];
+  if(view==='products'){
+   const selected=QM_GROUPS.filter(([g])=>!group||g===group);
+   sections=selected.map(([g,label])=>{
+    const p=QM_GUIDE_PRODUCTS[g]||QM_GUIDE_PRODUCTS.musculacion;
+    return `<section><h3>${escapeHtml(label)}</h3><p>${escapeHtml(p.text)}</p><p>${p.refs.map(id=>`<a href="${QM_GUIDE_STANDARDS[id].url}" target="_blank" rel="noopener noreferrer">${escapeHtml(QM_GUIDE_STANDARDS[id].name)}</a>`).join(' · ')}</p><h4>Orientación interna para los controles · No es transcripción normativa</h4>${list(p.checks)}</section>`;
+  });
+   [...new Set(selected.flatMap(([g])=>QM_GUIDE_PRODUCTS[g]?.refs||[]))].forEach(id=>sections.push('<section>'+ref(id)+'</section>'));
+  }
+  else if(view==='stages')sections=QM_STAGES.filter(([s])=>!stage||s===stage).map(([s,label])=>`<section><h3>${escapeHtml(label)}</h3><p class="guide-note">Criterio de organización interna XTENSOR, no exigencia textual de una norma.</p>${list(QM_GUIDE_STAGE_NOTES[s]||[])}${s==='resoldado'?ref('welding'):''}</section>`);
+  else sections=[
+    '<section><h3>Antes de aprobar un criterio</h3>'+list(['Identificar modelo, uso previsto, usuarios, ambiente y revisión del plano/BOM. El código comercial por sí solo no demuestra aplicabilidad.','El responsable técnico debe confirmar norma, edición, cláusula y método con una copia oficial autorizada, además de los requisitos contractuales y reglamentarios del destino.','Definir si el control es rutinario de producción, una prueba de tipo/diseño o una verificación de instalación. No trasladar ensayos especializados al operario sin medios ni procedimiento.','Registrar quién aprueba la especificación y qué evidencia demostrará el resultado. Un cambio editorial no equivale a una nueva validación del producto.'])+'</section>',
+    '<section><h3>Criterio de aceptación y condición ideal</h3><dl><dt>Criterio de aceptación</dt><dd>Regla verificable para decidir cumple/no cumple: característica, método, condición de prueba, límite y referencia aprobada. No usar solamente “bien”, “resistente” o “buena calidad”.</dd><dt>Condición ideal</dt><dd>Objetivo esperado de fabricación. No sustituye el límite de aceptación ni permite aprobar algo fuera de la especificación.</dd><dt>Herramienta y evidencia</dt><dd>Instrumento o procedimiento adecuado, identificación de la medición y registro del resultado. Una revisión visual no sustituye una medición o un ensayo requerido.</dd></dl></section>',
+    '<section><h3>Ejemplo de redacción interna · Punteado</h3><dl><dt>Criterio de aceptación</dt><dd>Las piezas corresponden al plano y BOM aprobados; su posición y dimensiones se verifican con el método y las tolerancias de ese plano. Los puntos mantienen el conjunto para su entrega a Resoldado conforme al procedimiento de fabricación.</dd><dt>Condición ideal</dt><dd>Conjunto alineado, identificado y estable para la siguiente operación.</dd><dt>Referencia</dt><dd>Registrar código y revisión reales del plano y del procedimiento. No atribuir este ejemplo a una cláusula ISO.</dd></dl></section>',
+    '<section><h3>Cuando falta un dato técnico</h3>'+list(['No inventar valores de carga, separación, torque, espesor, duración, ciclos ni tolerancias. Solicitar la especificación aprobada antes de declarar el control conforme.','No retirar un control de seguridad solo para reducir el checklist. Revisar primero el riesgo y el alcance del producto con el responsable técnico.','No trasladar automáticamente un control entre familias: placas, discos, juegos infantiles, exterior y accesorios tienen configuraciones y riesgos diferentes.','Completar el checklist no otorga una certificación ISO ni acredita por sí solo todos los requisitos de una norma.'])+'</section>'
+  ];
+  if(query)sections=sections.filter(html=>{const el=document.createElement('div');el.innerHTML=html;return normProductText(el.textContent).includes(query);});
+  document.getElementById('qm-guide-content').innerHTML='<section><p class="guide-note">Guía de consulta XTENSOR · Referencias consultadas: 14/09/2026. Selección preliminar, pendiente de validación técnica por modelo. No sustituye los textos oficiales, no certifica productos y no determina la obligatoriedad local o contractual. El contenido interno se identifica por separado.</p></section>'+(sections.join('')||'<p>No hay coincidencias para esta búsqueda.</p>');
+  document.getElementById('qm-guide-content').scrollTop=0;
+}
 function qmCatalog(){
   const items=new Map();
   const add=(stage,item)=>{if(!items.has(item.id))items.set(item.id,{...item,stage});};
+  MATERIAL_RECEIVED_ITEMS.forEach(i=>add('material',i));
   [COMMON_STAGE_ITEMS,...Object.values(GROUP_STAGE_ITEMS),...PRODUCT_STAGE_RULES.map(r=>r.items)].forEach(def=>Object.entries(def).forEach(([s,list])=>list.forEach(i=>add(s,i))));
   featureItems({features:{cushion:true,bearing:true,shaft:true,cable:true,portapeso:true}}).forEach(i=>add('ensamble',i));
   Object.entries(qmValues).forEach(([key,item])=>{if(key.startsWith('item:')&&item?.id&&QM_STAGES.some(s=>s[0]===item.stage)){if(item.archived)items.delete(item.id);else items.set(item.id,{...item});}});
@@ -1710,13 +1952,37 @@ function qmApply(items,stage,profile){
     if(mode==='off')map.delete(item.id);
     if(mode==='on')map.set(item.id,item);
   });
-  return [...map.values()].filter(i=>!qmValues['item:'+i.id]?.archived).map(i=>({...i,...(qmValues['item:'+i.id]||{})}));
+  return qmOrdered([...map.values()].filter(i=>!qmValues['item:'+i.id]?.archived).map(i=>({...i,...(qmValues['item:'+i.id]||{})})),group,stage);
+}
+function qmOrdered(items,group,stage){
+  const ids=qmValues['order:'+group+':'+stage]?.ids||[],rank=new Map(ids.map((id,n)=>[id,n]));
+  return [...items].sort((a,b)=>(rank.get(a.id)??ids.length)-(rank.get(b.id)??ids.length));
+}
+function qmAssigned(group,stage){
+  const defaults=qmDefaults().get(group);
+  return qmOrdered([...qmCatalog().values()].filter(i=>i.stage===stage&&((qmValues['assign:'+group+':'+i.id]?.mode||'auto')==='on'||(qmValues['assign:'+group+':'+i.id]?.mode||'auto')==='auto'&&defaults?.has(i.id))),group,stage);
+}
+function qmMove(id,group,stage,before,step){
+  if(!group)return;
+  const ids=qmAssigned(group,stage).map(i=>i.id),from=ids.indexOf(id);
+  if(step){const to=from+step;if(from<0||to<0||to>=ids.length)return;ids.splice(from,1);ids.splice(to,0,id);}
+  else {if(id===before)return;if(from>=0)ids.splice(from,1);const to=ids.indexOf(before);ids.splice(to<0?ids.length:to,0,id);}
+  const changes={['order:'+group+':'+stage]:{ids}};
+  if(from<0)changes['assign:'+group+':'+id]={mode:'on'};
+  qmChange(changes);
+}
+function qmLayout(){
+  const board=document.getElementById('qm-board');
+  const width=Number(document.getElementById('qm-width').value),height=Number(document.getElementById('qm-height').value);
+  board.style.setProperty('--qm-width',width+'px');board.style.setProperty('--qm-height',height+'px');
+  try{localStorage.setItem('xtensor_matrix_layout',JSON.stringify({width,height}));}catch(e){}
 }
 function qmSnapshot(){
   const items=Object.fromEntries(qmCatalog());
   const assignments={};
   Object.keys(items).forEach(id=>QM_GROUPS.forEach(([g])=>{const key='assign:'+g+':'+id;assignments[key]={mode:qmValues[key]?.mode||'auto'};}));
-  return JSON.parse(JSON.stringify({items,assignments}));
+  const orders=Object.fromEntries(Object.entries(qmValues).filter(([k])=>k.startsWith('order:')));
+  return JSON.parse(JSON.stringify({items,assignments,orders}));
 }
 function qmVersion(name,author){return {id:crypto.randomUUID(),name,author,createdAt:new Date().toISOString(),snapshot:qmSnapshot()};}
 function qmOpenVersions(){qmRenderVersions();document.getElementById('qm-versions-dialog').showModal();void qmSync();}
@@ -1789,6 +2055,8 @@ function qmRestoreVersion(key){
     if(JSON.stringify(current.get(id))!==JSON.stringify(item))changes['item:'+id]={...item,archived:false};
   });
   Object.entries(version.snapshot.assignments).forEach(([k,value])=>{if((qmValues[k]?.mode||'auto')!==value.mode)changes[k]=value;});
+  Object.keys(qmValues).filter(k=>k.startsWith('order:')).forEach(k=>{changes[k]={ids:[]};});
+  Object.assign(changes,version.snapshot.orders||{});
   qmChange(changes);qmRenderVersions();
 }
 function qmPersist(){
@@ -1811,6 +2079,7 @@ function qmRefresh(){
   if(document.getElementById('sec-ajustes').classList.contains('active'))qmRender();
 }
 function qmChange(changes){
+  if(!appIsAdmin())return false;
   const values={...qmValues},pending={...qmPending};
   Object.entries(changes).forEach(([key,value])=>{values[key]=value;pending[key]={key:QM_PREFIX+key,value};});
   try{localStorage.setItem(QM_STORAGE,JSON.stringify({values,pending,deletes:qmDeleted}));}
@@ -1818,12 +2087,14 @@ function qmChange(changes){
   qmValues=values;qmPending=pending;qmStatus();qmRefresh();void qmSync();return true;
 }
 async function qmSync(){
+  if(!appAccess.ready)return;
   if(qmBusy)return;
   if(!sb){qmError='Base de datos no disponible';qmStatus();return;}
   qmBusy=true;qmStatus();
   try{
     const read=()=>calInspectionRequest(signal=>sb.from('app_settings').select('key,value').like('key',QM_PREFIX+'%').abortSignal(signal));
     let changed=qmIngest(await read());
+    if(!appIsAdmin()){qmError='';qmPersist();if(changed)qmRefresh();return;}
     for(const [key] of Object.entries(qmDeleted)){
       await calInspectionRequest(signal=>sb.rpc('calidad_eliminar_version_matriz',{p_key:QM_PREFIX+key}).abortSignal(signal));
       delete qmDeleted[key];qmPersist();
@@ -1850,7 +2121,7 @@ function qmRender(){
   const query=normProductText(document.getElementById('qm-search').value);
   const stageFilter=document.getElementById('qm-stage').value,groupFilter=document.getElementById('qm-group').value;
   const groups=QM_GROUPS.filter(([key])=>!groupFilter||key===groupFilter),defaults=qmDefaults();
-  const catalog=[...qmCatalog().values()].filter(i=>!query||normProductText(i.item+' '+i.criterio).includes(query)).sort((a,b)=>a.item.localeCompare(b.item,'es',{sensitivity:'base',numeric:true})||a.id.localeCompare(b.id));
+  const catalog=[...qmCatalog().values()].filter(i=>!query||normProductText(i.item+' '+i.criterio).includes(query));
   const card=(item,group)=>{
     const id=escapeHtml(item.id),mode=qmValues['assign:'+group+':'+item.id]?.mode||'auto';
     return `<article class="qm-card" draggable="true" data-id="${id}" data-group="${group}" data-stage="${item.stage}"><p>${escapeHtml(item.item)}</p><div class="qm-card-foot"><small>${group?(mode==='auto'?'Regla de producto / BOM':'Asignado'):'Disponible'}</small><span><button class="btn btn-ghost" data-edit="${id}" aria-label="Editar ${escapeHtml(item.item)}" title="Editar y asignar"><i class="ti ti-pencil"></i></button>${group?`<button class="btn btn-ghost" data-remove="${id}" data-group="${group}" aria-label="Retirar ${escapeHtml(item.item)}" title="Retirar de esta clasificación"><i class="ti ti-arrow-back-up"></i></button>`:''}</span></div></article>`;
@@ -1858,8 +2129,13 @@ function qmRender(){
   document.getElementById('qm-board').innerHTML=`<table><thead><tr><th>Etapa</th><th>Ítems disponibles</th>${groups.map(([,label])=>`<th>${escapeHtml(label)}</th>`).join('')}</tr></thead><tbody>${QM_STAGES.filter(([s])=>!stageFilter||s===stageFilter).map(([stage,label])=>{
     const items=catalog.filter(i=>i.stage===stage);
     const cell=(group,list)=>`<td><div class="qm-zone" data-group="${group}" data-stage="${stage}">${list.map(i=>card(i,group)).join('')||'<p class="qm-empty">Sin ítems</p>'}</div></td>`;
-    return `<tr><th>${label}</th>${cell('',items)}${groups.map(([g])=>cell(g,items.filter(i=>{const mode=qmValues['assign:'+g+':'+i.id]?.mode||'auto';return mode==='on'||mode==='auto'&&defaults.get(g).has(i.id);}))).join('')}</tr>`;
+    return `<tr><th>${label}</th>${cell('',[...items].sort((a,b)=>a.item.localeCompare(b.item,'es',{sensitivity:'base',numeric:true})||a.id.localeCompare(b.id)))}${groups.map(([g])=>cell(g,qmOrdered(items.filter(i=>{const mode=qmValues['assign:'+g+':'+i.id]?.mode||'auto';return mode==='on'||mode==='auto'&&defaults.get(g).has(i.id);}),g,stage))).join('')}</tr>`;
   }).join('')}</tbody></table>`;
+  document.querySelectorAll('.qm-card[data-group]:not([data-group=""]) .qm-card-foot span').forEach(el=>{
+    const card=el.closest('.qm-card');
+    [-1,1].forEach(step=>{const b=document.createElement('button');b.className='btn btn-ghost';b.title=step<0?'Subir ítem':'Bajar ítem';b.setAttribute('aria-label',b.title);b.innerHTML=`<i class="ti ti-arrow-${step<0?'up':'down'}"></i>`;b.onclick=()=>qmMove(card.dataset.id,card.dataset.group,card.dataset.stage,null,step);el.prepend(b);});
+  });
+  qmLayout();
 }
 function qmOpen(){
   switchSection('ajustes');
@@ -1894,11 +2170,12 @@ function buildStagesForProfile(profile,baseOnly=false){
   const groupDef=GROUP_STAGE_ITEMS[group]||{};
   const productDef=productSpecificItems(profile);
   const defs=[
+    ['material','Material recibido','ti-package-import'],
     ['armado','Armado','ti-tool'],['resoldado','Resoldado','ti-flame'],['pulido','Pulido','ti-wand'],
     ['pintado','Pintado','ti-droplet'],['ensamble','Ensamble','ti-settings'],['empacado','Empacado','ti-package']
   ];
-  return defs.map(([key,label,icon])=>{
-    let items=(COMMON_STAGE_ITEMS[key]||[]).map(x=>({...x}));
+  const stages=defs.map(([key,label,icon])=>{
+    let items=(key==='material'?MATERIAL_RECEIVED_ITEMS:COMMON_STAGE_ITEMS[key]||[]).map(x=>({...x}));
     items.push(...(groupDef[key]||[]).map(x=>({...x})));
     items.push(...(productDef[key]||[]).map(x=>({...x})));
     if(key==='ensamble') items.push(...featureItems(profile));
@@ -1907,6 +2184,7 @@ function buildStagesForProfile(profile,baseOnly=false){
     items=items.filter(it=>{ if(seen.has(it.id)) return false; seen.add(it.id); return true; });
     return {key,label,icon,items:baseOnly?items:qmApply(items,key,profile)};
   });
+  return !baseOnly&&appAccess.ready&&!appIsAdmin()?stages.filter(s=>s.key===appStage()):stages;
 }
 let STAGES=buildStagesForProfile(null);
 document.getElementById('app-body').appendChild(document.getElementById('sec-ajustes'));
@@ -1919,6 +2197,7 @@ QM_STAGES.forEach(([key,label])=>{
 });
 QM_GROUPS.forEach(([key,label])=>document.getElementById('qm-group').insertAdjacentHTML('beforeend',`<option value="${key}">${label}</option>`));
 const qmBoard=document.getElementById('qm-board');
+try{const l=JSON.parse(localStorage.getItem('xtensor_matrix_layout')||'{}');if(l.width)document.getElementById('qm-width').value=l.width;if(l.height)document.getElementById('qm-height').value=l.height;}catch(e){}
 qmBoard.addEventListener('click',event=>{
   const edit=event.target.closest('[data-edit]'),remove=event.target.closest('[data-remove]');
   if(edit)qmEdit(edit.dataset.edit);
@@ -1939,7 +2218,7 @@ qmBoard.addEventListener('drop',event=>{
   event.preventDefault();qmDragged=null;
   if(!zone||!drag||zone.dataset.stage!==drag.stage)return;
   zone.classList.remove('qm-over');
-  if(zone.dataset.group)qmAssign(drag.id,zone.dataset.group,'on');
+  if(zone.dataset.group)qmMove(drag.id,zone.dataset.group,drag.stage,event.target.closest('.qm-card')?.dataset.id);
   else if(drag.group)qmAssign(drag.id,drag.group,'off');
 });
 qmBoard.addEventListener('dragend',()=>{qmDragged=null;qmBoard.querySelectorAll('.qm-over').forEach(z=>z.classList.remove('qm-over'));});
@@ -1953,7 +2232,7 @@ function setCurrentQualityProfile(m){
 const WELDING_STAGE_MOVES=[{id:'a6',before:'a7'},{id:'gj-a2',before:'gj-a3'}];
 function getStagesForRecord(record){
   if(record?.stageData?.__quality?.checklist) return JSON.parse(JSON.stringify(record.stageData.__quality.checklist));
-  const stages=buildStagesForProfile(resolveProductProfile(record),!!record?.stageData);
+  const stages=buildStagesForProfile(resolveProductProfile(record),!!record?.stageData).filter(s=>s.key!=='material'||!record?.stageData||record.stageData.material);
   if(record?.stageData)stages.forEach(s=>{s.items=s.items.map(i=>{const id=({'r-dimensions':'r2','r-verification':'r5','gj-r-access':'gj-a2'})[i.id]||i.id;return {...i,id,...(QM_LEGACY_WELDING[id]||{})};});});
   // El histórico conserva la etapa original de las respuestas anteriores al cambio.
   if(Object.prototype.hasOwnProperty.call(record?.stageData?.armado||{},'a6')){
@@ -2003,7 +2282,7 @@ let countdownInterval=null;
 let sidebarOpen=true;
 let calLoaded=false;
 
-const CAL_INSP_PENDING_KEY='xtensor_quality_pending_v1';
+let CAL_INSP_PENDING_KEY='xtensor_quality_pending_v1';
 let calInspPending={},calInspFlushing=false;
 function calMergeFindings(...lists){
   const map=new Map();
@@ -2128,14 +2407,19 @@ function calRestorePendingInspections(){
   }catch(e){/* Conserva los datos disponibles en memoria. */}
 }
 async function calFlushPendingInspections(){
-  if(calInspFlushing||!sb) return;
+  if(calInspFlushing||!sb||!appAccess.ready) return;
   calInspFlushing=true;
   let failure='';
   try{
     for(const [key,row] of Object.entries(calInspPending)){
       try{
-        const rows=await calInspectionRequest(signal=>sb.from('calidad_inspecciones').upsert(row).select('serial').abortSignal(signal));
+        const rows=await calInspectionRequest(signal=>appIsAdmin()?sb.from('calidad_inspecciones').upsert(row).select('serial,data').abortSignal(signal):sb.rpc('calidad_guardar_mi_etapa',{p_serial:key,p_data:row.data,p_revision:row.data.stageRevision||0}).abortSignal(signal));
         if(!rows?.some(saved=>saved.serial===key)) throw new Error('La base de datos no confirmó el guardado');
+        const saved=rows.find(r=>r.serial===key).data;
+        if(saved){
+          if(calInspPending[key]===row)inspData[key]=saved;
+          else if(calInspPending[key]){const revision=appIsAdmin()?'stageRevisions':'stageRevision';calInspPending[key].data[revision]=saved[revision];inspData[key][revision]=saved[revision];}
+        }
         if(calInspPending[key]===row) delete calInspPending[key];
       }catch(e){failure=e.message||String(e);}
     }
@@ -2170,11 +2454,11 @@ function calApplyRemoteInspection(row){
 }
 let calReconciling=false;
 async function calReconcileInspections(){
-  if(!sb||calReconciling||calInspFlushing) return;
+  if(!sb||calReconciling||calInspFlushing||!appAccess.ready) return;
   calReconciling=true;
   try{
     await calFlushPendingInspections();
-    const rows=await calInspectionRequest(signal=>sb.from('calidad_inspecciones').select('*').abortSignal(signal));
+    const rows=await calInspectionRequest(signal=>appInspectionRead().abortSignal(signal));
     (rows||[]).forEach(calApplyRemoteInspection);
     if(!Object.keys(calInspPending).length) calSyncError='';
     setDbStatus(true);
@@ -2201,12 +2485,12 @@ async function calFetchAll(){
     }
   }catch(e){ /* usa fallback local */ }
 
-  const insp = await sbCall(()=>sb.from('calidad_inspecciones').select('*'));
+  const insp = await sbCall(()=>appInspectionRead());
   inspData={};
   (insp||[]).forEach(row=>{ inspData[row.serial]={...row.data}; });
   calRestorePendingInspections();
 
-  const hist = await sbCall(()=>sb.from('calidad_historico').select('*').order('created_at',{ascending:false}));
+  const hist = appIsAdmin()?await sbCall(()=>sb.from('calidad_historico').select('*').order('created_at',{ascending:false})):[];
   historico = (hist||[]).map(h=>({
     _dbId:h.id, _machineKey:h.machine_key||h.serial, serial:h.serial, code:h.code, name:h.name, client:h.client, prometido:h.prometido, color:h.color,
     fechaInsp:h.fecha_insp, _createdAt:h.created_at, conformes:h.conformes, noConformes:h.no_conformes, total:h.total, pct:h.pct,
@@ -2216,6 +2500,7 @@ async function calFetchAll(){
 }
 
 async function calUpsertInsp(serial){
+  if(!appAccess.ready)return;
   const d=getInsp(serial);
   d.machineSnapshot=calStatsMachine(serial,d);
   calInspPending[serial]={serial,data:JSON.parse(JSON.stringify(d)),updated_at:new Date().toISOString()};
@@ -2253,7 +2538,7 @@ function getInsp(serial){
   if(!d.inspectors) d.inspectors={};
   if(!d.responsables) d.responsables={};
   if(!d.stageObs) d.stageObs={};
-  migrateWeldingStageAnswers(d);
+  if(appIsAdmin())migrateWeldingStageAnswers(d);
   if(d.currentStageIdx==null) d.currentStageIdx=0;
   if(d.currentStageIdx>=STAGES.length) d.currentStageIdx=STAGES.length-1;
   return d;
@@ -2556,10 +2841,12 @@ function selectMachine(machineId,skipSave){
   renderList();
   setView(currentView);
   updateBBPos();
+  if(window.matchMedia('(max-width:700px)').matches&&sidebarOpen)toggleSidebar();
 }
 
 // ── HISTÓRICO ──
 async function checkAndArchive(machineId){
+  if(!appIsAdmin())return;
   if(historico.find(h=>h._machineKey===machineId)) return;
   const d=getInsp(machineId);
   let totalItems=0,totalDone=0;
@@ -2686,7 +2973,8 @@ function renderInspection(){
   const si=d.currentStageIdx;
   const stage=STAGES[si];
   document.getElementById('stage-title').textContent=stage.label;
-  document.getElementById('field-inspector').value=d.inspectors[stage.key]||'';
+  document.getElementById('field-inspector').value=appIsAdmin()?(d.inspectors[stage.key]||''):(appAccess.user?.email||'');
+  document.getElementById('field-inspector').readOnly=!appIsAdmin();
   document.getElementById('field-responsable').value=d.responsables[stage.key]||'';
   document.getElementById('stage-obs').value=d.stageObs[stage.key]||'';
   document.getElementById('stage-tabs').innerHTML=STAGES.map((s,i)=>{
@@ -2738,6 +3026,7 @@ function calRowKey(event,sk,id){
   event.preventDefault();event.stopPropagation();calActivateRow(event,sk,id);
 }
 function toggleItem(sk,id,el){
+  if(!appAccess.ready||!appIsAdmin()&&sk!==appStage())return;
   const d=getInsp(currentSerial);
   const cur=(d.stageData[sk]||{})[id]||'';
   const next=cur===''?'ok':cur==='ok'?'fail':'';
@@ -2755,6 +3044,7 @@ function toggleItem(sk,id,el){
 }
 
 function selectResult(sk,id,val){
+  if(!appAccess.ready||!appIsAdmin()&&sk!==appStage())return;
   const d=getInsp(currentSerial);
   calRecordInternalResult(currentSerial,sk,id,val);
   d.stageData[sk][id]=val;
@@ -2860,7 +3150,7 @@ function renderSummary(){
         <div style="display:flex;align-items:center;gap:7px">
           <i class="ti ${s.icon}" style="color:var(--text2);font-size:13px"></i>
           <span style="font-weight:600;font-size:13px">${s.label}</span>
-          ${d.inspectors[s.key]?`<span style="font-size:11px;color:var(--text3)">${d.inspectors[s.key]}</span>`:''}
+          ${d.inspectors[s.key]?`<span style="font-size:11px;color:var(--text3)">${escapeHtml(d.inspectors[s.key])}</span>`:''}
         </div>
         <span style="font-weight:600;font-size:13px;color:${fail>0?'var(--red)':p===100?'var(--green)':'var(--yellow)'}">${p}%</span>
       </div>
@@ -2874,7 +3164,7 @@ function renderSummary(){
         <div style="font-size:11px;font-weight:600;color:var(--red);margin-bottom:3px"><i class="ti ti-alert-triangle"></i> Ítems fallidos:</div>
         ${fails.map(it=>`<div style="font-size:11px;color:var(--red);margin:1px 0">• ${escapeHtml(it.item)} — ${escapeHtml(it.criterio)}</div>`).join('')}
       </div>`:''}
-      ${d.stageObs[s.key]?`<div style="font-size:11px;color:var(--text2);margin-top:6px"><i class="ti ti-notes"></i> ${d.stageObs[s.key]}</div>`:''}
+      ${d.stageObs[s.key]?`<div style="font-size:11px;color:var(--text2);margin-top:6px"><i class="ti ti-notes"></i> ${escapeHtml(d.stageObs[s.key])}</div>`:''}
     </div>`;
   }).join('');
 }
@@ -3010,6 +3300,7 @@ function calObserveProduction(machines,observedAt=new Date().toISOString()){
   void calSyncNotifications();
 }
 async function calSyncNotifications(){
+  if(!appIsAdmin())return;
   if(!sb || !SUPABASE_CONFIGURED){calRenderNotifications();return;}
   if(calNotSyncing){calNotSyncAgain=true;return;}
   calNotSyncing=true;
@@ -3537,6 +3828,7 @@ function updateCountdown(){
 
 // ── SINCRONIZACIÓN EN VIVO — otros dispositivos ven avances/histórico sin recargar ──
 function calSubscribeRealtime(){
+  if(!appIsAdmin())return;
   if(!SUPABASE_CONFIGURED || !sb) return;
   sb.channel('calidad_notificaciones_rt')
     .on('postgres_changes',{event:'*',schema:'public',table:'calidad_notificaciones'},payload=>{
@@ -4866,13 +5158,27 @@ async function garInit(){
 // ══════════════ INIT ══════════════
 let __initSec='recepcion';
 try{ const s=localStorage.getItem('xtensor_app_lastsection'); if(s) __initSec=s; }catch(e){}
-switchSection(__initSec);
-
-(async function(){
-  if(!SUPABASE_CONFIGURED) return; // el banner de configuración ya está visible
-  await Promise.allSettled([ recInit(), calInit(), garInit() ]);
-  renderEstadisticas();
-})();
+async function appBoot(){
+  switchSection(appIsAdmin()?__initSec:'calidad');
+  if(appIsAdmin()){await Promise.allSettled([recInit(),calInit(),garInit()]);renderEstadisticas();}
+  else await calInit();
+}
+async function appStart(){
+  appLock('');
+  if(!sb){appLock('No se pudo cargar la conexión. Recarga la página.');return;}
+  const {data,error}=await sb.auth.getSession();
+  if(error){appLock(error.message);return;}
+  await appAuthorize(data.session);
+  sb.auth.onAuthStateChange((event,session)=>{
+    if(event==='SIGNED_OUT')appLock('Sesión cerrada');
+    if(event==='SIGNED_IN'&&appStarted&&session?.user.id!==appAccess.user?.id)location.reload();
+  });
+  setInterval(async()=>{
+    if(!appStarted||appClosing||document.hidden)return;
+    try{const {data,error}=await sb.auth.getSession();if(error)throw error;await appAuthorize(data.session);}catch(e){appLock('No se pudo verificar la sesión. Vuelve a iniciar sesión.');}
+  },30000);
+}
+void appStart();
 </script>
 </body>
 </html>
