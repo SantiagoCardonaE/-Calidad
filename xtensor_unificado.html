@@ -5226,7 +5226,7 @@ async function garInit(){
 <script>
 // Tiempos de produccion: la captura no depende de tener abierta esta vista.
 const TP_STAGES=['Material','Armar','Resoldar','Pulir','Pintar','Ensamblar','Empacar','Despacho'];
-let tpRows=[],tpRuns=[],tpBusy=false,tpLoading=false,tpTimer=null,tpLast=null,tpStatus='Pendiente de primera lectura',tpView='historial',tpLimit=100;
+let tpRows=[],tpRuns=[],tpBusy=false,tpLoading=false,tpTimer=null,tpLast=null,tpStatus='Pendiente de primera lectura',tpView='productos',tpLimit=100;
 const tpSection=document.createElement('section');
 tpSection.id='sec-tiempos';tpSection.className='app-section';tpSection.setAttribute('aria-label','Tiempos de producción');
 tpSection.innerHTML=`<style>
@@ -5243,6 +5243,10 @@ tpSection.innerHTML=`<style>
 #sec-tiempos th{position:sticky;top:0;background:var(--bg2);z-index:1;white-space:nowrap}
 #sec-tiempos [role=tab][aria-selected=true]{color:var(--yellow);border-color:var(--yellow)}
 #sec-tiempos [hidden]{display:none!important}
+#tp-product-summary{border-block:1px solid var(--border);padding:12px 0}
+#tp-product-summary h3{font-size:17px;margin-bottom:10px}
+.tp-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px}
+.tp-metrics dt{font-size:12px;color:var(--text2)}.tp-metrics dd{font-size:16px;margin-top:5px;overflow-wrap:anywhere}
 #tp-status,#tp-count{font-size:12px;color:var(--text2)}
 .tp-note{font-size:12px;color:var(--text2);line-height:1.5;margin:0}
 #tp-pages{display:flex;justify-content:space-between;align-items:center}
@@ -5252,15 +5256,18 @@ tpSection.innerHTML=`<style>
 <button class="btn" onclick="tpTick(true)" title="Actualizar tiempos" aria-label="Actualizar tiempos"><i class="ti ti-refresh"></i></button>
 <button class="btn" onclick="tpExport()"><i class="ti ti-download"></i> Exportar CSV</button></div>
 <div class="tp-filters"><input type="search" id="tp-search" placeholder="Código, producto, serial o lote" aria-label="Buscar fabricación" oninput="tpLimit=100;tpRender()">
+<select id="tp-product" aria-label="Producto" onchange="tpLimit=100;tpRender()"><option value="">Todos los productos</option></select>
 <select id="tp-stage" aria-label="Etapa" onchange="tpLimit=100;tpRender()"><option value="">Todas las etapas</option>${TP_STAGES.map((s,i)=>`<option value="${i}">${s}</option>`).join('')}</select>
 <label>Desde <input id="tp-from" type="date" onchange="tpLimit=100;tpRender()"></label><label>Hasta <input id="tp-to" type="date" onchange="tpLimit=100;tpRender()"></label>
 <select id="tp-state" aria-label="Estado" onchange="tpLimit=100;tpRender()"><option value="">Todos los estados</option><option value="abierto">En etapa</option><option value="valido">Finalizado válido</option><option value="incompleto">Sin inicio / interrumpido</option></select>
 </div>
 <div class="tp-toolbar" role="tablist" aria-label="Vistas de tiempos">
+<button class="btn" role="tab" id="tp-tab-productos" onclick="tpSetView('productos')">Por producto</button>
 <button class="btn" role="tab" id="tp-tab-historial" onclick="tpSetView('historial')">Histórico</button>
 <button class="btn" role="tab" id="tp-tab-indicadores" onclick="tpSetView('indicadores')">Por código y etapa</button>
 <button class="btn" role="tab" id="tp-tab-fabricaciones" onclick="tpSetView('fabricaciones')">Fabricaciones</button></div>
-<p class="tp-note">Tiempo transcurrido observado (minutos), incluye esperas y periodos fuera de jornada. No es tiempo efectivo de trabajo, tiempo estándar ni takt time. Sin inicio o con interrupciones: excluido de indicadores. «Terminada» no confirma Despacho.</p>
+<p class="tp-note">Minutos laborales observados · Colombia. Lunes–jueves: 07:00–13:00 y 13:30–16:30. Viernes: 07:00–13:00 y 13:30–14:45. Fuera de horario: siguiente franja. No cuenta almuerzo, noches ni fines de semana; sin calendario adicional de festivos. Incluye esperas dentro de jornada, no mide trabajo efectivo ni takt time. Sin inicio o con interrupciones: fuera de indicadores. «Terminada» no confirma Despacho.</p>
+<section id="tp-product-summary" hidden aria-label="Referencia y confiabilidad por producto"></section>
 <div class="tp-scroll"><table><thead id="tp-head"></thead><tbody id="tp-body"></tbody></table></div>
 <div id="tp-pages"><span id="tp-count"></span><button class="btn" id="tp-more" onclick="tpLimit+=100;tpRender()">Ver más</button></div>`;
 document.getElementById('app-body').appendChild(tpSection);
@@ -5268,15 +5275,30 @@ function tpEscape(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<
 function tpDate(v){return v?new Date(v).toLocaleString('es-CO',{timeZone:'America/Bogota'}):'—';}
 function tpDay(v){return v?new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(v)):'';}
 function tpNum(v){return v==null?'—':Number(v).toLocaleString('es-CO',{maximumFractionDigits:2});}
-function tpValid(r){return !!r.inicio&&!!r.finalizacion&&!r.interrumpido&&Number.isFinite(Number(r.duracion_minutos))&&Number(r.duracion_minutos)>=0;}
+const TP_BOGOTA=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+function tpCivil(ms){const p=Object.fromEntries(TP_BOGOTA.formatToParts(new Date(ms)).map(p=>[p.type,p.value]));return Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);}
+function tpLocalInstant(day,minute){const guess=day+minute*60000;return guess+(guess-tpCivil(guess));}
+function tpWorkSlots(day){const dow=new Date(day).getUTCDay();return dow===0||dow===6?[]:[[420,780],[810,dow===5?885:990]].map(([a,b])=>[tpLocalInstant(day,a),tpLocalInstant(day,b)]);}
+function tpWorkDay(ms){const local=new Date(tpCivil(ms));return Date.UTC(local.getUTCFullYear(),local.getUTCMonth(),local.getUTCDate());}
+function tpNextWork(value){
+  if(!value)return null;const t=Date.parse(value);if(!Number.isFinite(t))return null;
+  for(let day=tpWorkDay(t);;day+=86400000)for(const [a,b] of tpWorkSlots(day))if(t<b)return new Date(Math.max(t,a)).toISOString();
+}
+function tpWorkMinutes(start,end){
+  if(!start||!end)return null;const a=Date.parse(start),b=Date.parse(end);if(!Number.isFinite(a)||!Number.isFinite(b)||b<a)return null;
+  let ms=0;for(let day=tpWorkDay(a),last=tpWorkDay(b);day<=last;day+=86400000)for(const [open,close] of tpWorkSlots(day))ms+=Math.max(0,Math.min(b,close)-Math.max(a,open));
+  return ms/60000;
+}
+function tpMinutes(r){const n=r.duracion_laboral_minutos==null?tpWorkMinutes(r.inicio,r.finalizacion):Number(r.duracion_laboral_minutos);return n!=null&&Number.isFinite(n)&&n>=0?n:null;}
+function tpValid(r){return !!r.inicio&&!!r.finalizacion&&!r.interrumpido&&Number.isFinite(Date.parse(r.inicio))&&Date.parse(r.finalizacion)>=Date.parse(r.inicio)&&tpMinutes(r)!=null;}
 function tpState(r){return r.interrumpido?'Interrumpido':!r.inicio?'Inicio desconocido':r.finalizacion?'Finalizado':'En etapa';}
 function tpFiltered(){
-  const q=normKey(document.getElementById('tp-search').value),stage=document.getElementById('tp-stage').value,
+  const q=normKey(document.getElementById('tp-search').value),stage=document.getElementById('tp-stage').value,product=document.getElementById('tp-product').value,
     from=document.getElementById('tp-from').value,to=document.getElementById('tp-to').value,state=document.getElementById('tp-state').value;
   const runs=new Map(tpRuns.map(r=>[r.id,r]));
   return tpRows.map(r=>({...r,f:runs.get(r.fabricacion_id)||{}})).filter(r=>{
-    const day=tpDay(r.inicio||r.primera_observacion);
-    return (!q||normKey([r.f.codigo,r.f.producto,r.f.serial,r.fabricacion_id].join(' ')).includes(q))&&
+    const day=tpDay(tpNextWork(r.inicio||r.primera_observacion));
+    return (!product||r.f.codigo===product)&&(!q||normKey([r.f.codigo,r.f.producto,r.f.serial,r.fabricacion_id].join(' ')).includes(q))&&
       (stage===''||r.etapa===Number(stage))&&(!from||day>=from)&&(!to||day<=to)&&
       (!state||(state==='abierto'&&!r.finalizacion)||(state==='valido'&&tpValid(r))||(state==='incompleto'&&(!r.inicio||r.interrumpido)));
   });
@@ -5286,33 +5308,85 @@ function tpStatistics(values){
   const mean=a.reduce((s,v)=>s+v,0)/n;
   return {n,mean,min:a[0],max:a[n-1],median:n%2?a[(n-1)/2]:(a[n/2-1]+a[n/2])/2,sd:n>1?Math.sqrt(a.reduce((s,v)=>s+(v-mean)**2,0)/(n-1)):null};
 }
+function tpQuantile(values,p){const a=values.map(Number).sort((a,b)=>a-b);if(!a.length)return null;const x=(a.length-1)*p,i=Math.floor(x);return a[i]+(a[Math.min(i+1,a.length-1)]-a[i])*(x-i);}
+function tpTypical(values){const s=tpStatistics(values);return s?{...s,q25:tpQuantile(values,.25),q75:tpQuantile(values,.75),cv:s.mean>0&&s.sd!=null?100*s.sd/s.mean:null}:null;}
+function tpRunInterval(f,limit=6){
+  const all=tpRows.filter(r=>r.fabricacion_id===f.id&&r.etapa<=limit).sort((a,b)=>Date.parse(a.inicio)-Date.parse(b.inicio));
+  const coverage=new Set(all.filter(tpValid).map(r=>r.etapa));
+  if(!all.length||coverage.size!==limit+1||!all.every(tpValid)||!(limit===6?f.etapa_actual>=7:f.estado==='despachada'))return null;
+  // No transforma huecos u observaciones solapadas en un total completo.
+  if(all[0].etapa!==0||all.at(-1).etapa!==limit||all.some((r,i)=>i>0&&Date.parse(r.inicio)!==Date.parse(all[i-1].finalizacion)))return null;
+  const inicio=all[0].inicio,finalizacion=all.at(-1).finalizacion;
+  return {inicio,finalizacion,duracion_minutos:tpWorkMinutes(inicio,finalizacion)};
+}
+function tpBacktest(records){
+  const errors=[];
+  for(const record of records){
+    const past=records.filter(p=>Date.parse(p.finalizacion)<Date.parse(record.inicio));
+    if(past.length<3)continue;
+    errors.push(Math.abs(tpMinutes(record)-tpStatistics(past.map(tpMinutes)).median));
+  }
+  return {n:errors.length,mae:errors.length?errors.reduce((s,e)=>s+e,0)/errors.length:null};
+}
+function tpProductOptions(){
+  const select=document.getElementById('tp-product'),selected=select.value;
+  const codes=[...new Map(tpRuns.filter(f=>f.codigo).map(f=>[f.codigo,f.producto])).entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+  const markup='<option value="">Todos los productos</option>'+codes.map(([code,name])=>`<option value="${tpEscape(code)}">${tpEscape(code+' · '+name)}</option>`).join('');
+  if(select.innerHTML!==markup){select.innerHTML=markup;select.value=codes.some(([code])=>code===selected)?selected:'';}
+}
+function tpProductRuns(){
+  const code=document.getElementById('tp-product').value,q=normKey(document.getElementById('tp-search').value),from=document.getElementById('tp-from').value,to=document.getElementById('tp-to').value;
+  return tpRuns.filter(f=>{
+    const day=tpDay(tpNextWork(f.primera_observacion));
+    return (!code||f.codigo===code)&&(!q||normKey([f.codigo,f.producto,f.serial,f.id].join(' ')).includes(q))&&(!from||day>=from)&&(!to||day<=to);
+  });
+}
+function tpReferenceRows(records,total){
+  const s=tpTypical(records.map(tpMinutes)),back=tpBacktest(records);
+  return [s?tpNum(s.median):'Sin referencia',records.length+' / '+total,s?tpNum(s.mean):'—',s?.n>1?tpNum(s.q25)+' – '+tpNum(s.q75):'Muestra insuficiente',s?tpNum(s.min)+' – '+tpNum(s.max):'—',s?tpNum(s.sd):'—',s?.cv!=null?tpNum(s.cv)+'%':'—',back.n?tpNum(back.mae)+' ('+back.n+' comparaciones)':'Sin validación retrospectiva'];
+}
+function tpProductSummary(code,runs){
+  const records=runs.map(f=>tpRunInterval(f)).filter(Boolean),s=tpTypical(records.map(r=>r.duracion_minutos)),back=tpBacktest(records),complete=runs.map(f=>tpRunInterval(f,7)).filter(Boolean),full=tpTypical(complete.map(r=>r.duracion_minutos));
+  const box=document.getElementById('tp-product-summary');box.hidden=false;
+  const metrics=[['Referencia típica de fabricación',s?tpNum(s.median)+' min':'Sin fabricaciones completas'],['Fabricaciones completas / observadas',records.length+' / '+runs.length],['Promedio de fabricación',s?tpNum(s.mean)+' min':'—'],['Rango central histórico (P25–P75)',s?tpNum(s.q25)+' – '+tpNum(s.q75)+' min':'—'],['Variabilidad (CV)',s?.cv!=null?tpNum(s.cv)+'%':'Muestra insuficiente'],['Error retrospectivo (MAE)',back.n?tpNum(back.mae)+' min · '+back.n+' comparaciones':'Aún sin comparaciones'],['Hasta Despacho: mediana',full?tpNum(full.median)+' min · '+complete.length+' registros':'Sin proceso completo observado']];
+  box.innerHTML=`<h3>${tpEscape(code+' · '+(runs[0]?.producto||''))}</h3><dl class="tp-metrics">${metrics.map(([label,value])=>`<div><dt>${tpEscape(label)}</dt><dd>${tpEscape(value)}</dd></div>`).join('')}</dl><p class="tp-note" style="margin-top:12px">Fabricación: Material → Empacar. La referencia es la mediana histórica, no una promesa de entrega. El rango P25–P75 contiene el 50% central de los tiempos registrados, no es un intervalo de confianza. El error retrospectivo usa solo fabricaciones finalizadas antes del inicio de cada caso, con al menos tres antecedentes. Los conteos y la variabilidad no garantizan precisión futura. Periodo por fecha de primera observación; los filtros de etapa y estado no recortan el total.</p>`;
+}
+document.getElementById('tp-body').addEventListener('click',event=>{const button=event.target.closest('[data-tp-product]');if(button){document.getElementById('tp-product').value=button.dataset.tpProduct;tpLimit=100;tpRender();}});
 function tpSetView(v){tpView=v;tpLimit=100;tpRender();}
 function tpRender(){
   if(!appIsAdmin())return;
+  tpProductOptions();document.getElementById('tp-product-summary').hidden=true;
+  ['tp-stage','tp-state'].forEach(id=>document.getElementById(id).disabled=['productos','fabricaciones'].includes(tpView));
   document.getElementById('tp-status').textContent=tpLast?'Última lectura: '+tpDate(tpLast):tpStatus;
-  ['historial','indicadores','fabricaciones'].forEach(v=>{const el=document.getElementById('tp-tab-'+v);el.setAttribute('aria-selected',String(tpView===v));el.classList.toggle('btn-yellow',tpView===v);});
+  ['productos','historial','indicadores','fabricaciones'].forEach(v=>{const el=document.getElementById('tp-tab-'+v);el.setAttribute('aria-selected',String(tpView===v));});
   const rows=tpFiltered().sort((a,b)=>String(b.primera_observacion).localeCompare(String(a.primera_observacion)));let headers,values=[];
-  if(tpView==='historial'){
-    headers=['Código','Producto / serial','Fabricación (ID producción)','Etapa','Inicio observado','Finalización observada','Minutos','Responsable','Estado','Observaciones'];
-    values=rows.map(r=>[r.f.codigo||'Sin código vinculado',`${r.f.producto||''} / #${r.f.serial||''}`,r.fabricacion_id,TP_STAGES[r.etapa],tpDate(r.inicio),tpDate(r.finalizacion),tpNum(r.duracion_minutos),r.responsable||'No informado',tpState(r),r.observaciones||'']);
+  if(tpView==='productos'){
+    const runs=tpProductRuns(),code=document.getElementById('tp-product').value;
+    headers=['Producto','Referencia típica: mediana (min)','Válidos / observados','Promedio (min)','P25–P75 (min)','Mín.–máx. (min)','Desv. estándar (min)','Variabilidad CV','Error retrospectivo MAE (min)'];
+    if(code){
+      tpProductSummary(code,runs);headers[0]='Sección';
+      const ids=new Set(runs.map(f=>f.id));
+      values=TP_STAGES.map((stage,i)=>{const all=tpRows.filter(r=>ids.has(r.fabricacion_id)&&r.etapa===i),valid=all.filter(tpValid);return [stage,...tpReferenceRows(valid,all.length)];});
+    }else{
+      const codes=[...new Set(runs.map(f=>f.codigo).filter(Boolean))].sort();
+      values=codes.map(c=>{const list=runs.filter(f=>f.codigo===c),valid=list.map(f=>tpRunInterval(f)).filter(Boolean);return [c,...tpReferenceRows(valid,list.length)];});
+    }
+  }else if(tpView==='historial'){
+    headers=['Código','Producto','Fabricación (serial)','Etapa','Inicio laboral','Finalización laboral','Minutos laborales','Responsable','Estado','Observaciones','Reporte original de inicio','Reporte original de fin'];
+    values=rows.map(r=>[r.f.codigo||'Sin código vinculado',r.f.producto||'',r.f.serial?`#${r.f.serial}`:'Sin serial',TP_STAGES[r.etapa],tpDate(tpNextWork(r.inicio)),tpDate(tpNextWork(r.finalizacion)),tpNum(tpMinutes(r)),r.responsable||'No informado',tpState(r),r.observaciones||'',tpDate(r.inicio),tpDate(r.finalizacion)]);
   }else if(tpView==='indicadores'){
     headers=['Código','Etapa','Registros válidos','Promedio (min)','Mínimo','Máximo','Mediana','Desv. estándar muestral'];
-    const groups=new Map();rows.filter(r=>tpValid(r)&&r.f.codigo).forEach(r=>{const k=r.f.codigo+'|'+r.etapa;if(!groups.has(k))groups.set(k,{code:r.f.codigo,stage:r.etapa,a:[]});groups.get(k).a.push(r.duracion_minutos);});
+    const groups=new Map();rows.filter(r=>tpValid(r)&&r.f.codigo).forEach(r=>{const k=r.f.codigo+'|'+r.etapa;if(!groups.has(k))groups.set(k,{code:r.f.codigo,stage:r.etapa,a:[]});groups.get(k).a.push(tpMinutes(r));});
     values=[...groups.values()].sort((a,b)=>a.code.localeCompare(b.code)||a.stage-b.stage).map(g=>{const s=tpStatistics(g.a);return [g.code,TP_STAGES[g.stage],s.n,tpNum(s.mean),tpNum(s.min),tpNum(s.max),tpNum(s.median),tpNum(s.sd)];});
   }else{
-    headers=['Código','Producto / serial','Fabricación (ID producción)','Primera observación','Última observación','Etapas con intervalo válido','Minutos válidos acumulados','Tiempo total fabricación (min)','Estado'];
-    const selected=new Set(rows.map(r=>r.fabricacion_id));
-    // Incluye fabricaciones detectadas ya terminadas, aunque no tengan intervalos.
-    if(!document.getElementById('tp-search').value&&!document.getElementById('tp-stage').value&&!document.getElementById('tp-from').value&&!document.getElementById('tp-to').value&&!document.getElementById('tp-state').value)tpRuns.forEach(f=>selected.add(f.id));
-    values=tpRuns.filter(f=>selected.has(f.id)).map(f=>{
+    headers=['Código','Producto','Fabricación (serial)','Primera observación','Última observación','Etapas con intervalo válido','Minutos laborales válidos acumulados','Fabricación: Material → Empacar (min)','Estado','Proceso hasta Despacho (min)'];
+    values=tpProductRuns().map(f=>{
       const all=tpRows.filter(r=>r.fabricacion_id===f.id),valid=all.filter(tpValid),coverage=new Set(valid.map(r=>r.etapa));
-      const complete=coverage.size===8&&all.every(tpValid)&&f.estado==='despachada';
-      const total=complete?(Math.max(...all.map(r=>Date.parse(r.finalizacion)))-Math.min(...all.map(r=>Date.parse(r.inicio))))/60000:null;
-      return [f.codigo||'Sin código vinculado',`${f.producto} / #${f.serial}`,f.id,tpDate(f.primera_observacion),tpDate(f.ultima_observacion),coverage.size+'/8',valid.length?tpNum(valid.reduce((s,r)=>s+Number(r.duracion_minutos),0)):'—',tpNum(total),f.estado==='despachada'?'Despacho observado':f.estado==='terminada_sin_despacho'?'Terminada; despacho sin observar':TP_STAGES[f.etapa_actual]];
+      return [f.codigo||'Sin código vinculado',f.producto,f.serial?`#${f.serial}`:'Sin serial',tpDate(f.primera_observacion),tpDate(f.ultima_observacion),coverage.size+'/8',valid.length?tpNum(valid.reduce((s,r)=>s+tpMinutes(r),0)):'—',tpNum(tpRunInterval(f)?.duracion_minutos),f.estado==='despachada'?'Despacho observado':f.estado==='terminada_sin_despacho'?'Terminada; despacho sin observar':TP_STAGES[f.etapa_actual],tpNum(tpRunInterval(f,7)?.duracion_minutos)];
     });
   }
   document.getElementById('tp-head').innerHTML='<tr>'+headers.map(h=>'<th scope="col">'+tpEscape(h)+'</th>').join('')+'</tr>';
-  document.getElementById('tp-body').innerHTML=values.length?values.slice(0,tpLimit).map(row=>'<tr>'+row.map(v=>'<td>'+tpEscape(v)+'</td>').join('')+'</tr>').join(''):`<tr><td colspan="${headers.length}">Sin registros para esta vista.</td></tr>`;
+  document.getElementById('tp-body').innerHTML=values.length?values.slice(0,tpLimit).map(row=>'<tr>'+row.map((v,i)=>'<td>'+(tpView==='productos'&&!document.getElementById('tp-product').value&&i===0?`<button class="btn btn-ghost" data-tp-product="${tpEscape(v)}">${tpEscape(v)}</button>`:tpEscape(v))+'</td>').join('')+'</tr>').join(''):`<tr><td colspan="${headers.length}">Sin registros para esta vista.</td></tr>`;
   document.getElementById('tp-count').textContent=`${Math.min(tpLimit,values.length)} de ${values.length} registros`;
   document.getElementById('tp-more').hidden=values.length<=tpLimit;
 }
@@ -5345,9 +5419,9 @@ async function tpTick(manual=false){
 }
 function tpStart(){if(tpTimer)return;void tpTick();tpTimer=setInterval(()=>void tpTick(),120000);window.addEventListener('online',()=>void tpTick());document.addEventListener('visibilitychange',()=>{if(!document.hidden)void tpTick();});}
 function tpCsv(rows){
-  const header=['Fecha','Código','Producto','Orden/lote','Etapa','Inicio','Finalización','Duración en minutos','Responsable','Estado','Observaciones','Serial','Válido para indicadores','Método','ID fabricación'];
+  const header=['Fecha laboral','Código','Producto','Orden/lote','Etapa','Inicio laboral','Finalización laboral','Duración en minutos laborales','Responsable','Estado','Observaciones','Serial','Válido para indicadores','Método','Reporte original de inicio','Reporte original de fin','Minutos transcurridos originales'];
   const cell=v=>{let s=String(v??'');if(/^[\s]*[=+@-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
-  return '\uFEFF'+[header,...rows.map(r=>[tpDay(r.inicio||r.primera_observacion),r.f.codigo||'',r.f.producto||'','',TP_STAGES[r.etapa],r.inicio||'',r.finalizacion||'',r.duracion_minutos??'',r.responsable||'',tpState(r),r.observaciones||'',r.f.serial||'',tpValid(r)?'Sí':'No','Transcurrido observado por sincronización; fechas ISO con zona',r.fabricacion_id])].map(row=>row.map(cell).join(',')).join('\r\n');
+  return '\uFEFF'+[header,...rows.map(r=>[tpDay(tpNextWork(r.inicio||r.primera_observacion)),r.f.codigo||'',r.f.producto||'','',TP_STAGES[r.etapa],tpNextWork(r.inicio)||'',tpNextWork(r.finalizacion)||'',tpMinutes(r)??'',r.responsable||'',tpState(r),r.observaciones||'',r.f.serial||'',tpValid(r)?'Sí':'No','Laboral observado por sincronización; America/Bogota; fechas ISO con zona',r.inicio||'',r.finalizacion||'',r.duracion_minutos??''])].map(row=>row.map(cell).join(',')).join('\r\n');
 }
 function tpExport(){
   if(!appIsAdmin())return;const url=URL.createObjectURL(new Blob([tpCsv(tpFiltered())],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');

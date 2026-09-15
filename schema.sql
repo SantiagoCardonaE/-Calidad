@@ -937,6 +937,44 @@ create table if not exists public.produccion_fabricaciones (
   etapa_actual integer not null check(etapa_actual between 0 and 8),
   estado text not null default 'observando'
 );
+-- Calendario laboral America/Bogota. No descuenta festivos no especificados.
+create or replace function public.produccion_siguiente_franja(t timestamptz) returns timestamptz
+language plpgsql immutable strict set search_path='' as $$
+declare dia date; dow integer; apertura timestamptz; cierre timestamptz; tramo integer;
+begin
+  if not isfinite(t) then return null; end if;
+  dia:=(t at time zone 'America/Bogota')::date;
+  loop
+    dow:=extract(isodow from dia)::integer;
+    if dow<=5 then
+      for tramo in 0..1 loop
+        apertura:=(dia+case when tramo=0 then time '07:00' else time '13:30' end) at time zone 'America/Bogota';
+        cierre:=(dia+case when tramo=0 then time '13:00' when dow=5 then time '14:45' else time '16:30' end) at time zone 'America/Bogota';
+        if t<cierre then return greatest(t,apertura); end if;
+      end loop;
+    end if;
+    dia:=dia+1;
+  end loop;
+end $$;
+create or replace function public.produccion_minutos_laborales(desde timestamptz,hasta timestamptz) returns double precision
+language plpgsql immutable strict set search_path='' as $$
+declare dia date; ultimo date; dow integer; tramo integer; a timestamptz; b timestamptz; total double precision:=0;
+begin
+  if not isfinite(desde) or not isfinite(hasta) or hasta<desde then return null; end if;
+  dia:=(desde at time zone 'America/Bogota')::date;ultimo:=(hasta at time zone 'America/Bogota')::date;
+  while dia<=ultimo loop
+    dow:=extract(isodow from dia)::integer;
+    if dow<=5 then
+      for tramo in 0..1 loop
+        a:=(dia+case when tramo=0 then time '07:00' else time '13:30' end) at time zone 'America/Bogota';
+        b:=(dia+case when tramo=0 then time '13:00' when dow=5 then time '14:45' else time '16:30' end) at time zone 'America/Bogota';
+        total:=total+greatest(0,extract(epoch from least(hasta,b)-greatest(desde,a))/60.0);
+      end loop;
+    end if;
+    dia:=dia+1;
+  end loop;
+  return total;
+end $$;
 create table if not exists public.produccion_tiempos (
   id bigint generated always as identity primary key,
   fabricacion_id uuid not null references public.produccion_fabricaciones(id),
@@ -952,6 +990,9 @@ create table if not exists public.produccion_tiempos (
 );
 create unique index if not exists produccion_tiempos_abierto on public.produccion_tiempos(fabricacion_id) where finalizacion is null;
 create index if not exists produccion_tiempos_historial on public.produccion_tiempos(fabricacion_id,primera_observacion);
+alter table public.produccion_tiempos add column if not exists inicio_laboral timestamptz generated always as (public.produccion_siguiente_franja(inicio)) stored;
+alter table public.produccion_tiempos add column if not exists finalizacion_laboral timestamptz generated always as (public.produccion_siguiente_franja(finalizacion)) stored;
+alter table public.produccion_tiempos add column if not exists duracion_laboral_minutos double precision generated always as (public.produccion_minutos_laborales(inicio,finalizacion)) stored;
 alter table public.produccion_fabricaciones enable row level security;
 alter table public.produccion_tiempos enable row level security;
 revoke all on public.produccion_fabricaciones,public.produccion_tiempos from public,anon,authenticated;
@@ -999,25 +1040,34 @@ end $$;
 -- Serializa todos los equipos. La hora de deteccion pertenece al servidor.
 create or replace function public.produccion_aplicar_observacion(filas jsonb, momento timestamptz) returns void
 language plpgsql set search_path='' as $$
-declare m jsonb; f public.produccion_fabricaciones%rowtype; ident uuid; idx integer; salto boolean;
+declare m jsonb; f public.produccion_fabricaciones%rowtype; ident uuid; idx integer; salto boolean; consecutiva boolean; alta_observada boolean;
 begin
   for m in select value from jsonb_array_elements(filas) loop
     ident:=(m->>'id')::uuid; idx:=(m->>'etapa')::integer;
     select * into f from public.produccion_fabricaciones where id=ident for update;
     if not found then
+      -- Solo altas nuevas en Material, despues de una lectura reciente y completa.
+      -- La primera carga y los arranques tras interrupciones conservan inicio desconocido.
+      select idx=0 and ultima_lectura is not null and detalle is null
+        and ultima_lectura<momento and public.produccion_minutos_laborales(ultima_lectura,momento)<=3
+        into alta_observada from public.produccion_tiempos_config where id=true;
       insert into public.produccion_fabricaciones(id,producto,serial,cliente,primera_observacion,ultima_observacion,etapa_actual,estado)
       values(ident,m->>'producto',m->>'serial',m->>'cliente',momento,momento,idx,case when idx=8 then 'terminada_sin_despacho' else 'observando' end);
-      if idx<8 then insert into public.produccion_tiempos(fabricacion_id,etapa,primera_observacion,observaciones)
-        values(ident,idx,momento,'Inicio desconocido: primera observacion.'); end if;
+      if idx<8 then insert into public.produccion_tiempos(fabricacion_id,etapa,inicio,primera_observacion,observaciones)
+        values(ident,idx,case when alta_observada then momento end,momento,
+          case when alta_observada then 'Alta observada en Material; inicio por sincronizacion, no cronometraje de trabajo.' else 'Inicio desconocido: primera observacion.' end); end if;
       continue;
     end if;
     if momento<=f.ultima_observacion then continue; end if;
-    salto:=momento-f.ultima_observacion>interval '180 seconds';
+    salto:=public.produccion_minutos_laborales(f.ultima_observacion,momento)>3;
     if salto then update public.produccion_tiempos set interrumpido=true where fabricacion_id=ident and finalizacion is null; end if;
     if idx<>f.etapa_actual then
+      -- La cartelera pasa de Empacar a Terminada sin exponer Despacho.
+      -- Cierra fabricacion; no crea ni completa un intervalo de Despacho.
+      consecutiva:=idx=f.etapa_actual+1 or (f.etapa_actual=6 and idx=8);
       update public.produccion_tiempos set finalizacion=momento,
-        interrumpido=interrumpido or salto or idx<>f.etapa_actual+1,
-        observaciones=observaciones||case when idx<>f.etapa_actual+1 then ' Transicion no consecutiva; no se reconstruyen etapas omitidas.' else '' end
+        interrumpido=interrumpido or salto or not consecutiva,
+        observaciones=observaciones||case when not consecutiva then ' Transicion no consecutiva; no se reconstruyen etapas omitidas.' when f.etapa_actual=6 and idx=8 then ' Fin de fabricacion observado; Despacho no informado.' else '' end
         where fabricacion_id=ident and finalizacion is null;
       if idx<8 then
         insert into public.produccion_tiempos(fabricacion_id,etapa,inicio,primera_observacion,interrumpido,observaciones)
@@ -1077,7 +1127,8 @@ begin
     -- No se devuelve la respuesta HTTP ni cookies al navegador.
     fallo:='Lectura pendiente; se conserva el historico.';
     update public.produccion_tiempos_config set detalle=fallo where id=true;
-    update public.produccion_tiempos set interrumpido=true where finalizacion is null;
+    update public.produccion_tiempos set interrumpido=true where finalizacion is null
+      and (c.ultima_lectura is null or public.produccion_minutos_laborales(c.ultima_lectura,clock_timestamp())>3);
     return jsonb_build_object('estado','pendiente','ultima',c.ultima_lectura,'detalle',fallo);
   end;
 end $$;
