@@ -402,7 +402,8 @@ body[data-worker] .app-section:not(#sec-calidad){display:none!important}
 #access-form{width:100%;max-width:360px;display:grid;gap:14px}
 #access-form h1{font-size:24px;margin:0;color:var(--yellow)}
 #access-form label{display:grid;gap:6px}
-#access-form input,#access-users select{width:100%;min-width:0;border:1px solid var(--border2);border-radius:4px;padding:10px;background:var(--surface);color:var(--text);font:inherit}
+#access-form input,#access-form select,#access-users select{width:100%;min-width:0;border:1px solid var(--border2);border-radius:4px;padding:10px;background:var(--surface);color:var(--text);font:inherit}
+#access-form [hidden]{display:none!important}
 #access-message{font-size:13px;line-height:1.5;min-height:20px}
 #access-users,#access-review{background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;width:min(720px,calc(100vw - 24px));max-height:85vh;padding:16px}
 #access-pending[hidden]{display:none}
@@ -432,13 +433,12 @@ body[data-worker] .app-section:not(#sec-calidad){display:none!important}
 <body>
 <section id="access-screen" aria-label="Acceso a XTENSOR">
   <form id="access-form" onsubmit="appLogin(event)">
-    <h1>XTENSOR</h1><h2 style="font-size:18px;margin:0">Iniciar sesión</h2>
-    <label>Usuario<input id="access-email" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" list="access-usernames" placeholder="admin, armado, resoldado…" required maxlength="40"></label>
-    <datalist id="access-usernames"><option value="admin"></option><option value="armado"></option><option value="resoldado"></option><option value="pulido"></option><option value="pintado"></option><option value="ensamble"></option><option value="empacado"></option></datalist>
-    <label>Contraseña<input id="access-password" type="password" autocomplete="current-password" required></label>
+    <h1>XTENSOR</h1><h2 style="font-size:18px;margin:0">Seleccionar acceso</h2>
+    <label>Sección<select id="access-email" required onchange="appEntryChanged()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.form.requestSubmit();}"><option value="">Seleccionar sección</option><option value="admin">Admin</option><option value="armado">Armado</option><option value="resoldado">Resoldado</option><option value="pulido">Pulido</option><option value="pintado">Pintado</option><option value="ensamble">Ensamble</option><option value="empacado">Empacado</option></select></label>
+    <label id="access-password-label" hidden>Contraseña de admin<input id="access-password" type="password" autocomplete="current-password" disabled></label>
     <button class="btn btn-primary" type="submit" id="access-submit">Entrar</button>
     <p id="access-message" role="status"></p>
-    <button class="btn" type="button" onclick="appLogout()">Cerrar sesión / Cambiar cuenta</button>
+    <button class="btn" type="button" onclick="appLogout()">Cerrar sesión / Cambiar sección</button>
   </form>
 </section>
 <dialog id="access-users"><header style="display:flex;justify-content:space-between;align-items:center"><h2 style="font-size:18px">Usuarios</h2><button class="btn" onclick="document.getElementById('access-users').close()" aria-label="Cerrar"><i class="ti ti-x"></i></button></header><div id="access-users-list"></div><p id="access-users-status" role="status"></p></dialog>
@@ -456,6 +456,7 @@ body[data-worker] .app-section:not(#sec-calidad){display:none!important}
     <div class="mtab" data-sec="calidad" onclick="switchSection('calidad')"><i class="ti ti-clipboard-check"></i> <span class="mtab-lbl">Calidad</span></div>
     <div class="mtab" data-sec="garantias" onclick="switchSection('garantias')"><i class="ti ti-tools"></i> <span class="mtab-lbl">Garantías</span></div>
     <div class="mtab" data-sec="estadisticas" onclick="switchSection('estadisticas');renderEstadisticas()"><i class="ti ti-chart-dots"></i> <span class="mtab-lbl">Estadísticas</span></div>
+    <button class="mtab" data-sec="tiempos" onclick="switchSection('tiempos')" title="Tiempos de producción"><i class="ti ti-clock"></i> <span class="mtab-lbl">Tiempos de producción</span></button>
     <button class="mtab" data-sec="ajustes" onclick="qmOpen()" aria-label="Ajustes" title="Ajustes"><i class="ti ti-settings"></i> <span class="mtab-lbl">Ajustes</span></button>
   </div>
 
@@ -652,7 +653,7 @@ body[data-worker] .app-section:not(#sec-calidad){display:none!important}
           <div style="display:flex;align-items:center;gap:6px">
             <span style="font-size:11px;color:var(--text3)">
               <span class="kb-hint">←→</span> máq. anterior/siguiente &nbsp;
-              <span class="kb-hint">1-6</span> etapa
+              <span class="kb-hint" id="cal-stage-shortcut">1-7</span> etapa
             </span>
             <div style="display:flex;gap:3px">
               <button class="btn btn-ghost" onclick="prevMachine()" data-tip="Máquina anterior (←)"><i class="ti ti-chevron-left"></i></button>
@@ -1038,6 +1039,27 @@ let appPendingReview=null;
 const APP_ROLES=['admin','armado','resoldado','pulido','pintado','ensamble','empacado'];
 // Identificadores tecnicos de Supabase; las claves nunca se incluyen en el HTML.
 const APP_LOGIN_EMAILS=Object.fromEntries(APP_ROLES.map(role=>[role,role==='admin'?'santiagocardona.15.98@gmail.com':role+'@usuarios.xtensor.invalid']));
+const appClients={},appWatchedClients=new WeakSet();
+function appEntryChanged(){
+  const admin=document.getElementById('access-email').value==='admin',password=document.getElementById('access-password');
+  document.getElementById('access-password-label').hidden=!admin;password.disabled=!admin;password.required=admin;
+  if(!admin)password.value='';document.getElementById('access-message').textContent='';
+}
+function appClientFor(role){
+  if(role==='admin')return appClients.admin||sb;
+  if(!APP_ROLES.includes(role))throw new Error('Selecciona una sección.');
+  // Una identidad tecnica por seccion/equipo conserva sus pendientes al volver a entrar.
+  if(!appClients[role])appClients[role]=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{storageKey:'xtensor-section:'+new URL(SUPABASE_URL).hostname+':'+role}});
+  return appClients[role];
+}
+function appWatchClient(client){
+  if(appWatchedClients.has(client))return;appWatchedClients.add(client);
+  client.auth.onAuthStateChange((event,session)=>{
+    if(client!==sb)return;
+    if(event==='SIGNED_OUT')appLock('Sesión cerrada');
+    if(event==='SIGNED_IN'&&appStarted&&session?.user.id!==appAccess.user?.id)location.reload();
+  });
+}
 function appIsAdmin(){return appAccess.ready&&appAccess.role==='admin';}
 function appStage(){return ({armado:'material',resoldado:'armado',pulido:'resoldado',pintado:'pulido',ensamble:'pintado',empacado:'ensamble'})[appAccess.role]||null;}
 function appInspectionRead(){return appIsAdmin()?sb.from('calidad_inspecciones').select('*'):sb.rpc('calidad_leer_mi_etapa');}
@@ -1052,11 +1074,24 @@ async function appLogin(event){
   event.preventDefault();appClosing=false;const button=document.getElementById('access-submit');button.disabled=true;
   try{
     if(!sb)throw new Error('No se pudo conectar. Comprueba la conexión y recarga.');
-    const username=document.getElementById('access-email').value.trim().toLowerCase();
+    const username=document.getElementById('access-email').value;
     if(!Object.prototype.hasOwnProperty.call(APP_LOGIN_EMAILS,username))throw new Error('Selecciona un usuario de la lista.');
-    const {data,error}=await sb.auth.signInWithPassword({email:APP_LOGIN_EMAILS[username],password:document.getElementById('access-password').value});
-    document.getElementById('access-password').value='';if(error)throw error;
-    await appAuthorize(data.session,username);
+    sb=appClientFor(username);appWatchClient(sb);let session;
+    if(username==='admin'){
+      const {data,error}=await sb.auth.signInWithPassword({email:APP_LOGIN_EMAILS.admin,password:document.getElementById('access-password').value});
+      document.getElementById('access-password').value='';if(error)throw error;session=data.session;
+    }else{
+      const current=await sb.auth.getSession();if(current.error)throw current.error;session=current.data.session;
+      if(!session){
+        const {data,error}=await sb.auth.signInAnonymously();
+        if(error){if(error.code==='anonymous_provider_disabled'||/anonymous.*disabled/i.test(error.message))throw new Error('Activa Anonymous Sign-Ins en Supabase Authentication y vuelve a entrar.');throw error;}
+        session=data.session;
+      }
+      if(!session?.user?.is_anonymous)throw new Error('La sesión de esta sección no es válida.');
+      const {error}=await sb.rpc('calidad_entrar_seccion',{p_rol:username});if(error)throw error;
+    }
+    await appAuthorize(session,username);
+    if(appAccess.ready)try{sessionStorage.setItem('xtensor_access_section',username);}catch(e){}
   }catch(e){document.getElementById('access-message').textContent=e.message||'No se pudo iniciar sesión';}
   finally{button.disabled=false;}
 }
@@ -1065,6 +1100,7 @@ async function appAuthorize(session,expectedRole){
   const {data,error}=await sb.from('calidad_usuarios').select('rol,activo').eq('user_id',session.user.id).maybeSingle();
   if(error){appLock('No se pudo validar el acceso. Verifica que se haya ejecutado el schema.sql actualizado.');return;}
   if(!data?.activo||!APP_ROLES.includes(data.rol)){appLock('Cuenta sin acceso asignado. Solicita a admin que habilite tu sección.');return;}
+  if(session.user.is_anonymous&&data.rol==='admin'){appLock('Admin requiere autenticación con contraseña.');return;}
   if(expectedRole&&data.rol!==expectedRole){appLock('La cuenta no tiene asignada la sección de ese usuario. Consulta con admin.');return;}
   if(appStarted&&(appAccess.user?.id!==session.user.id||appAccess.role!==data.rol)){location.reload();return;}
   appAccess={ready:true,role:data.rol,user:session.user};
@@ -1094,7 +1130,9 @@ async function appLogout(){
     if(!confirm('Hay cambios pendientes guardados en este equipo. Solo se enviarán al volver a entrar con esta cuenta. ¿Cerrar sesión?'))return;
   }
   appClosing=true;appLock('Cerrando sesión…');
-  if(sb){const {error}=await sb.auth.signOut({scope:'local'});if(error){document.getElementById('access-message').textContent=error.message;return;}}
+  // La sesion tecnica no concede acceso a admin y se conserva para recuperar pendientes.
+  try{sessionStorage.setItem('xtensor_access_section','picker');}catch(e){}
+  if(sb&&!appAccess.user?.is_anonymous){const {error}=await sb.auth.signOut({scope:'local'});if(error){document.getElementById('access-message').textContent=error.message;return;}}
   location.reload();
 }
 async function appUsersOpen(){
@@ -1147,6 +1185,7 @@ async function appPendingSave(){
 }
 try{
   sb = SUPABASE_CONFIGURED && typeof supabase!=='undefined' ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+  if(sb)appClients.admin=sb;
 }catch(e){
   console.error('No se pudo inicializar el cliente de Supabase (¿falló la carga del script desde el CDN?):', e);
   sb = null;
@@ -1242,6 +1281,7 @@ function switchSection(sec){
   document.querySelectorAll('.tbr-variant').forEach(el=>el.classList.toggle('show', el.dataset.sec===sec));
   try{ localStorage.setItem('xtensor_app_lastsection', sec); }catch(e){}
   if(sec==='ajustes'){qmRender();void qmSync();}
+  if(sec==='tiempos'){tpRender();void tpLoad();}
 }
 </script>
 
@@ -2427,7 +2467,8 @@ async function calFlushPendingInspections(){
         if(!rows?.some(saved=>saved.serial===key)) throw new Error('La base de datos no confirmó el guardado');
         const saved=rows.find(r=>r.serial===key).data;
         if(saved){
-          if(calInspPending[key]===row)inspData[key]=saved;
+          // La confirmacion puede llegar despues de navegar; la etapa visible es local.
+          if(calInspPending[key]===row)inspData[key]={...saved,currentStageIdx:inspData[key]?.currentStageIdx??saved.currentStageIdx};
           else if(calInspPending[key]){const revision=appIsAdmin()?'stageRevisions':'stageRevision';calInspPending[key].data[revision]=saved[revision];inspData[key][revision]=saved[revision];}
         }
         if(calInspPending[key]===row) delete calInspPending[key];
@@ -2481,7 +2522,7 @@ window.addEventListener('focus',()=>{if(calLoaded) void calReconcileInspections(
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&calLoaded) void calReconcileInspections();});
 setInterval(()=>{if(calLoaded&&!document.hidden) void calReconcileInspections();},15000);
 ['field-inspector','field-responsable','stage-obs'].forEach(id=>{
-  document.getElementById(id)?.addEventListener('input',()=>saveCurrentStage());
+  ['input','change'].forEach(event=>document.getElementById(id)?.addEventListener(event,()=>saveCurrentStage()));
 });
 
 async function calFetchAll(){
@@ -2982,6 +3023,7 @@ function renderInspection(){
   const d=getInsp(currentSerial);
   const si=d.currentStageIdx;
   const stage=STAGES[si];
+  document.getElementById('cal-stage-shortcut').textContent=STAGES.length>1?`1-${STAGES.length}`:'1';
   document.getElementById('stage-title').textContent=stage.label;
   calPeopleFields(stage,d);
   document.getElementById('stage-obs').value=d.stageObs[stage.key]||'';
@@ -3096,7 +3138,7 @@ function updateProgress(stage,d){
 }
 
 function saveCurrentStage(){
-  if(!currentSerial) return;
+  if(!currentSerial||!appAccess.ready) return;
   const m=MACHINES.find(x=>machineQualityId(x)===currentSerial);
   if(m) setCurrentQualityProfile(m);
   const d=getInsp(currentSerial);
@@ -3111,6 +3153,7 @@ function saveCurrentStage(){
 }
 
 function jumpStage(idx){
+  if(!currentSerial||!appAccess.ready||!Number.isInteger(idx)||idx<0||idx>=STAGES.length)return;
   saveCurrentStage();
   getInsp(currentSerial).currentStageIdx=idx;
   renderInspection();
@@ -3228,7 +3271,8 @@ document.addEventListener('keydown',e=>{
     if(idx<filteredList.length-1) selectMachine(machineQualityId(filteredList[idx+1]));
   }
   else if(e.key==='b'||e.key==='B') toggleSidebar();
-  else if(e.key>='1'&&e.key<='6'&&currentSerial){
+  else if(/^[1-9]$/.test(e.key)&&Number(e.key)<=STAGES.length&&currentSerial&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+    e.preventDefault();
     jumpStage(parseInt(e.key)-1);
     setView('checklist');
   }
@@ -5180,6 +5224,138 @@ async function garInit(){
 
 
 <script>
+// Tiempos de produccion: la captura no depende de tener abierta esta vista.
+const TP_STAGES=['Material','Armar','Resoldar','Pulir','Pintar','Ensamblar','Empacar','Despacho'];
+let tpRows=[],tpRuns=[],tpBusy=false,tpLoading=false,tpTimer=null,tpLast=null,tpStatus='Pendiente de primera lectura',tpView='historial',tpLimit=100;
+const tpSection=document.createElement('section');
+tpSection.id='sec-tiempos';tpSection.className='app-section';tpSection.setAttribute('aria-label','Tiempos de producción');
+tpSection.innerHTML=`<style>
+#sec-tiempos{min-width:0;overflow:auto;padding:16px;gap:14px}
+#sec-tiempos.active{display:flex;flex-direction:column}
+#main-tabs{min-width:0;flex-shrink:1;overflow-x:auto}
+.tp-toolbar,.tp-filters{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.tp-toolbar h2{font-size:18px;margin:0;flex:1;min-width:180px}
+.tp-filters input,.tp-filters select{min-height:36px;min-width:0;max-width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 9px}
+.tp-filters input[type=search]{width:240px}.tp-filters label{display:flex;align-items:center;gap:6px;font-size:12px}
+.tp-scroll{overflow:auto;min-height:160px;flex:1;border-top:1px solid var(--border)}
+#sec-tiempos table{border-collapse:collapse;width:100%;min-width:1100px;font-size:12px;white-space:nowrap}
+#sec-tiempos th,#sec-tiempos td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:left;max-width:330px;white-space:normal;overflow-wrap:normal}
+#sec-tiempos th{position:sticky;top:0;background:var(--bg2);z-index:1;white-space:nowrap}
+#sec-tiempos [role=tab][aria-selected=true]{color:var(--yellow);border-color:var(--yellow)}
+#sec-tiempos [hidden]{display:none!important}
+#tp-status,#tp-count{font-size:12px;color:var(--text2)}
+.tp-note{font-size:12px;color:var(--text2);line-height:1.5;margin:0}
+#tp-pages{display:flex;justify-content:space-between;align-items:center}
+@media(max-width:700px){#sec-tiempos{padding:10px}.tp-toolbar h2{flex-basis:100%}.tp-filters{align-items:stretch}.tp-filters input[type=search]{width:100%}}
+</style>
+<div class="tp-toolbar"><h2>Tiempos de producción</h2><span id="tp-status"></span>
+<button class="btn" onclick="tpTick(true)" title="Actualizar tiempos" aria-label="Actualizar tiempos"><i class="ti ti-refresh"></i></button>
+<button class="btn" onclick="tpExport()"><i class="ti ti-download"></i> Exportar CSV</button></div>
+<div class="tp-filters"><input type="search" id="tp-search" placeholder="Código, producto, serial o lote" aria-label="Buscar fabricación" oninput="tpLimit=100;tpRender()">
+<select id="tp-stage" aria-label="Etapa" onchange="tpLimit=100;tpRender()"><option value="">Todas las etapas</option>${TP_STAGES.map((s,i)=>`<option value="${i}">${s}</option>`).join('')}</select>
+<label>Desde <input id="tp-from" type="date" onchange="tpLimit=100;tpRender()"></label><label>Hasta <input id="tp-to" type="date" onchange="tpLimit=100;tpRender()"></label>
+<select id="tp-state" aria-label="Estado" onchange="tpLimit=100;tpRender()"><option value="">Todos los estados</option><option value="abierto">En etapa</option><option value="valido">Finalizado válido</option><option value="incompleto">Sin inicio / interrumpido</option></select>
+</div>
+<div class="tp-toolbar" role="tablist" aria-label="Vistas de tiempos">
+<button class="btn" role="tab" id="tp-tab-historial" onclick="tpSetView('historial')">Histórico</button>
+<button class="btn" role="tab" id="tp-tab-indicadores" onclick="tpSetView('indicadores')">Por código y etapa</button>
+<button class="btn" role="tab" id="tp-tab-fabricaciones" onclick="tpSetView('fabricaciones')">Fabricaciones</button></div>
+<p class="tp-note">Tiempo transcurrido observado (minutos), incluye esperas y periodos fuera de jornada. No es tiempo efectivo de trabajo, tiempo estándar ni takt time. Sin inicio o con interrupciones: excluido de indicadores. «Terminada» no confirma Despacho.</p>
+<div class="tp-scroll"><table><thead id="tp-head"></thead><tbody id="tp-body"></tbody></table></div>
+<div id="tp-pages"><span id="tp-count"></span><button class="btn" id="tp-more" onclick="tpLimit+=100;tpRender()">Ver más</button></div>`;
+document.getElementById('app-body').appendChild(tpSection);
+function tpEscape(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function tpDate(v){return v?new Date(v).toLocaleString('es-CO',{timeZone:'America/Bogota'}):'—';}
+function tpDay(v){return v?new Intl.DateTimeFormat('en-CA',{timeZone:'America/Bogota',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(v)):'';}
+function tpNum(v){return v==null?'—':Number(v).toLocaleString('es-CO',{maximumFractionDigits:2});}
+function tpValid(r){return !!r.inicio&&!!r.finalizacion&&!r.interrumpido&&Number.isFinite(Number(r.duracion_minutos))&&Number(r.duracion_minutos)>=0;}
+function tpState(r){return r.interrumpido?'Interrumpido':!r.inicio?'Inicio desconocido':r.finalizacion?'Finalizado':'En etapa';}
+function tpFiltered(){
+  const q=normKey(document.getElementById('tp-search').value),stage=document.getElementById('tp-stage').value,
+    from=document.getElementById('tp-from').value,to=document.getElementById('tp-to').value,state=document.getElementById('tp-state').value;
+  const runs=new Map(tpRuns.map(r=>[r.id,r]));
+  return tpRows.map(r=>({...r,f:runs.get(r.fabricacion_id)||{}})).filter(r=>{
+    const day=tpDay(r.inicio||r.primera_observacion);
+    return (!q||normKey([r.f.codigo,r.f.producto,r.f.serial,r.fabricacion_id].join(' ')).includes(q))&&
+      (stage===''||r.etapa===Number(stage))&&(!from||day>=from)&&(!to||day<=to)&&
+      (!state||(state==='abierto'&&!r.finalizacion)||(state==='valido'&&tpValid(r))||(state==='incompleto'&&(!r.inicio||r.interrumpido)));
+  });
+}
+function tpStatistics(values){
+  const a=values.map(Number).sort((a,b)=>a-b),n=a.length;if(!n)return null;
+  const mean=a.reduce((s,v)=>s+v,0)/n;
+  return {n,mean,min:a[0],max:a[n-1],median:n%2?a[(n-1)/2]:(a[n/2-1]+a[n/2])/2,sd:n>1?Math.sqrt(a.reduce((s,v)=>s+(v-mean)**2,0)/(n-1)):null};
+}
+function tpSetView(v){tpView=v;tpLimit=100;tpRender();}
+function tpRender(){
+  if(!appIsAdmin())return;
+  document.getElementById('tp-status').textContent=tpLast?'Última lectura: '+tpDate(tpLast):tpStatus;
+  ['historial','indicadores','fabricaciones'].forEach(v=>{const el=document.getElementById('tp-tab-'+v);el.setAttribute('aria-selected',String(tpView===v));el.classList.toggle('btn-yellow',tpView===v);});
+  const rows=tpFiltered().sort((a,b)=>String(b.primera_observacion).localeCompare(String(a.primera_observacion)));let headers,values=[];
+  if(tpView==='historial'){
+    headers=['Código','Producto / serial','Fabricación (ID producción)','Etapa','Inicio observado','Finalización observada','Minutos','Responsable','Estado','Observaciones'];
+    values=rows.map(r=>[r.f.codigo||'Sin código vinculado',`${r.f.producto||''} / #${r.f.serial||''}`,r.fabricacion_id,TP_STAGES[r.etapa],tpDate(r.inicio),tpDate(r.finalizacion),tpNum(r.duracion_minutos),r.responsable||'No informado',tpState(r),r.observaciones||'']);
+  }else if(tpView==='indicadores'){
+    headers=['Código','Etapa','Registros válidos','Promedio (min)','Mínimo','Máximo','Mediana','Desv. estándar muestral'];
+    const groups=new Map();rows.filter(r=>tpValid(r)&&r.f.codigo).forEach(r=>{const k=r.f.codigo+'|'+r.etapa;if(!groups.has(k))groups.set(k,{code:r.f.codigo,stage:r.etapa,a:[]});groups.get(k).a.push(r.duracion_minutos);});
+    values=[...groups.values()].sort((a,b)=>a.code.localeCompare(b.code)||a.stage-b.stage).map(g=>{const s=tpStatistics(g.a);return [g.code,TP_STAGES[g.stage],s.n,tpNum(s.mean),tpNum(s.min),tpNum(s.max),tpNum(s.median),tpNum(s.sd)];});
+  }else{
+    headers=['Código','Producto / serial','Fabricación (ID producción)','Primera observación','Última observación','Etapas con intervalo válido','Minutos válidos acumulados','Tiempo total fabricación (min)','Estado'];
+    const selected=new Set(rows.map(r=>r.fabricacion_id));
+    // Incluye fabricaciones detectadas ya terminadas, aunque no tengan intervalos.
+    if(!document.getElementById('tp-search').value&&!document.getElementById('tp-stage').value&&!document.getElementById('tp-from').value&&!document.getElementById('tp-to').value&&!document.getElementById('tp-state').value)tpRuns.forEach(f=>selected.add(f.id));
+    values=tpRuns.filter(f=>selected.has(f.id)).map(f=>{
+      const all=tpRows.filter(r=>r.fabricacion_id===f.id),valid=all.filter(tpValid),coverage=new Set(valid.map(r=>r.etapa));
+      const complete=coverage.size===8&&all.every(tpValid)&&f.estado==='despachada';
+      const total=complete?(Math.max(...all.map(r=>Date.parse(r.finalizacion)))-Math.min(...all.map(r=>Date.parse(r.inicio))))/60000:null;
+      return [f.codigo||'Sin código vinculado',`${f.producto} / #${f.serial}`,f.id,tpDate(f.primera_observacion),tpDate(f.ultima_observacion),coverage.size+'/8',valid.length?tpNum(valid.reduce((s,r)=>s+Number(r.duracion_minutos),0)):'—',tpNum(total),f.estado==='despachada'?'Despacho observado':f.estado==='terminada_sin_despacho'?'Terminada; despacho sin observar':TP_STAGES[f.etapa_actual]];
+    });
+  }
+  document.getElementById('tp-head').innerHTML='<tr>'+headers.map(h=>'<th scope="col">'+tpEscape(h)+'</th>').join('')+'</tr>';
+  document.getElementById('tp-body').innerHTML=values.length?values.slice(0,tpLimit).map(row=>'<tr>'+row.map(v=>'<td>'+tpEscape(v)+'</td>').join('')+'</tr>').join(''):`<tr><td colspan="${headers.length}">Sin registros para esta vista.</td></tr>`;
+  document.getElementById('tp-count').textContent=`${Math.min(tpLimit,values.length)} de ${values.length} registros`;
+  document.getElementById('tp-more').hidden=values.length<=tpLimit;
+}
+async function tpReadAll(table){
+  const rows=[];for(let start=0;;start+=1000){const {data,error}=await sb.from(table).select('*').order('id').range(start,start+999);if(error)throw error;rows.push(...data);if(data.length<1000)return rows;}
+}
+async function tpLoad(){
+  if(!appIsAdmin()||tpLoading)return;tpLoading=true;const uid=appAccess.user?.id;
+  try{
+    const runs=await tpReadAll('produccion_fabricaciones'),rows=await tpReadAll('produccion_tiempos');
+    if(!appIsAdmin()||appAccess.user?.id!==uid)return;
+    tpRuns=runs;tpRows=rows;tpRender();
+  }catch(e){tpStatus='Histórico conservado; lectura pendiente';if(!tpLast)document.getElementById('tp-status').textContent=tpStatus;}
+  finally{tpLoading=false;}
+}
+async function tpTick(manual=false){
+  if(tpBusy||!appAccess.ready||!sb)return;tpBusy=true;
+  try{
+    const {data,error}=await sb.rpc('produccion_observar_tablero');if(error)throw error;
+    tpLast=data?.ultima||tpLast;tpStatus=data?.estado==='actualizado'?'Lectura completada':'Lectura pendiente';
+    if(appIsAdmin()){
+      const meta=MACHINES.filter(m=>m._productionId&&m.code).map(m=>({id:m._productionId,code:m.code.toUpperCase().trim()}));
+      if(meta.length){const result=await sb.rpc('produccion_identificar',{p_maquinas:meta});if(result.error)tpStatus='Códigos pendientes de vincular';}
+      if(manual||document.getElementById('sec-tiempos').classList.contains('active'))await tpLoad();
+      tpRender();
+      if(manual&&data?.estado==='actualizado')showToast('Tiempos actualizados','green');
+    }
+  }catch(e){tpStatus='Pendiente de activar o consultar el registro de tiempos';if(appIsAdmin())tpRender();}
+  finally{tpBusy=false;}
+}
+function tpStart(){if(tpTimer)return;void tpTick();tpTimer=setInterval(()=>void tpTick(),120000);window.addEventListener('online',()=>void tpTick());document.addEventListener('visibilitychange',()=>{if(!document.hidden)void tpTick();});}
+function tpCsv(rows){
+  const header=['Fecha','Código','Producto','Orden/lote','Etapa','Inicio','Finalización','Duración en minutos','Responsable','Estado','Observaciones','Serial','Válido para indicadores','Método','ID fabricación'];
+  const cell=v=>{let s=String(v??'');if(/^[\s]*[=+@-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
+  return '\uFEFF'+[header,...rows.map(r=>[tpDay(r.inicio||r.primera_observacion),r.f.codigo||'',r.f.producto||'','',TP_STAGES[r.etapa],r.inicio||'',r.finalizacion||'',r.duracion_minutos??'',r.responsable||'',tpState(r),r.observaciones||'',r.f.serial||'',tpValid(r)?'Sí':'No','Transcurrido observado por sincronización; fechas ISO con zona',r.fabricacion_id])].map(row=>row.map(cell).join(',')).join('\r\n');
+}
+function tpExport(){
+  if(!appIsAdmin())return;const url=URL.createObjectURL(new Blob([tpCsv(tpFiltered())],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');
+  a.href=url;a.download='tiempos_produccion_'+tpDay(new Date().toISOString())+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+</script>
+
+<script>
 // ══════════════ INIT ══════════════
 let __initSec='recepcion';
 try{ const s=localStorage.getItem('xtensor_app_lastsection'); if(s) __initSec=s; }catch(e){}
@@ -5187,17 +5363,18 @@ async function appBoot(){
   switchSection(appIsAdmin()?__initSec:'calidad');
   if(appIsAdmin()){await Promise.allSettled([recInit(),calInit(),garInit()]);renderEstadisticas();}
   else await calInit();
+  tpStart();
 }
 async function appStart(){
   appLock('');
   if(!sb){appLock('No se pudo cargar la conexión. Recarga la página.');return;}
-  const {data,error}=await sb.auth.getSession();
-  if(error){appLock(error.message);return;}
-  await appAuthorize(data.session);
-  sb.auth.onAuthStateChange((event,session)=>{
-    if(event==='SIGNED_OUT')appLock('Sesión cerrada');
-    if(event==='SIGNED_IN'&&appStarted&&session?.user.id!==appAccess.user?.id)location.reload();
-  });
+  let role='admin';try{role=sessionStorage.getItem('xtensor_access_section')||'admin';}catch(e){}
+  if(role!=='picker'&&APP_ROLES.includes(role)){
+    sb=appClientFor(role);appWatchClient(sb);
+    document.getElementById('access-email').value=role;appEntryChanged();
+    const {data,error}=await sb.auth.getSession();
+    if(error)appLock(error.message);else await appAuthorize(data.session,role);
+  }
   setInterval(async()=>{
     if(!appStarted||appClosing||document.hidden)return;
     try{const {data,error}=await sb.auth.getSession();if(error)throw error;await appAuthorize(data.session);}catch(e){appLock('No se pudo verificar la sesión. Vuelve a iniciar sesión.');}

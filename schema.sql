@@ -733,7 +733,8 @@ create table if not exists public.calidad_accesos_auditoria (
 );
 create or replace function public.calidad_rol() returns text
 language sql stable security definer set search_path = '' as $$
-  select rol from public.calidad_usuarios where user_id=auth.uid() and activo;
+  select rol from public.calidad_usuarios where user_id=auth.uid() and activo
+    and (rol<>'admin' or coalesce(nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'is_anonymous','false')<>'true');
 $$;
 create or replace function public.calidad_etapa_usuario() returns text
 language sql stable security definer set search_path = '' as $$
@@ -910,5 +911,214 @@ begin
 end $$;
 drop trigger if exists trg_calidad_revision on public.calidad_inspecciones;
 create trigger trg_calidad_revision before update on public.calidad_inspecciones for each row execute function public.calidad_validar_revision();
+-- Tiempos observados: colector independiente, sin escribir en Produccion.
+create schema if not exists extensions;
+create extension if not exists http with schema extensions;
+create table if not exists public.produccion_tiempos_config (
+  id boolean primary key default true check(id),
+  clave text not null,
+  cookie text,
+  ultimo_intento timestamptz,
+  ultima_lectura timestamptz,
+  detalle text
+);
+insert into public.produccion_tiempos_config(id,clave) values(true,'planta2026') on conflict do nothing;
+alter table public.produccion_tiempos_config enable row level security;
+revoke all on public.produccion_tiempos_config from public,anon,authenticated;
+
+create table if not exists public.produccion_fabricaciones (
+  id uuid primary key,
+  codigo text,
+  producto text not null,
+  serial text,
+  cliente text,
+  primera_observacion timestamptz not null,
+  ultima_observacion timestamptz not null,
+  etapa_actual integer not null check(etapa_actual between 0 and 8),
+  estado text not null default 'observando'
+);
+create table if not exists public.produccion_tiempos (
+  id bigint generated always as identity primary key,
+  fabricacion_id uuid not null references public.produccion_fabricaciones(id),
+  etapa integer not null check(etapa between 0 and 7),
+  inicio timestamptz,
+  finalizacion timestamptz,
+  duracion_minutos double precision generated always as (extract(epoch from (finalizacion-inicio))/60.0) stored,
+  primera_observacion timestamptz not null,
+  responsable text,
+  interrumpido boolean not null default false,
+  observaciones text not null default '',
+  check(finalizacion is null or inicio is null or finalizacion>=inicio)
+);
+create unique index if not exists produccion_tiempos_abierto on public.produccion_tiempos(fabricacion_id) where finalizacion is null;
+create index if not exists produccion_tiempos_historial on public.produccion_tiempos(fabricacion_id,primera_observacion);
+alter table public.produccion_fabricaciones enable row level security;
+alter table public.produccion_tiempos enable row level security;
+revoke all on public.produccion_fabricaciones,public.produccion_tiempos from public,anon,authenticated;
+grant select on public.produccion_fabricaciones,public.produccion_tiempos to authenticated;
+drop policy if exists tiempos_admin on public.produccion_fabricaciones;
+create policy tiempos_admin on public.produccion_fabricaciones for select to authenticated using(public.calidad_rol()='admin');
+drop policy if exists tiempos_admin on public.produccion_tiempos;
+create policy tiempos_admin on public.produccion_tiempos for select to authenticated using(public.calidad_rol()='admin');
+
+-- Lee exclusivamente componentes de datos de Next; no ejecuta JavaScript del origen.
+create or replace function public.produccion_texto_nodo(p jsonb,clase text) returns text
+language sql immutable set search_path='' as $$
+  select n->>'children' from jsonb_path_query(p,'strict $.** ? (@.type() == "object")') n
+  where clase=any(string_to_array(n->>'className',' ')) and jsonb_typeof(n->'children') in ('string','number') limit 1
+$$;
+create or replace function public.produccion_parsear_tablero(html text) returns jsonb
+language plpgsql set search_path='' as $$
+declare m text[]; stream text:=''; linea text; p jsonb; n jsonb; filas jsonb:='{}'; ident text; etapa text; idx integer;
+begin
+  for m in select regexp_matches(html,'self\.__next_f\.push\((.*?)\)</script>','g') loop
+    begin p:=m[1]::jsonb; if p->>0='1' then stream:=stream||(p->>1); end if;
+    exception when others then null; end;
+  end loop;
+  foreach linea in array string_to_array(stream,E'\n') loop
+    if linea !~ '^[0-9a-f]+:\[' then continue; end if;
+    begin p:=substring(linea from position(':' in linea)+1)::jsonb;
+    exception when others then continue; end;
+    for n in select value from jsonb_path_query(p,'strict $.** ? (@.type() == "array")') value loop
+      if coalesce(n->>0,'')<>'$' or not coalesce('xt-board-row'=any(string_to_array(n->3->>'className',' ')),false) then continue; end if;
+      ident:=n->>2;
+      if ident !~* '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$' then raise exception 'Fabricacion sin identificador estable'; end if;
+      etapa:=public.produccion_texto_nodo(n->3,'xt-board-next');
+      idx:=array_position(array['Material','Armar','Resoldar','Pulir','Pintar','Ensamblar','Empacar','Despacho','Terminada'],etapa)-1;
+      if idx is null then raise exception 'Etapa no reconocida'; end if;
+      filas:=filas||jsonb_build_object(ident,jsonb_build_object('id',ident,'etapa',idx,
+        'serial',public.produccion_texto_nodo(n->3,'xt-board-serial'),
+        'producto',public.produccion_texto_nodo(n->3,'xt-board-machine'),
+        'cliente',public.produccion_texto_nodo(n->3,'xt-board-client')));
+    end loop;
+  end loop;
+  if filas='{}'::jsonb then raise exception 'Tablero sin filas verificables'; end if;
+  return (select jsonb_agg(value) from jsonb_each(filas));
+end $$;
+
+-- Serializa todos los equipos. La hora de deteccion pertenece al servidor.
+create or replace function public.produccion_aplicar_observacion(filas jsonb, momento timestamptz) returns void
+language plpgsql set search_path='' as $$
+declare m jsonb; f public.produccion_fabricaciones%rowtype; ident uuid; idx integer; salto boolean;
+begin
+  for m in select value from jsonb_array_elements(filas) loop
+    ident:=(m->>'id')::uuid; idx:=(m->>'etapa')::integer;
+    select * into f from public.produccion_fabricaciones where id=ident for update;
+    if not found then
+      insert into public.produccion_fabricaciones(id,producto,serial,cliente,primera_observacion,ultima_observacion,etapa_actual,estado)
+      values(ident,m->>'producto',m->>'serial',m->>'cliente',momento,momento,idx,case when idx=8 then 'terminada_sin_despacho' else 'observando' end);
+      if idx<8 then insert into public.produccion_tiempos(fabricacion_id,etapa,primera_observacion,observaciones)
+        values(ident,idx,momento,'Inicio desconocido: primera observacion.'); end if;
+      continue;
+    end if;
+    if momento<=f.ultima_observacion then continue; end if;
+    salto:=momento-f.ultima_observacion>interval '180 seconds';
+    if salto then update public.produccion_tiempos set interrumpido=true where fabricacion_id=ident and finalizacion is null; end if;
+    if idx<>f.etapa_actual then
+      update public.produccion_tiempos set finalizacion=momento,
+        interrumpido=interrumpido or salto or idx<>f.etapa_actual+1,
+        observaciones=observaciones||case when idx<>f.etapa_actual+1 then ' Transicion no consecutiva; no se reconstruyen etapas omitidas.' else '' end
+        where fabricacion_id=ident and finalizacion is null;
+      if idx<8 then
+        insert into public.produccion_tiempos(fabricacion_id,etapa,inicio,primera_observacion,interrumpido,observaciones)
+        values(ident,idx,case when not salto and idx=f.etapa_actual+1 then momento end,momento,salto,
+          case when salto or idx<>f.etapa_actual+1 then 'Inicio desconocido: interrupcion o transicion no consecutiva.' else '' end);
+      end if;
+    end if;
+    update public.produccion_fabricaciones set ultima_observacion=momento,etapa_actual=idx,
+      producto=m->>'producto',serial=m->>'serial',cliente=m->>'cliente',
+      estado=case when idx=8 then case when f.etapa_actual=7 or f.estado='despachada' then 'despachada' else 'terminada_sin_despacho' end else 'observando' end
+      where id=ident;
+  end loop;
+  -- Desaparecer de la cartelera no prueba despacho ni finalizacion.
+  update public.produccion_tiempos t set interrumpido=true
+    where finalizacion is null and not exists(select 1 from jsonb_array_elements(filas) item where (item->>'id')::uuid=t.fabricacion_id);
+end $$;
+
+create or replace function public.produccion_observar_tablero() returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare c public.produccion_tiempos_config%rowtype; r extensions.http_response;
+  accion text; cookies text; filas jsonb; momento timestamptz; fallo text; limite text; cuerpo text;
+begin
+  if public.calidad_rol() is null then raise exception 'Acceso no autorizado'; end if;
+  if not pg_try_advisory_xact_lock(9175261) then return jsonb_build_object('estado','ocupado'); end if;
+  select * into c from public.produccion_tiempos_config where id=true;
+  if c.ultimo_intento>clock_timestamp()-interval '110 seconds' then
+    return jsonb_build_object('estado',case when c.detalle is null then 'actualizado' else 'pendiente' end,'ultima',c.ultima_lectura,'detalle',c.detalle);
+  end if;
+  update public.produccion_tiempos_config set ultimo_intento=clock_timestamp() where id=true;
+  begin
+    perform set_config('http.curlopt_timeout_ms','8000',true);
+    perform set_config('http.curlopt_connecttimeout_ms','4000',true);
+    perform set_config('http.curlopt_followlocation','0',true);
+    cookies:=c.cookie;
+    select * into r from extensions.http(('GET','https://xtensor-one.vercel.app/planta/tablero',
+      array[('Cookie',coalesce(cookies,''))::extensions.http_header],null,null)::extensions.http_request);
+    if r.status in (301,302,303,307,308) or r.content not like '%xt-board-row%' then
+      select * into r from extensions.http_get('https://xtensor-one.vercel.app/planta');
+      accion:=substring(r.content from 'name="(\$ACTION_ID_[a-zA-Z0-9]+)"');
+      if accion is null then raise exception 'Acceso de planta pendiente'; end if;
+      limite:='xtensor'||replace(gen_random_uuid()::text,'-','');
+      cuerpo:='--'||limite||E'\r\nContent-Disposition: form-data; name="'||accion||E'"\r\n\r\n\r\n--'||limite||
+        E'\r\nContent-Disposition: form-data; name="password"\r\n\r\n'||c.clave||E'\r\n--'||limite||E'--\r\n';
+      select * into r from extensions.http_post('https://xtensor-one.vercel.app/planta',cuerpo,'multipart/form-data; boundary='||limite);
+      select string_agg(split_part(h.value,';',1),'; ') into cookies from unnest(r.headers) h where lower(h.field)='set-cookie';
+      if cookies is null then raise exception 'No se pudo acceder a planta'; end if;
+      select * into r from extensions.http(('GET','https://xtensor-one.vercel.app/planta/tablero',
+        array[('Cookie',cookies)::extensions.http_header],null,null)::extensions.http_request);
+    end if;
+    if r.status<>200 then raise exception 'Tablero temporalmente no disponible'; end if;
+    filas:=public.produccion_parsear_tablero(r.content);
+    momento:=clock_timestamp();
+    perform public.produccion_aplicar_observacion(filas,momento);
+    update public.produccion_tiempos_config set cookie=cookies,ultima_lectura=momento,detalle=null where id=true;
+    return jsonb_build_object('estado','actualizado','ultima',momento,'maquinas',jsonb_array_length(filas));
+  exception when others then
+    -- No se devuelve la respuesta HTTP ni cookies al navegador.
+    fallo:='Lectura pendiente; se conserva el historico.';
+    update public.produccion_tiempos_config set detalle=fallo where id=true;
+    update public.produccion_tiempos set interrumpido=true where finalizacion is null;
+    return jsonb_build_object('estado','pendiente','ultima',c.ultima_lectura,'detalle',fallo);
+  end;
+end $$;
+
+-- Completa codigos solo por UUID de Produccion, nunca por serial ni parecido de nombre.
+create or replace function public.produccion_identificar(p_maquinas jsonb) returns void
+language plpgsql security definer set search_path='' as $$
+declare m jsonb;
+begin
+  if public.calidad_rol()<>'admin' or public.calidad_rol() is null then raise exception 'Solo admin'; end if;
+  if jsonb_typeof(p_maquinas)<>'array' or jsonb_array_length(p_maquinas)>2000 then raise exception 'Lista invalida'; end if;
+  for m in select value from jsonb_array_elements(p_maquinas) loop
+    if coalesce(m->>'code','') !~ '^X[A-Z][0-9A-Z-]+$' then continue; end if;
+    update public.produccion_fabricaciones set codigo=m->>'code' where id=(m->>'id')::uuid and codigo is null;
+  end loop;
+end $$;
+revoke all on function public.produccion_texto_nodo(jsonb,text), public.produccion_parsear_tablero(text),
+  public.produccion_aplicar_observacion(jsonb,timestamptz),public.produccion_observar_tablero(),public.produccion_identificar(jsonb) from public,anon,authenticated;
+grant execute on function public.produccion_observar_tablero(),public.produccion_identificar(jsonb) to authenticated;
+-- Entrada por seleccion para operarios. Activar Anonymous Sign-Ins en Authentication.
+-- No habilita al rol anon: requiere una sesion tecnica firmada por Supabase.
+create or replace function public.calidad_entrar_seccion(p_rol text) returns void
+language plpgsql security definer set search_path='' as $$
+declare previo public.calidad_usuarios%rowtype;
+begin
+  if auth.uid() is null or coalesce(nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'is_anonymous','false')<>'true' then
+    raise exception 'Se requiere una sesion tecnica de seccion';
+  end if;
+  if p_rol is null or p_rol not in ('armado','resoldado','pulido','pintado','ensamble','empacado') then raise exception 'Seccion no permitida'; end if;
+  perform pg_advisory_xact_lock(hashtextextended(auth.uid()::text,717));
+  select * into previo from public.calidad_usuarios where user_id=auth.uid() for update;
+  if found then
+    if not previo.activo then raise exception 'Acceso deshabilitado por admin'; end if;
+    if previo.rol<>p_rol then raise exception 'Esta sesion pertenece a otra seccion'; end if;
+    return;
+  end if;
+  insert into public.calidad_usuarios(user_id,rol,activo) values(auth.uid(),p_rol,true);
+  insert into public.calidad_accesos_auditoria(actor,usuario,anterior,nuevo)
+    values(auth.uid(),auth.uid(),null,jsonb_build_object('rol',p_rol,'activo',true,'origen','seleccion_seccion'));
+end $$;
+revoke all on function public.calidad_entrar_seccion(text) from public,anon;
+grant execute on function public.calidad_entrar_seccion(text) to authenticated;
 NOTIFY pgrst, 'reload schema';
 commit;
