@@ -282,6 +282,9 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 .checklist-grid{display:flex;flex-direction:column;gap:0}
 .check-row{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)}
 .check-row:last-child{border-bottom:none}
+#checklist-items{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));column-gap:18px;align-items:stretch}
+#checklist-items .check-row{min-width:0;padding:10px 0;border-bottom:1px solid var(--border)}
+#checklist-items .result-select{min-height:28px;max-width:100%}
 .check-circle{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border2);cursor:pointer;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all .12s}
 .check-circle.ok{background:var(--green);border-color:var(--green)}
 .check-circle.fail{background:var(--red);border-color:var(--red)}
@@ -430,7 +433,8 @@ body[data-worker] .app-section:not(#sec-calidad){display:none!important}
 <section id="access-screen" aria-label="Acceso a XTENSOR">
   <form id="access-form" onsubmit="appLogin(event)">
     <h1>XTENSOR</h1><h2 style="font-size:18px;margin:0">Iniciar sesión</h2>
-    <label>Correo<input id="access-email" type="email" autocomplete="username" required></label>
+    <label>Usuario<input id="access-email" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" list="access-usernames" placeholder="admin, armado, resoldado…" required maxlength="40"></label>
+    <datalist id="access-usernames"><option value="admin"></option><option value="armado"></option><option value="resoldado"></option><option value="pulido"></option><option value="pintado"></option><option value="ensamble"></option><option value="empacado"></option></datalist>
     <label>Contraseña<input id="access-password" type="password" autocomplete="current-password" required></label>
     <button class="btn btn-primary" type="submit" id="access-submit">Entrar</button>
     <p id="access-message" role="status"></p>
@@ -600,8 +604,9 @@ body[data-worker] .app-section:not(#sec-calidad){display:none!important}
               </div>
               <div class="prog-bar"><div id="stage-bar" class="prog-fill" style="width:0%"></div></div>
               <div class="insp-grid">
-                <div><label class="field-lbl">Inspector</label><input id="field-inspector" type="text" class="obs-input" placeholder="Nombre inspector"></div>
-                <div><label class="field-lbl">Responsable</label><input id="field-responsable" type="text" class="obs-input" placeholder="Armador / pintor…"></div>
+                <div><label class="field-lbl" for="field-inspector">Inspector</label><input id="field-inspector" type="text" class="obs-input" list="cal-people" autocomplete="off" placeholder="Nombre inspector" maxlength="120"></div>
+                <div><label class="field-lbl" for="field-responsable">Responsable</label><input id="field-responsable" type="text" class="obs-input" list="cal-responsables" autocomplete="off" placeholder="Nombre del responsable" maxlength="120"></div>
+                <datalist id="cal-people"></datalist><datalist id="cal-responsables"></datalist>
               </div>
               <div id="checklist-items"></div>
               <div style="margin-top:10px">
@@ -1031,6 +1036,8 @@ let sb = null;
 let appAccess={ready:false,role:null,user:null},appStarted=false,appClosing=false;
 let appPendingReview=null;
 const APP_ROLES=['admin','armado','resoldado','pulido','pintado','ensamble','empacado'];
+// Identificadores tecnicos de Supabase; las claves nunca se incluyen en el HTML.
+const APP_LOGIN_EMAILS=Object.fromEntries(APP_ROLES.map(role=>[role,role==='admin'?'santiagocardona.15.98@gmail.com':role+'@usuarios.xtensor.invalid']));
 function appIsAdmin(){return appAccess.ready&&appAccess.role==='admin';}
 function appStage(){return ({armado:'material',resoldado:'armado',pulido:'resoldado',pintado:'pulido',ensamble:'pintado',empacado:'ensamble'})[appAccess.role]||null;}
 function appInspectionRead(){return appIsAdmin()?sb.from('calidad_inspecciones').select('*'):sb.rpc('calidad_leer_mi_etapa');}
@@ -1045,23 +1052,26 @@ async function appLogin(event){
   event.preventDefault();appClosing=false;const button=document.getElementById('access-submit');button.disabled=true;
   try{
     if(!sb)throw new Error('No se pudo conectar. Comprueba la conexión y recarga.');
-    const {data,error}=await sb.auth.signInWithPassword({email:document.getElementById('access-email').value.trim(),password:document.getElementById('access-password').value});
+    const username=document.getElementById('access-email').value.trim().toLowerCase();
+    if(!Object.prototype.hasOwnProperty.call(APP_LOGIN_EMAILS,username))throw new Error('Selecciona un usuario de la lista.');
+    const {data,error}=await sb.auth.signInWithPassword({email:APP_LOGIN_EMAILS[username],password:document.getElementById('access-password').value});
     document.getElementById('access-password').value='';if(error)throw error;
-    await appAuthorize(data.session);
+    await appAuthorize(data.session,username);
   }catch(e){document.getElementById('access-message').textContent=e.message||'No se pudo iniciar sesión';}
   finally{button.disabled=false;}
 }
-async function appAuthorize(session){
+async function appAuthorize(session,expectedRole){
   if(!session?.user){appLock('');return;}
   const {data,error}=await sb.from('calidad_usuarios').select('rol,activo').eq('user_id',session.user.id).maybeSingle();
   if(error){appLock('No se pudo validar el acceso. Verifica que se haya ejecutado el schema.sql actualizado.');return;}
   if(!data?.activo||!APP_ROLES.includes(data.rol)){appLock('Cuenta sin acceso asignado. Solicita a admin que habilite tu sección.');return;}
+  if(expectedRole&&data.rol!==expectedRole){appLock('La cuenta no tiene asignada la sección de ese usuario. Consulta con admin.');return;}
   if(appStarted&&(appAccess.user?.id!==session.user.id||appAccess.role!==data.rol)){location.reload();return;}
   appAccess={ready:true,role:data.rol,user:session.user};
   document.body.setAttribute('data-access',data.rol);document.body.toggleAttribute('data-worker',data.rol!=='admin');
   document.getElementById('app-body').inert=false;document.getElementById('topbar').inert=false;
   document.getElementById('access-screen').hidden=true;
-  document.getElementById('access-account').setAttribute('data-tip',session.user.email+' · '+data.rol+' · Cerrar sesión');
+  document.getElementById('access-account').setAttribute('data-tip',data.rol+' · Cerrar sesión');
   if(appStarted)return;
   appStarted=true;
   // Los pendientes de cuentas distintas nunca se mezclan ni se envian con otro rol.
@@ -2902,7 +2912,7 @@ function renderHistorico(list){
           </div>
           <div style="font-size:13px;font-weight:600">${h.name}</div>
           <div style="font-size:12px;color:var(--text2)">${h.client}</div>
-          ${h.inspectors!=='—'?`<div style="font-size:11px;color:var(--text3);margin-top:2px"><i class="ti ti-user" style="font-size:10px"></i> ${h.inspectors}</div>`:''}
+          ${h.inspectors!=='—'?`<div style="font-size:11px;color:var(--text3);margin-top:2px"><i class="ti ti-user" style="font-size:10px"></i> ${escapeHtml(h.inspectors)}</div>`:''}
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:10px;color:var(--text3)">INSPECCIONADO</div>
@@ -2973,9 +2983,7 @@ function renderInspection(){
   const si=d.currentStageIdx;
   const stage=STAGES[si];
   document.getElementById('stage-title').textContent=stage.label;
-  document.getElementById('field-inspector').value=appIsAdmin()?(d.inspectors[stage.key]||''):(appAccess.user?.email||'');
-  document.getElementById('field-inspector').readOnly=!appIsAdmin();
-  document.getElementById('field-responsable').value=d.responsables[stage.key]||'';
+  calPeopleFields(stage,d);
   document.getElementById('stage-obs').value=d.stageObs[stage.key]||'';
   document.getElementById('stage-tabs').innerHTML=STAGES.map((s,i)=>{
     const cls=i===si?'active':i<si?'done':'';
@@ -2988,6 +2996,23 @@ function renderInspection(){
   btn.innerHTML=isLast?'Ver resumen <i class="ti ti-check"></i>':'Siguiente etapa <i class="ti ti-arrow-right"></i>';
 }
 
+const CAL_PEOPLE=[
+  ['Ariel Valencia M',['pulido']],['Cristian C Rodriguez G',['material']],
+  ['Daniel Garcia Zaray',['ensamble']],['Daniel R Duque Z',['empacado']],
+  ['Germán A Villada',['armado','resoldado']],['Jose Fernando Gaviria',['armado']],
+  ['Juan Felipe Martinez A',['armado','resoldado']],['Luis Alfonso Betancurth O',['pintado']]
+];
+function calDefaultPerson(section){return CAL_PEOPLE.find(([,sections])=>sections.includes(section))?.[0]||'';}
+function calPeopleFields(stage,d){
+  const options=people=>people.map(([name,sections])=>`<option value="${escapeHtml(name)}" label="${escapeHtml(sections.map(s=>QM_STAGES.find(x=>x[0]===s)?.[1]||s).join(' / '))}"></option>`).join('');
+  document.getElementById('cal-people').innerHTML=options(CAL_PEOPLE);
+  document.getElementById('cal-responsables').innerHTML=options([...CAL_PEOPLE].sort((a,b)=>Number(b[1].includes(stage.key))-Number(a[1].includes(stage.key))));
+  if(!String(d.responsables[stage.key]||'').trim())d.responsables[stage.key]=calDefaultPerson(stage.key);
+  if(!String(d.inspectors[stage.key]||'').trim())d.inspectors[stage.key]=appIsAdmin()?'':calDefaultPerson(appAccess.role);
+  document.getElementById('field-responsable').value=d.responsables[stage.key]||'';
+  document.getElementById('field-inspector').value=d.inspectors[stage.key]||'';
+  document.getElementById('field-inspector').readOnly=false;
+}
 function renderChecklist(stage,d){
   if(calInfoOpen&&document.getElementById('checklist-items').contains(calInfoAnchor))calCloseInfo();
   document.getElementById('checklist-items').innerHTML=stage.items.map(it=>{

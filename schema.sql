@@ -752,6 +752,21 @@ begin
 end $$;
 
 -- Sustituye las politicas anonimas anteriores solo en las tablas de esta app.
+-- Cuentas de seccion: crearlas primero mediante Authentication > Users con
+-- correo confirmado y la clave elegida por el administrador. No se almacenan
+-- contrasenas en este archivo ni se modifica directamente auth.users.
+-- Usuario visible -> identificador tecnico de Supabase:
+-- admin -> santiagocardona.15.98@gmail.com (cuenta existente)
+-- armado -> armado@usuarios.xtensor.invalid
+-- resoldado -> resoldado@usuarios.xtensor.invalid
+-- pulido -> pulido@usuarios.xtensor.invalid
+-- pintado -> pintado@usuarios.xtensor.invalid
+-- ensamble -> ensamble@usuarios.xtensor.invalid
+-- empacado -> empacado@usuarios.xtensor.invalid
+-- Los correos .invalid son identificadores internos, no buzones de correo.
+-- Despues de crearlas, el admin asigna y activa cada seccion desde Ajustes >
+-- Usuarios. No se conceden permisos automaticamente por coincidir el correo.
+
 do $$
 declare t text; p record;
 begin
@@ -802,8 +817,8 @@ end $$;
 create or replace function public.calidad_datos_etapa(d jsonb,s text) returns jsonb
 language sql immutable set search_path = '' as $$
   select jsonb_build_object('stageData',jsonb_build_object(s,coalesce(d->'stageData'->s,'{}'::jsonb)),
-    'inspectors',jsonb_build_object(s,coalesce(d->'inspectors'->s,'""'::jsonb)),
-    'responsables',jsonb_build_object(s,coalesce(d->'responsables'->s,'""'::jsonb)),
+    'inspectors',case when d->'inspectors' ? s then jsonb_build_object(s,d->'inspectors'->s) else '{}'::jsonb end,
+    'responsables',case when d->'responsables' ? s then jsonb_build_object(s,d->'responsables'->s) else '{}'::jsonb end,
     'stageObs',jsonb_build_object(s,coalesce(d->'stageObs'->s,'""'::jsonb)),
     'resultDates',jsonb_build_object(s,coalesce(d->'resultDates'->s,'{}'::jsonb)),
     'stageRevision',coalesce(d->'stageRevisions'->s,'0'::jsonb),'currentStageIdx',0,
@@ -820,7 +835,7 @@ create or replace function public.calidad_guardar_mi_etapa(p_serial text,p_data 
 returns table(serial text,data jsonb,updated_at timestamptz)
 language plpgsql security definer set search_path = '' as $$
 declare s text:=public.calidad_etapa_usuario(); d jsonb; campo text; respuestas jsonb; eventos jsonb;
-  it record; ev jsonb; candidato jsonb; correo text; oldval text;
+  it record; ev jsonb; candidato jsonb; correo text; inspector text; oldval text;
 begin
   if s is null then raise exception 'Sin etapa autorizada'; end if;
   if p_serial is null or length(p_serial)>2000 or p_serial='' or jsonb_typeof(p_data)<>'object' then raise exception 'Inspeccion no valida'; end if;
@@ -833,6 +848,9 @@ begin
   d:=coalesce(d,'{}'::jsonb);
   if p_revision is distinct from coalesce((d->'stageRevisions'->>s)::bigint,0) then raise exception 'Esta etapa cambio en otro equipo. Revise los cambios antes de reintentar.'; end if;
   select u.email into correo from auth.users u where u.id=auth.uid();
+  if p_data->'inspectors' ? s and jsonb_typeof(p_data->'inspectors'->s) is distinct from 'string' then raise exception 'Nombre de inspector no valido'; end if;
+  inspector:=coalesce(nullif(btrim(p_data->'inspectors'->>s),''),correo);
+  if length(inspector)>120 then raise exception 'Nombre de inspector demasiado largo'; end if;
   eventos:=coalesce(d->'internalFindings','[]'::jsonb);
   for it in select * from jsonb_each_text(respuestas) loop
     oldval:=d->'stageData'->s->>it.key;
@@ -841,18 +859,19 @@ begin
       ev:=jsonb_build_object('id','finding:'||gen_random_uuid()::text,'machineKey',p_serial,
         'machine',coalesce(d->'machineSnapshot',p_data->'machineSnapshot','{}'::jsonb),'stage',s,'area',initcap(s),
         'itemId',it.key,'item',coalesce(candidato->>'item',it.key),'criterio',coalesce(candidato->>'criterio',''),
-        'detectedAt',now(),'closedAt',null,'inspector',correo,'actor',auth.uid());
+        'detectedAt',now(),'closedAt',null,'inspector',inspector,'actor',auth.uid(),'actorEmail',correo);
       eventos:=eventos||jsonb_build_array(ev);
     elsif it.value='ok' and oldval='fail' then
       select coalesce(jsonb_agg(case when e->>'stage'=s and e->>'itemId'=it.key and nullif(e->>'closedAt','') is null
-        then e||jsonb_build_object('closedAt',now(),'closure',jsonb_build_object('at',now(),'by',correo,'note','Corregido durante la inspeccion')) else e end),'[]'::jsonb)
+        then e||jsonb_build_object('closedAt',now(),'closure',jsonb_build_object('at',now(),'by',inspector,'actor',auth.uid(),'actorEmail',correo,'note','Corregido durante la inspeccion')) else e end),'[]'::jsonb)
         into eventos from jsonb_array_elements(eventos) e;
     end if;
   end loop;
   foreach campo in array array['stageData','responsables','stageObs','resultDates'] loop
     d:=jsonb_set(d,array[campo],coalesce(d->campo,'{}'::jsonb)||jsonb_build_object(s,coalesce(p_data->campo->s,case when campo in ('stageData','resultDates') then '{}'::jsonb else '""'::jsonb end)),true);
   end loop;
-  d:=jsonb_set(d,'{inspectors}',coalesce(d->'inspectors','{}'::jsonb)||jsonb_build_object(s,correo),true);
+  d:=jsonb_set(d,'{inspectors}',coalesce(d->'inspectors','{}'::jsonb)||jsonb_build_object(s,inspector),true);
+  d:=jsonb_set(d,'{stageEditors}',coalesce(d->'stageEditors','{}'::jsonb)||jsonb_build_object(s,jsonb_build_object('userId',auth.uid(),'email',correo,'at',now())),true);
   d:=jsonb_set(d,'{stageRevisions}',coalesce(d->'stageRevisions','{}'::jsonb)||jsonb_build_object(s,p_revision+1),true);
   d:=jsonb_set(d,'{internalFindings}',eventos,true);
   if not(d ? 'machineSnapshot') then d:=d||jsonb_build_object('machineSnapshot',coalesce(p_data->'machineSnapshot','{}'::jsonb)); end if;
