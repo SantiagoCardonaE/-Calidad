@@ -1281,9 +1281,9 @@ function switchSection(sec){
   document.querySelectorAll('.mtab').forEach(el=>el.classList.toggle('active', el.dataset.sec===sec));
   document.querySelectorAll('.tbr-variant').forEach(el=>el.classList.toggle('show', el.dataset.sec===sec));
   try{ localStorage.setItem('xtensor_app_lastsection', sec); }catch(e){}
-  if(sec==='ajustes'){qmRender();void qmSync();}
-  if(sec==='tiempos'){tpRender();void tpLoad();}
-  if(sec==='gestion'){gtRender();void gtLoad();}
+  if(sec==='ajustes'){requestAnimationFrame(qmRender);if(Object.keys(qmPending).length||Object.keys(qmDeleted).length||Date.now()-qmLastSync>120000)void qmSync();}
+  if(sec==='tiempos')requestAnimationFrame(()=>{tpRender();if(!tpRows.length)void tpLoad();});
+  if(sec==='gestion')requestAnimationFrame(()=>{gtRender();if(!gtLoaded||Date.now()-gtLoadedAt>120000)void gtLoad();});
 }
 </script>
 
@@ -1911,7 +1911,7 @@ const QM_LEGACY_WELDING={
  'gj-a2':{item:'Soldaduras y uniones estructurales',criterio:'Uniones completas, sin grietas, porosidad, bordes cortantes ni elementos sueltos',herramienta:'Visual / Tacto',ideal:'Uniones firmes y seguras',sup:'3'}
 };
 let QM_STORAGE='xtensor_matrix_v1:'+SUPABASE_URL;
-let qmValues={},qmPending={},qmDeleted={},qmBusy=false,qmError='',qmEditing=null,qmDragged=null,qmPreviewKey=null;
+let qmValues={},qmPending={},qmDeleted={},qmBusy=false,qmLastSync=0,qmError='',qmEditing=null,qmDragged=null,qmPreviewKey=null;
 const MATERIAL_RECEIVED_ITEMS=[
   {id:'mat-identidad',item:'Material recibido conforme a la máquina',criterio:'Las referencias y dimensiones del material entregado corresponden al plano o BOM de esta máquina.',ideal:'Referencias y dimensiones conformes',herramienta:'Plano / BOM / Medición',sup:'2'},
   {id:'mat-cantidad',item:'Cantidad de material recibido',criterio:'La cantidad entregada coincide con la requerida para este trabajo; registrar los faltantes en observaciones.',ideal:'Entrega completa',herramienta:'Conteo / BOM',sup:'2'},
@@ -2158,7 +2158,7 @@ async function qmSync(){
       qmPersist();
     }
     changed=qmIngest(await read())||changed;
-    qmError='';qmPersist();if(changed)qmRefresh();
+    qmError='';qmLastSync=Date.now();qmPersist();if(changed)qmRefresh();
   }catch(e){qmError=e.message||String(e);}
   finally{qmBusy=false;qmStatus();}
 }
@@ -5272,7 +5272,6 @@ tpSection.innerHTML=`<style>
 <button class="btn" role="tab" id="tp-tab-historial" onclick="tpSetView('historial')">Histórico</button>
 <button class="btn" role="tab" id="tp-tab-indicadores" onclick="tpSetView('indicadores')">Por código y etapa</button>
 <button class="btn" role="tab" id="tp-tab-fabricaciones" onclick="tpSetView('fabricaciones')">Fabricaciones</button></div>
-<p class="tp-note">Minutos laborales observados · Colombia. Lunes–jueves: 07:00–13:00 y 13:30–16:30. Viernes: 07:00–13:00 y 13:30–14:45. Excluye festivos nacionales, permisos, cierres, almuerzo, noches y fines de semana; incluye el tiempo extra registrado. Fuera de horario: siguiente franja. Incluye esperas dentro de jornada, no mide trabajo efectivo ni takt time. Sin inicio o con interrupciones: fuera de indicadores. «Terminada» no confirma Despacho.</p>
 <section id="tp-product-summary" hidden aria-label="Referencia y confiabilidad por producto"></section>
 <div class="tp-scroll"><table><thead id="tp-head"></thead><tbody id="tp-body"></tbody></table></div>
 <div id="tp-pages"><span id="tp-count"></span><button class="btn" id="tp-more" onclick="tpLimit+=100;tpRender()">Ver más</button></div>
@@ -5501,7 +5500,7 @@ function tpExport(){
 .gt-head h2{font-size:18px;margin-right:auto}.gt-tabs{border-bottom:1px solid var(--border);padding-bottom:8px}
 .gt-tabs button[aria-selected=true]{color:var(--yellow);border-color:var(--yellow)}
 .gt-filters{background:var(--bg2);border:1px solid var(--border);padding:9px}
-.gt-filters input,.gt-filters select{height:34px;min-width:130px}.gt-filters input[type=search]{min-width:210px;flex:1}
+.gt-filters input,.gt-filters select,.gt-form input,.gt-form select,.gt-form textarea{min-height:34px;min-width:130px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 9px}.gt-filters input[type=search]{min-width:210px;flex:1}
 .gt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
 .gt-card{border:1px solid var(--border);background:var(--bg2);padding:12px;min-width:0}
 .gt-card dt{font-size:11px;color:var(--muted);text-transform:uppercase}.gt-card dd{font-size:21px;font-weight:700;margin-top:5px}
@@ -5516,7 +5515,7 @@ function tpExport(){
 .gt-lane{min-height:54px;border-bottom:1px solid var(--border)}.gt-worker small{display:block;color:var(--muted);font-weight:400;margin-top:3px}
 .gt-track{position:relative;background-image:linear-gradient(to right,var(--border) 1px,transparent 1px);background-size:calc(100% / var(--gt-cols)) 100%}
 .gt-bar{position:absolute;top:8px;height:36px;min-width:8px;border:1px solid var(--yellow-border);background:var(--yellow-bg);color:var(--text);padding:4px 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:10px;cursor:grab}
-.gt-bar.done{border-color:var(--green-border);background:var(--green-bg)}.gt-bar.cancel{opacity:.45}.gt-bar.conflict{border-color:var(--red-border);background:var(--red-bg)}
+.gt-bar.done{border-color:var(--green-border);background:var(--green-bg)}.gt-bar.cancel{opacity:.45}.gt-bar.conflict,.gt-bar.overrun{border-color:var(--red-border);background:var(--red-bg)}
 .gt-empty{padding:28px;text-align:center;color:var(--muted)}.gt-note{font-size:11px;color:var(--muted);line-height:1.45}.gt-warn{color:var(--red)}
 .gt-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-width:min(650px,84vw)}.gt-form label{display:grid;gap:5px;font-size:11px;color:var(--muted)}.gt-form .full{grid-column:1/-1}.gt-form input,.gt-form select,.gt-form textarea{width:100%}
 #gt-assignment-dialog,#gt-novelty-dialog,#gt-overtime-dialog{max-width:760px}
@@ -5525,18 +5524,19 @@ function tpExport(){
 <section id="sec-gestion" class="app-section" aria-label="Gestión de tiempo">
   <header class="gt-head"><h2>Gestión de tiempo</h2><span id="gt-status" class="gt-note"></span><button class="btn" onclick="gtLoad(true)" title="Actualizar"><i class="ti ti-refresh"></i></button><button class="btn primary" onclick="gtOpenAssignment()"><i class="ti ti-plus"></i> Asignación</button></header>
   <nav class="gt-tabs" role="tablist">
-    <button class="btn" role="tab" data-gt-view="dashboard" onclick="gtSetView('dashboard')">Dashboard</button>
+    <button class="btn" role="tab" data-gt-view="dashboard" onclick="gtSetView('dashboard')">Resumen</button>
     <button class="btn" role="tab" data-gt-view="gantt" onclick="gtSetView('gantt')">Gantt</button>
     <button class="btn" role="tab" data-gt-view="operarios" onclick="gtSetView('operarios')">Operarios</button>
-    <button class="btn" role="tab" data-gt-view="tiempos" onclick="gtSetView('tiempos')">Tiempos de producción</button>
+    <button class="btn" role="tab" data-gt-view="tiempos" onclick="gtSetView('tiempos')">Tiempos</button>
     <button class="btn" role="tab" data-gt-view="novedades" onclick="gtSetView('novedades')">Novedades</button>
-    <button class="btn" role="tab" data-gt-view="extras" onclick="gtSetView('extras')">Horas extras</button>
+    <button class="btn" role="tab" data-gt-view="extras" onclick="gtSetView('extras')">Extras</button>
     <button class="btn" role="tab" data-gt-view="indicadores" onclick="gtSetView('indicadores')">Indicadores</button>
   </nav>
   <div class="gt-filters">
-    <input id="gt-search" type="search" placeholder="Operario, serial, código o producto" oninput="gtRender()">
+    <input id="gt-search" type="search" placeholder="Operario, serial, código o producto" oninput="gtScheduleRender()">
     <input id="gt-date" type="date" onchange="gtRender()">
     <select id="gt-range" onchange="gtRender()"><option value="day">Día</option><option value="week" selected>Semana</option><option value="month">Mes</option></select>
+    <select id="gt-group" aria-label="Agrupar Gantt" onchange="gtRender()"><option value="workers">Gantt: operarios</option><option value="machines">Gantt: máquinas</option></select>
     <select id="gt-worker-filter" onchange="gtRender()"><option value="">Todos los operarios</option></select>
     <select id="gt-role-filter" onchange="gtRender()"><option value="">Todos los cargos</option></select>
     <select id="gt-stage-filter" onchange="gtRender()"><option value="">Todas las etapas</option></select>
@@ -5547,12 +5547,12 @@ function tpExport(){
 </section>
 <dialog id="gt-assignment-dialog"><form class="gt-form" onsubmit="gtSaveAssignment(event)">
   <input id="gt-a-id" type="hidden"><h2 class="full" style="font-size:18px">Asignación de producción</h2>
-  <label class="full">Máquina / producto<select id="gt-a-machine" required></select></label>
-  <label>Etapa<select id="gt-a-stage" required></select></label><label>Operario<select id="gt-a-worker" required></select></label>
-  <label>Inicio<input id="gt-a-start" type="datetime-local" required></label><label>Finalización<input id="gt-a-end" type="datetime-local" required></label>
+  <label class="full">Máquina / producto<select id="gt-a-machine" required onchange="gtSuggestEnd()"></select></label>
+  <label>Etapa<select id="gt-a-stage" required onchange="gtSuggestEnd()"></select></label><label>Operario<select id="gt-a-worker" required></select></label>
+  <label>Inicio<input id="gt-a-start" type="datetime-local" required onchange="gtSuggestEnd()"></label><label>Final programado<input id="gt-a-end" type="datetime-local" required><small id="gt-a-duration-source" class="gt-note"></small></label>
   <label>Estado<select id="gt-a-state"><option value="programada">Programada</option><option value="en_progreso">En progreso</option><option value="completada">Completada</option><option value="cancelada">Cancelada</option></select></label>
   <label class="full">Observaciones<textarea id="gt-a-notes" rows="2"></textarea></label><p id="gt-a-warning" class="gt-note gt-warn full"></p>
-  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button id="gt-a-cancel" type="button" class="btn" onclick="gtCancelAssignment()">Cancelar actividad</button><button class="btn primary" type="submit">Guardar</button></footer>
+  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cerrar</button><button id="gt-a-delete" type="button" class="btn" onclick="gtDeleteAssignment()"><i class="ti ti-trash"></i> Eliminar</button><button id="gt-a-cancel" type="button" class="btn" onclick="gtCancelAssignment()">Marcar cancelada</button><button class="btn primary" type="submit">Guardar</button></footer>
 </form></dialog>
 <dialog id="gt-novelty-dialog"><form class="gt-form" onsubmit="gtSaveNovelty(event)">
   <input id="gt-n-id" type="hidden"><h2 class="full" style="font-size:18px">Novedad del operario</h2>
@@ -5575,7 +5575,7 @@ function tpExport(){
 // ══════════════ GESTIÓN DE TIEMPO ══════════════
 const GT_STAGES=['Material','Armar','Resoldar','Pulir','Pintar','Ensamblar','Empacar','Despacho'];
 const GT_NOVELTIES=['Permiso','Incapacidad','Vacaciones','Ausencia','Día no laborado','Capacitación','Reunión','Trabajo administrativo','Mantenimiento','Otra actividad','Otro'];
-let gtView='dashboard',gtLoading=false,gtLoaded=false,gtWorkers=[],gtAssignments=[],gtNovelties=[],gtOvertime=[],gtStandards=[],gtRuns=[],gtTimes=[];
+let gtView='dashboard',gtLoading=false,gtLoaded=false,gtLoadedAt=0,gtFiltersReady=false,gtRenderFrame=0,gtMetricCache=new Map(),gtRunIndex=new Map(),gtActualIndex=new Map(),gtWorkers=[],gtAssignments=[],gtNovelties=[],gtOvertime=[],gtStandards=[],gtRuns=[],gtTimes=[];
 document.getElementById('app-body').appendChild(document.getElementById('sec-gestion'));
 function gtIsoLocal(value){return value?new Date(value+':00-05:00').toISOString():null;}
 function gtInputDate(value){
@@ -5599,7 +5599,7 @@ function gtRange(){
   return {from:start,to:Date.parse(new Date(day.getTime()+days*86400000).toISOString().slice(0,10)+'T00:00:00-05:00'),days,mode,date:day.toISOString().slice(0,10)};
 }
 function gtWorker(id){return gtWorkers.find(w=>w.id===id)||{};}
-function gtRun(id){return gtRuns.find(f=>f.id===id)||{};}
+function gtRun(id){return gtRunIndex.get(id)||{};}
 function gtPlanMinutes(a,range){
   const o=gtOverlap(a.inicio,a.fin,range.from,range.to);if(!o)return 0;
   let total=tpWorkMinutes(new Date(o[0]).toISOString(),new Date(o[1]).toISOString(),a.etapa)||0;
@@ -5609,13 +5609,14 @@ function gtPlanMinutes(a,range){
   return total;
 }
 function gtMetrics(worker,range){
+  const cacheKey=worker.id+'|'+range.from+'|'+range.to;if(gtMetricCache.has(cacheKey))return gtMetricCache.get(cacheKey);
   const start=new Date(range.from).toISOString(),end=new Date(range.to).toISOString();
   const jornada=tpWorkMinutes(start,end)||0;
   const lost=gtMergedIntervals(gtNovelties.filter(n=>n.operario_id===worker.id&&n.estado==='Aprobado'),range).reduce((sum,o)=>sum+(tpWorkMinutes(new Date(o[0]).toISOString(),new Date(o[1]).toISOString())||0),0);
   const extra=gtMergedIntervals(gtOvertime.filter(x=>x.operario_id===worker.id&&x.estado==='Aprobado'),range).reduce((sum,o)=>sum+Math.max(0,(o[1]-o[0])/60000-(tpWorkMinutes(new Date(o[0]).toISOString(),new Date(o[1]).toISOString())||0)),0);
   const load=gtAssignments.filter(a=>a.operario_id===worker.id&&a.estado!=='cancelada').reduce((sum,a)=>sum+gtPlanMinutes(a,range),0);
   const available=Math.max(0,jornada-lost),remaining=available+extra-load,util=available+extra>0?load/(available+extra)*100:load?100:0;
-  return {jornada,lost,extra,load,available,remaining,util,over:Math.max(0,-remaining)};
+  const result={jornada,lost,extra,load,available,remaining,util,over:Math.max(0,-remaining)};gtMetricCache.set(cacheKey,result);return result;
 }
 function gtFilteredWorkers(){
   const id=document.getElementById('gt-worker-filter').value,role=document.getElementById('gt-role-filter').value,q=normKey(document.getElementById('gt-search').value);
@@ -5627,7 +5628,8 @@ function gtFilteredAssignments(range){
 }
 function gtMachineLabel(a){const f=gtRun(a.fabricacion_id);return '#'+(f.serial||'—')+' · '+(f.codigo||'Sin código')+' · '+(f.producto||'Producto');}
 function gtState(m){return m.over>0?['Sobrecargado','over']:m.util>=80?['Alta ocupación','busy']:['Disponible','free'];}
-function gtSetView(view){gtView=view;gtRender();}
+function gtScheduleRender(){cancelAnimationFrame(gtRenderFrame);gtRenderFrame=requestAnimationFrame(gtRender);}
+function gtSetView(view){if(gtView===view)return;gtView=view;gtRender();}
 function gtCard(label,value,detail){return '<dl class="gt-card"><dt>'+tpEscape(label)+'</dt><dd>'+tpEscape(value)+'</dd>'+(detail?'<small class="gt-note">'+tpEscape(detail)+'</small>':'')+'</dl>';}
 function gtTable(headers,rows){
   return '<div class="gt-table-wrap"><table class="gt-table"><thead><tr>'+headers.map(h=>'<th>'+tpEscape(h)+'</th>').join('')+'</tr></thead><tbody>'+(rows.length?rows.join(''):'<tr><td colspan="'+headers.length+'" class="gt-empty">Sin registros para los filtros seleccionados</td></tr>')+'</tbody></table></div>';
@@ -5643,11 +5645,33 @@ function gtTicks(range){
   else for(let i=0;i<range.days;i++){const d=new Date(Date.UTC(+range.date.slice(0,4),+range.date.slice(5,7)-1,+range.date.slice(8,10)+i));ticks.push(new Intl.DateTimeFormat('es-CO',{weekday:'short',day:'2-digit',month:'short',timeZone:'UTC'}).format(d));}
   return ticks;
 }
+function gtActual(a){
+  const row=gtActualIndex.get(a.fabricacion_id+'|'+a.etapa);
+  return row?{fin:row.finalizacion,minutos:tpMinutes(row),valido:tpValid(row)}:null;
+}
+function gtTypical(fabricationId,stage){
+  const run=gtRun(fabricationId),values=gtTimes.filter(t=>tpValid(t)&&Number(t.etapa)===Number(stage)&&gtRun(t.fabricacion_id).codigo===run.codigo).map(tpMinutes).filter(Number.isFinite),stats=tpStatistics(values);
+  if(stats)return {minutes:Math.max(1,Math.round(stats.median)),label:'Mediana histórica · '+stats.n+' registro'+(stats.n===1?'':'s')};
+  const standard=gtStandards.find(s=>s.codigo===run.codigo&&Number(s.etapa)===Number(stage));
+  return standard?{minutes:Number(standard.minutos),label:'Tiempo estándar'}:{minutes:60,label:'Sin histórico · 1 h inicial'};
+}
+function gtAddWorkMinutes(startIso,minutes,stage){
+  let cursor=Date.parse(startIso),remaining=Math.max(1,Math.round(minutes)),guard=0;
+  if(!Number.isFinite(cursor))return null;
+  while(remaining>0&&guard++<600000){
+    if(!tpIsWorking(cursor+30000,stage)){const next=tpNextWork(new Date(cursor+60000).toISOString(),stage);if(!next)return null;cursor=Date.parse(next);continue;}
+    cursor+=60000;remaining--;
+  }
+  return guard>=600000?null:new Date(cursor).toISOString();
+}
 function gtRenderGantt(range,workers){
-  const assignments=gtFilteredAssignments(range),ticks=gtTicks(range),span=range.to-range.from;
-  const axis='<div class="gt-axis"><div class="gt-axis-name">Operario</div><div class="gt-axis-track">'+ticks.map(t=>'<div class="gt-tick">'+tpEscape(t)+'</div>').join('')+'</div></div>';
-  const lanes=workers.map(w=>{const m=gtMetrics(w,range),bars=assignments.filter(a=>a.operario_id===w.id).map(a=>{const left=Math.max(0,(Date.parse(a.inicio)-range.from)/span*100),right=Math.min(100,(Date.parse(a.fin)-range.from)/span*100),conf=gtAssignments.some(b=>b.id!==a.id&&b.operario_id===a.operario_id&&b.estado!=='cancelada'&&b.inicio<a.fin&&b.fin>a.inicio);return '<button class="gt-bar '+(a.estado==='completada'?'done ':a.estado==='cancelada'?'cancel ':'')+(conf?'conflict':'')+'" style="left:'+left+'%;width:'+Math.max(.5,right-left)+'%" draggable="true" ondragstart="gtDrag(event,\''+a.id+'\')" onclick="gtOpenAssignment(\''+a.id+'\')" title="'+tpEscape(gtMachineLabel(a)+' · '+GT_STAGES[a.etapa]+' · '+gtFmt(a.inicio)+' - '+gtFmt(a.fin))+'">'+tpEscape((gtRun(a.fabricacion_id).codigo||'')+' '+GT_STAGES[a.etapa])+'</button>';}).join('');return '<div class="gt-lane"><div class="gt-worker">'+tpEscape(w.nombre)+'<small>'+tpEscape(w.cargo)+' · '+gtHours(Math.max(0,m.remaining))+' libres</small></div><div class="gt-track" style="--gt-cols:'+ticks.length+'" ondragover="event.preventDefault()" ondrop="gtDrop(event,\''+w.id+'\')">'+bars+'</div></div>';}).join('');
-  return '<section class="gt-gantt"><div class="gt-gantt-inner">'+axis+lanes+'</div></section><p class="gt-note">Arrastra una actividad a otra posición u operario. La duración se conserva y el sistema vuelve a comprobar conflictos. Haz clic para editar fechas, etapa, máquina o duración.</p>';
+  const assignments=gtFilteredAssignments(range),ticks=gtTicks(range),span=range.to-range.from,group=document.getElementById('gt-group').value;
+  const bar=a=>{const actual=gtActual(a),displayEnd=actual&&Date.parse(actual.fin)>Date.parse(a.fin)?actual.fin:a.fin,left=Math.max(0,(Date.parse(a.inicio)-range.from)/span*100),right=Math.min(100,(Date.parse(displayEnd)-range.from)/span*100),conf=gtAssignments.some(b=>b.id!==a.id&&b.operario_id===a.operario_id&&b.estado!=='cancelada'&&b.inicio<a.fin&&b.fin>a.inicio),overrun=actual&&Date.parse(actual.fin)>Date.parse(a.fin),title=gtMachineLabel(a)+' · '+GT_STAGES[a.etapa]+' · Programado '+gtFmt(a.inicio)+' - '+gtFmt(a.fin)+(actual?' · Final real '+gtFmt(actual.fin):'');return '<button class="gt-bar '+(a.estado==='completada'?'done ':a.estado==='cancelada'?'cancel ':'')+(conf?'conflict ':'')+(overrun?'overrun':'')+'" style="left:'+left+'%;width:'+Math.max(.5,right-left)+'%" draggable="true" ondragstart="gtDrag(event,\''+a.id+'\')" onclick="gtOpenAssignment(\''+a.id+'\')" title="'+tpEscape(title)+'">'+tpEscape((group==='machines'?gtWorker(a.operario_id).nombre:(gtRun(a.fabricacion_id).codigo||''))+' · '+GT_STAGES[a.etapa])+'</button>';};
+  const entities=group==='machines'?[...new Map(assignments.map(a=>[a.fabricacion_id,gtRun(a.fabricacion_id)])).values()].filter(x=>x.id):workers;
+  const axis='<div class="gt-axis"><div class="gt-axis-name">'+(group==='machines'?'Máquina':'Operario')+'</div><div class="gt-axis-track">'+ticks.map(t=>'<div class="gt-tick">'+tpEscape(t)+'</div>').join('')+'</div></div>';
+  const lanes=entities.map(entity=>{const list=assignments.filter(a=>group==='machines'?a.fabricacion_id===entity.id:a.operario_id===entity.id),label=group==='machines'?'#'+(entity.serial||'—')+' · '+(entity.codigo||'Sin código'):entity.nombre,detail=group==='machines'?(entity.producto||'Producto'):(entity.cargo+' · '+gtHours(Math.max(0,gtMetrics(entity,range).remaining))+' libres'),dropKind=group==='machines'?'machine':'worker';return '<div class="gt-lane"><div class="gt-worker">'+tpEscape(label)+'<small>'+tpEscape(detail)+'</small></div><div class="gt-track" style="--gt-cols:'+ticks.length+'" ondragover="event.preventDefault()" ondrop="gtDrop(event,\''+dropKind+'\',\''+entity.id+'\')">'+list.map(bar).join('')+'</div></div>';}).join('');
+  const rows=assignments.slice().sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(a=>{const actual=gtActual(a);return '<tr><td>'+tpEscape(gtMachineLabel(a))+'</td><td>'+GT_STAGES[a.etapa]+'</td><td>'+tpEscape(gtWorker(a.operario_id).nombre||'Sin asignar')+'</td><td>'+gtFmt(a.inicio)+'</td><td>'+gtFmt(a.fin)+'</td><td>'+(actual?gtFmt(actual.fin):'Pendiente')+'</td><td>'+tpEscape(a.estado)+'</td><td class="gt-actions"><button class="btn" onclick="gtOpenAssignment(\''+a.id+'\')" title="Editar"><i class="ti ti-edit"></i></button><button class="btn" onclick="gtDeleteAssignment(\''+a.id+'\')" title="Eliminar"><i class="ti ti-trash"></i></button></td></tr>';});
+  return '<section class="gt-gantt"><div class="gt-gantt-inner">'+axis+(lanes||'<div class="gt-empty">Sin asignaciones</div>')+'</div></section><section class="gt-panel"><div class="gt-panel-head"><h3>Asignaciones</h3></div>'+gtTable(['Máquina','Etapa','Operario','Inicio','Fin programado','Fin real','Estado',''],rows)+'</section>';
 }
 function gtRenderWorkers(range,workers){
   const rows=workers.map(w=>{const m=gtMetrics(w,range),state=gtState(m),linked=w.worker_id?'Vinculado':'Pendiente de vincular';return '<tr><td>'+tpEscape(w.nombre)+'</td><td>'+tpEscape(w.cargo)+'</td><td>'+linked+'</td><td>'+gtHours(m.jornada)+'</td><td>'+gtHours(m.lost)+'</td><td>'+gtHours(m.load)+'</td><td>'+gtHours(m.extra)+'</td><td>'+gtHours(Math.max(0,m.remaining))+'</td><td><span class="gt-state '+state[1]+'">'+state[0]+'</span></td><td><button class="btn" onclick="gtFocusWorker(\''+w.id+'\')">Ver agenda</button></td></tr>';});
@@ -5679,7 +5703,7 @@ function gtRender(){
   if(!appIsAdmin())return;const content=document.getElementById('gt-content');if(!content)return;
   document.querySelectorAll('[data-gt-view]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.gtView===gtView)));
   if(!gtLoaded){content.innerHTML='<div class="gt-empty">Cargando gestión de tiempo…</div>';return;}
-  gtFillFilters();const range=gtRange(),workers=gtFilteredWorkers();
+  if(!gtFiltersReady){gtFillFilters();gtFiltersReady=true;}gtMetricCache=new Map();const range=gtRange(),workers=gtFilteredWorkers();
   content.innerHTML=gtView==='dashboard'?gtRenderDashboard(range,workers):gtView==='gantt'?gtRenderGantt(range,workers):gtView==='operarios'?gtRenderWorkers(range,workers):gtView==='tiempos'?gtRenderTimes():gtView==='novedades'?gtRenderNovelties():gtView==='extras'?gtRenderOvertime():gtRenderIndicators(range,workers);
 }
 function gtFillSelect(id,rows,label){
@@ -5696,7 +5720,7 @@ async function gtLoad(manual){
   if(!appIsAdmin()||gtLoading)return;gtLoading=true;document.getElementById('gt-status').textContent='Sincronizando…';
   try{
     const data=await Promise.all([tpReadAll('gestion_operarios','nombre'),tpReadAll('gestion_asignaciones','inicio'),tpReadAll('gestion_novedades','inicio'),tpReadAll('gestion_horas_extra','inicio'),tpReadAll('gestion_tiempos_estandar','codigo'),tpReadAll('produccion_fabricaciones','primera_observacion'),tpReadAll('produccion_tiempos','primera_observacion')]);
-    [gtWorkers,gtAssignments,gtNovelties,gtOvertime,gtStandards,gtRuns,gtTimes]=data;gtLoaded=true;document.getElementById('gt-status').textContent='Actualizado '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});gtRender();if(manual)showToast('Gestión de tiempo actualizada','green');
+    [gtWorkers,gtAssignments,gtNovelties,gtOvertime,gtStandards,gtRuns,gtTimes]=data;gtRunIndex=new Map(gtRuns.map(f=>[f.id,f]));gtActualIndex=new Map();gtTimes.filter(t=>t.finalizacion).forEach(t=>{const key=t.fabricacion_id+'|'+t.etapa,prev=gtActualIndex.get(key);if(!prev||String(t.finalizacion)>String(prev.finalizacion))gtActualIndex.set(key,t);});gtLoaded=true;gtLoadedAt=Date.now();gtFiltersReady=false;document.getElementById('gt-status').textContent='Actualizado '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});gtRender();if(manual)showToast('Gestión de tiempo actualizada','green');
   }catch(e){document.getElementById('gt-status').textContent='Pendiente de sincronizar';if(manual)showToast(e.message,'yellow');}finally{gtLoading=false;}
 }
 function gtFocusWorker(id){document.getElementById('gt-worker-filter').value=id;gtView='gantt';gtRender();}
@@ -5709,7 +5733,11 @@ function gtDialogOptions(){
 }
 function gtOpenAssignment(id){
   gtDialogOptions();const a=typeof id==='string'?gtAssignments.find(x=>x.id===id):null,range=gtRange(),now=Date.now(),firstShift=range.from+7*3600000,start=new Date(now>=range.from&&now<range.to?Math.max(now,firstShift):firstShift);start.setMinutes(Math.ceil(start.getMinutes()/15)*15,0,0);const end=new Date(start.getTime()+3600000);
-  document.getElementById('gt-a-id').value=a?.id||'';document.getElementById('gt-a-machine').value=a?.fabricacion_id||gtRuns[0]?.id||'';document.getElementById('gt-a-stage').value=a?.etapa??0;document.getElementById('gt-a-worker').value=a?.operario_id||gtWorkers[0]?.id||'';document.getElementById('gt-a-start').value=gtInputDate(a?.inicio||start);document.getElementById('gt-a-end').value=gtInputDate(a?.fin||end);document.getElementById('gt-a-state').value=a?.estado||'programada';document.getElementById('gt-a-notes').value=a?.observaciones||'';document.getElementById('gt-a-warning').textContent='';document.getElementById('gt-a-cancel').hidden=!a||a.estado==='cancelada';document.getElementById('gt-assignment-dialog').showModal();
+  document.getElementById('gt-a-id').value=a?.id||'';document.getElementById('gt-a-machine').value=a?.fabricacion_id||gtRuns[0]?.id||'';document.getElementById('gt-a-stage').value=a?.etapa??0;document.getElementById('gt-a-worker').value=a?.operario_id||gtWorkers[0]?.id||'';document.getElementById('gt-a-start').value=gtInputDate(a?.inicio||start);document.getElementById('gt-a-end').value=gtInputDate(a?.fin||end);document.getElementById('gt-a-state').value=a?.estado||'programada';document.getElementById('gt-a-notes').value=a?.observaciones||'';document.getElementById('gt-a-warning').textContent='';document.getElementById('gt-a-cancel').hidden=!a||a.estado==='cancelada';document.getElementById('gt-a-delete').hidden=!a;document.getElementById('gt-assignment-dialog').showModal();if(a){const typical=gtTypical(a.fabricacion_id,a.etapa),actual=gtActual(a);document.getElementById('gt-a-duration-source').textContent=typical.label+(actual?' · Final real '+gtFmt(actual.fin):'');}else gtSuggestEnd();
+}
+function gtSuggestEnd(){
+  const machine=document.getElementById('gt-a-machine').value,stage=Number(document.getElementById('gt-a-stage').value),start=gtIsoLocal(document.getElementById('gt-a-start').value);if(!machine||!start)return;
+  const typical=gtTypical(machine,stage),end=gtAddWorkMinutes(start,typical.minutes,stage);if(end)document.getElementById('gt-a-end').value=gtInputDate(end);document.getElementById('gt-a-duration-source').textContent=typical.label+' · '+gtHours(typical.minutes);
 }
 function gtConflicts(row,id){
   return gtAssignments.filter(a=>a.id!==id&&a.operario_id===row.operario_id&&a.estado!=='cancelada'&&a.inicio<row.fin&&a.fin>row.inicio).map(a=>'Actividad: '+gtMachineLabel(a)+' ('+gtFmt(a.inicio)+' - '+gtFmt(a.fin)+')').concat(gtNovelties.filter(n=>n.operario_id===row.operario_id&&n.estado==='Aprobado'&&n.inicio<row.fin&&n.fin>row.inicio).map(n=>'Novedad: '+n.tipo+' ('+gtFmt(n.inicio)+' - '+gtFmt(n.fin)+')'));
@@ -5724,9 +5752,10 @@ async function gtSaveAssignment(event){
   try{if(await gtPersistAssignment(row,id,true)){document.getElementById('gt-assignment-dialog').close();showToast('Asignación guardada','green');}}catch(e){document.getElementById('gt-a-warning').textContent=e.message;}
 }
 async function gtCancelAssignment(){const id=document.getElementById('gt-a-id').value;if(!id||!confirm('¿Cancelar esta actividad? Permanecerá en el histórico.'))return;try{const {error}=await sb.from('gestion_asignaciones').update({estado:'cancelada'}).eq('id',id);if(error)throw error;document.getElementById('gt-assignment-dialog').close();await gtLoad();}catch(e){showToast(e.message,'yellow');}}
+async function gtDeleteAssignment(selectedId){const id=selectedId||document.getElementById('gt-a-id').value;if(!id||!confirm('¿Eliminar definitivamente esta asignación de la planificación y del histórico visible?'))return;try{const {error}=await sb.from('gestion_asignaciones').delete().eq('id',id);if(error)throw error;if(document.getElementById('gt-assignment-dialog').open)document.getElementById('gt-assignment-dialog').close();await gtLoad();showToast('Asignación eliminada','green');}catch(e){showToast(e.message,'yellow');}}
 function gtDrag(event,id){event.dataTransfer.setData('text/plain',id);event.dataTransfer.effectAllowed='move';}
-async function gtDrop(event,workerId){
-  event.preventDefault();const id=event.dataTransfer.getData('text/plain'),a=gtAssignments.find(x=>x.id===id);if(!a)return;const rect=event.currentTarget.getBoundingClientRect(),range=gtRange(),duration=Date.parse(a.fin)-Date.parse(a.inicio),raw=range.from+Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width))*(range.to-range.from),start=Math.round(raw/900000)*900000,row={operario_id:workerId,inicio:new Date(start).toISOString(),fin:new Date(start+duration).toISOString()};
+async function gtDrop(event,kind,targetId){
+  event.preventDefault();const id=event.dataTransfer.getData('text/plain'),a=gtAssignments.find(x=>x.id===id);if(!a)return;const rect=event.currentTarget.getBoundingClientRect(),range=gtRange(),duration=Date.parse(a.fin)-Date.parse(a.inicio),raw=range.from+Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width))*(range.to-range.from),start=Math.round(raw/900000)*900000,row={inicio:new Date(start).toISOString(),fin:new Date(start+duration).toISOString()};if(kind==='machine')row.fabricacion_id=targetId;else row.operario_id=targetId;
   try{if(await gtPersistAssignment(row,id,true))showToast('Actividad movida','green');}catch(e){showToast(e.message,'yellow');}
 }
 function gtOpenNovelty(id){
