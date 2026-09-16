@@ -993,6 +993,111 @@ create index if not exists produccion_tiempos_historial on public.produccion_tie
 alter table public.produccion_tiempos add column if not exists inicio_laboral timestamptz generated always as (public.produccion_siguiente_franja(inicio)) stored;
 alter table public.produccion_tiempos add column if not exists finalizacion_laboral timestamptz generated always as (public.produccion_siguiente_franja(finalizacion)) stored;
 alter table public.produccion_tiempos add column if not exists duracion_laboral_minutos double precision generated always as (public.produccion_minutos_laborales(inicio,finalizacion)) stored;
+
+-- Festivos nacionales y ajustes operativos. Las observaciones originales no se modifican.
+create table if not exists public.produccion_festivos_colombia (
+  fecha date primary key,
+  nombre text not null,
+  fuente text not null,
+  updated_at timestamptz not null default now()
+);
+create table if not exists public.produccion_calendario_ajustes (
+  id uuid primary key default gen_random_uuid(),
+  orden bigserial unique,
+  tipo text not null check(tipo in ('no_laboral','tiempo_extra')),
+  inicio timestamptz not null,
+  fin timestamptz not null,
+  etapa integer check(etapa between 0 and 7),
+  descripcion text not null,
+  created_at timestamptz not null default now(),
+  created_by uuid not null default auth.uid(),
+  check(fin>inicio)
+);
+alter table public.produccion_calendario_ajustes add column if not exists orden bigserial;
+create index if not exists produccion_calendario_ajustes_rango on public.produccion_calendario_ajustes(inicio,fin);
+
+create or replace function public.produccion_pascua(y integer) returns date
+language plpgsql immutable strict set search_path='' as $$
+declare a integer;b integer;c integer;d integer;e integer;f integer;g integer;h integer;i integer;k integer;l integer;m integer;mes integer;dia integer;
+begin
+  if y<1583 or y>4099 then raise exception 'Ano fuera de rango'; end if;
+  a:=y%19;b:=y/100;c:=y%100;d:=b/4;e:=b%4;f:=(b+8)/25;g:=(b-f+1)/3;
+  h:=(19*a+b-d-g+15)%30;i:=c/4;k:=c%4;l:=(32+2*e+2*i-h-k)%7;m:=(a+11*h+22*l)/451;
+  mes:=(h+l-7*m+114)/31;dia:=((h+l-7*m+114)%31)+1;
+  return make_date(y,mes,dia);
+end $$;
+create or replace function public.produccion_lunes_festivo(d date) returns date
+language sql immutable strict set search_path='' as $$select d+((8-extract(isodow from d)::integer)%7)$$;
+create or replace function public.produccion_festivos_del_ano(y integer) returns table(fecha date,nombre text)
+language sql immutable strict set search_path='' as $$
+with p as (select public.produccion_pascua(y) d), f(fecha,nombre) as (values
+  (make_date(y,1,1),'Año Nuevo'),
+  (public.produccion_lunes_festivo(make_date(y,1,6)),'Día de los Reyes Magos'),
+  (public.produccion_lunes_festivo(make_date(y,3,19)),'Día de San José'),
+  ((select d-3 from p),'Jueves Santo'),((select d-2 from p),'Viernes Santo'),
+  (make_date(y,5,1),'Día del Trabajo'),
+  (public.produccion_lunes_festivo((select d+39 from p)),'Ascensión del Señor'),
+  (public.produccion_lunes_festivo((select d+60 from p)),'Corpus Christi'),
+  (public.produccion_lunes_festivo((select d+68 from p)),'Sagrado Corazón de Jesús'),
+  (public.produccion_lunes_festivo(make_date(y,6,29)),'San Pedro y San Pablo'),
+  (make_date(y,7,20),'Día de la Independencia'),(make_date(y,8,7),'Batalla de Boyacá'),
+  (public.produccion_lunes_festivo(make_date(y,8,15)),'Asunción de la Virgen'),
+  (public.produccion_lunes_festivo(make_date(y,10,12)),'Día de la Diversidad Étnica y Cultural'),
+  (public.produccion_lunes_festivo(make_date(y,11,1)),'Todos los Santos'),
+  (public.produccion_lunes_festivo(make_date(y,11,11)),'Independencia de Cartagena'),
+  (make_date(y,12,8),'Inmaculada Concepción'),(make_date(y,12,25),'Navidad'))
+select * from f union all
+select public.produccion_lunes_festivo(make_date(y,7,9)),'Nuestra Señora del Rosario de Chiquinquirá' where y>=2026
+$$;
+insert into public.produccion_festivos_colombia(fecha,nombre,fuente)
+select f.fecha,string_agg(distinct f.nombre,' / ' order by f.nombre),
+  case when bool_or(f.nombre='Nuestra Señora del Rosario de Chiquinquirá')
+    then 'Ley 51 de 1983 / Ley 2578 de 2026' else 'Ley 51 de 1983' end
+from generate_series(2020,2050) y cross join lateral public.produccion_festivos_del_ano(y) f
+group by f.fecha
+on conflict(fecha) do update set nombre=excluded.nombre,fuente=excluded.fuente;
+
+alter table public.produccion_festivos_colombia enable row level security;
+alter table public.produccion_calendario_ajustes enable row level security;
+revoke all on public.produccion_festivos_colombia,public.produccion_calendario_ajustes from public,anon,authenticated;
+grant select on public.produccion_festivos_colombia to authenticated;
+grant select,insert,update,delete on public.produccion_calendario_ajustes to authenticated;
+drop policy if exists calendario_admin on public.produccion_festivos_colombia;
+create policy calendario_admin on public.produccion_festivos_colombia for select to authenticated using(public.calidad_rol()='admin');
+drop policy if exists calendario_admin on public.produccion_calendario_ajustes;
+create policy calendario_admin on public.produccion_calendario_ajustes for all to authenticated
+  using(public.calidad_rol()='admin') with check(public.calidad_rol()='admin' and created_by=auth.uid());
+
+create or replace function public.produccion_es_laboral(t timestamptz,p_etapa integer default null) returns boolean
+language plpgsql stable set search_path='' as $$
+declare local_ts timestamp:=t at time zone 'America/Bogota';tipo_ajuste text;dow integer;hora time;
+begin
+  select a.tipo into tipo_ajuste from public.produccion_calendario_ajustes a
+    where a.inicio<=t and a.fin>t and (a.etapa is null or a.etapa=p_etapa)
+    order by a.created_at desc,a.orden desc,a.id desc limit 1;
+  if found then return tipo_ajuste='tiempo_extra'; end if;
+  dow:=extract(isodow from local_ts)::integer;hora:=local_ts::time;
+  if dow>5 or exists(select 1 from public.produccion_festivos_colombia f where f.fecha=local_ts::date) then return false; end if;
+  return (hora>=time '07:00' and hora<time '13:00') or
+    (hora>=time '13:30' and hora<case when dow=5 then time '14:45' else time '16:30' end);
+end $$;
+create or replace function public.produccion_minutos_calendario(desde timestamptz,hasta timestamptz,p_etapa integer default null) returns double precision
+language sql stable set search_path='' as $$
+with recursive dias as (
+  select (desde at time zone 'America/Bogota')::date d
+  union all select d+1 from dias where d<(hasta at time zone 'America/Bogota')::date
+), puntos as (
+  select desde p union select hasta
+  union select (d+time '07:00') at time zone 'America/Bogota' from dias
+  union select (d+time '13:00') at time zone 'America/Bogota' from dias
+  union select (d+time '13:30') at time zone 'America/Bogota' from dias
+  union select (d+case when extract(isodow from d)=5 then time '14:45' else time '16:30' end) at time zone 'America/Bogota' from dias
+  union select greatest(desde,a.inicio) from public.produccion_calendario_ajustes a where a.fin>desde and a.inicio<hasta and (a.etapa is null or a.etapa=p_etapa)
+  union select least(hasta,a.fin) from public.produccion_calendario_ajustes a where a.fin>desde and a.inicio<hasta and (a.etapa is null or a.etapa=p_etapa)
+), segmentos as (select p,lead(p) over(order by p) q from puntos where p between desde and hasta)
+select case when desde is null or hasta is null or hasta<desde then null else coalesce(sum(extract(epoch from(q-p))/60.0)
+  filter(where q>p and public.produccion_es_laboral(p+(q-p)/2,p_etapa)),0) end from segmentos
+$$;
 alter table public.produccion_fabricaciones enable row level security;
 alter table public.produccion_tiempos enable row level security;
 revoke all on public.produccion_fabricaciones,public.produccion_tiempos from public,anon,authenticated;
@@ -1049,7 +1154,7 @@ begin
       -- Solo altas nuevas en Material, despues de una lectura reciente y completa.
       -- La primera carga y los arranques tras interrupciones conservan inicio desconocido.
       select idx=0 and ultima_lectura is not null and detalle is null
-        and ultima_lectura<momento and public.produccion_minutos_laborales(ultima_lectura,momento)<=3
+        and ultima_lectura<momento and public.produccion_minutos_calendario(ultima_lectura,momento,idx)<=3
         into alta_observada from public.produccion_tiempos_config where id=true;
       insert into public.produccion_fabricaciones(id,producto,serial,cliente,primera_observacion,ultima_observacion,etapa_actual,estado)
       values(ident,m->>'producto',m->>'serial',m->>'cliente',momento,momento,idx,case when idx=8 then 'terminada_sin_despacho' else 'observando' end);
@@ -1059,7 +1164,7 @@ begin
       continue;
     end if;
     if momento<=f.ultima_observacion then continue; end if;
-    salto:=public.produccion_minutos_laborales(f.ultima_observacion,momento)>3;
+    salto:=public.produccion_minutos_calendario(f.ultima_observacion,momento,f.etapa_actual)>3;
     if salto then update public.produccion_tiempos set interrumpido=true where fabricacion_id=ident and finalizacion is null; end if;
     if idx<>f.etapa_actual then
       -- La cartelera pasa de Empacar a Terminada sin exponer Despacho.
@@ -1127,8 +1232,8 @@ begin
     -- No se devuelve la respuesta HTTP ni cookies al navegador.
     fallo:='Lectura pendiente; se conserva el historico.';
     update public.produccion_tiempos_config set detalle=fallo where id=true;
-    update public.produccion_tiempos set interrumpido=true where finalizacion is null
-      and (c.ultima_lectura is null or public.produccion_minutos_laborales(c.ultima_lectura,clock_timestamp())>3);
+    update public.produccion_tiempos t set interrumpido=true where finalizacion is null
+      and (c.ultima_lectura is null or public.produccion_minutos_calendario(c.ultima_lectura,clock_timestamp(),t.etapa)>3);
     return jsonb_build_object('estado','pendiente','ultima',c.ultima_lectura,'detalle',fallo);
   end;
 end $$;

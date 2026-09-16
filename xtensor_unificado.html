@@ -5226,7 +5226,7 @@ async function garInit(){
 <script>
 // Tiempos de produccion: la captura no depende de tener abierta esta vista.
 const TP_STAGES=['Material','Armar','Resoldar','Pulir','Pintar','Ensamblar','Empacar','Despacho'];
-let tpRows=[],tpRuns=[],tpBusy=false,tpLoading=false,tpTimer=null,tpLast=null,tpStatus='Pendiente de primera lectura',tpView='productos',tpLimit=100;
+let tpRows=[],tpRuns=[],tpHolidays=[],tpAdjustments=[],tpBusy=false,tpLoading=false,tpTimer=null,tpLast=null,tpStatus='Pendiente de primera lectura',tpView='productos',tpLimit=100;
 const tpSection=document.createElement('section');
 tpSection.id='sec-tiempos';tpSection.className='app-section';tpSection.setAttribute('aria-label','Tiempos de producción');
 tpSection.innerHTML=`<style>
@@ -5250,10 +5250,13 @@ tpSection.innerHTML=`<style>
 #tp-status,#tp-count{font-size:12px;color:var(--text2)}
 .tp-note{font-size:12px;color:var(--text2);line-height:1.5;margin:0}
 #tp-pages{display:flex;justify-content:space-between;align-items:center}
+#tp-calendar-list{max-height:330px;overflow:auto;margin-top:12px}
+#tp-calendar-list table{min-width:720px}
 @media(max-width:700px){#sec-tiempos{padding:10px}.tp-toolbar h2{flex-basis:100%}.tp-filters{align-items:stretch}.tp-filters input[type=search]{width:100%}}
 </style>
 <div class="tp-toolbar"><h2>Tiempos de producción</h2><span id="tp-status"></span>
 <button class="btn" onclick="tpTick(true)" title="Actualizar tiempos" aria-label="Actualizar tiempos"><i class="ti ti-refresh"></i></button>
+<button class="btn" onclick="tpCalendarOpen()"><i class="ti ti-calendar-cog"></i> Ajustar calendario</button>
 <button class="btn" onclick="tpExport()"><i class="ti ti-download"></i> Exportar CSV</button></div>
 <div class="tp-filters"><input type="search" id="tp-search" placeholder="Código, producto, serial o lote" aria-label="Buscar fabricación" oninput="tpLimit=100;tpRender()">
 <select id="tp-product" aria-label="Producto" onchange="tpLimit=100;tpRender()"><option value="">Todos los productos</option></select>
@@ -5266,10 +5269,26 @@ tpSection.innerHTML=`<style>
 <button class="btn" role="tab" id="tp-tab-historial" onclick="tpSetView('historial')">Histórico</button>
 <button class="btn" role="tab" id="tp-tab-indicadores" onclick="tpSetView('indicadores')">Por código y etapa</button>
 <button class="btn" role="tab" id="tp-tab-fabricaciones" onclick="tpSetView('fabricaciones')">Fabricaciones</button></div>
-<p class="tp-note">Minutos laborales observados · Colombia. Lunes–jueves: 07:00–13:00 y 13:30–16:30. Viernes: 07:00–13:00 y 13:30–14:45. Fuera de horario: siguiente franja. No cuenta almuerzo, noches ni fines de semana; sin calendario adicional de festivos. Incluye esperas dentro de jornada, no mide trabajo efectivo ni takt time. Sin inicio o con interrupciones: fuera de indicadores. «Terminada» no confirma Despacho.</p>
+<p class="tp-note">Minutos laborales observados · Colombia. Lunes–jueves: 07:00–13:00 y 13:30–16:30. Viernes: 07:00–13:00 y 13:30–14:45. Excluye festivos nacionales, permisos, cierres, almuerzo, noches y fines de semana; incluye el tiempo extra registrado. Fuera de horario: siguiente franja. Incluye esperas dentro de jornada, no mide trabajo efectivo ni takt time. Sin inicio o con interrupciones: fuera de indicadores. «Terminada» no confirma Despacho.</p>
 <section id="tp-product-summary" hidden aria-label="Referencia y confiabilidad por producto"></section>
 <div class="tp-scroll"><table><thead id="tp-head"></thead><tbody id="tp-body"></tbody></table></div>
-<div id="tp-pages"><span id="tp-count"></span><button class="btn" id="tp-more" onclick="tpLimit+=100;tpRender()">Ver más</button></div>`;
+<div id="tp-pages"><span id="tp-count"></span><button class="btn" id="tp-more" onclick="tpLimit+=100;tpRender()">Ver más</button></div>
+<dialog id="tp-calendar-dialog" class="workflow-dialog" aria-labelledby="tp-calendar-title">
+ <h2 id="tp-calendar-title">Calendario laboral</h2>
+ <p class="tp-note">Los festivos nacionales se cargan automáticamente. Los ajustes recalculan el histórico; si se superponen, prevalece el más reciente.</p>
+ <form id="tp-calendar-form" onsubmit="tpCalendarSave(event)">
+  <label>Tipo<select id="tp-adjust-type" required><option value="no_laboral">Permiso / cierre</option><option value="tiempo_extra">Tiempo extra</option></select></label>
+  <label>Fecha<input id="tp-adjust-date" type="date" required></label>
+  <label>Desde<input id="tp-adjust-start" type="time" required value="07:00"></label>
+  <label>Hasta<input id="tp-adjust-end" type="time" required value="16:30"></label>
+  <label>Etapa<select id="tp-adjust-stage"><option value="">Toda la planta</option>${TP_STAGES.map((s,i)=>`<option value="${i}">${s}</option>`).join('')}</select></label>
+  <label>Motivo<input id="tp-adjust-description" maxlength="240" required placeholder="Ej. Permiso del equipo de Pintura"></label>
+  <button class="btn btn-y" type="submit"><i class="ti ti-device-floppy"></i> Guardar ajuste</button>
+ </form>
+ <div class="tp-filters"><label>Año<select id="tp-calendar-year" onchange="tpCalendarRender()"></select></label></div>
+ <div id="tp-calendar-list" class="tp-scroll"></div>
+ <footer><button class="btn" type="button" onclick="document.getElementById('tp-calendar-dialog').close()">Cerrar</button></footer>
+</dialog>`;
 document.getElementById('app-body').appendChild(tpSection);
 function tpEscape(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function tpDate(v){return v?new Date(v).toLocaleString('es-CO',{timeZone:'America/Bogota'}):'—';}
@@ -5280,16 +5299,34 @@ function tpCivil(ms){const p=Object.fromEntries(TP_BOGOTA.formatToParts(new Date
 function tpLocalInstant(day,minute){const guess=day+minute*60000;return guess+(guess-tpCivil(guess));}
 function tpWorkSlots(day){const dow=new Date(day).getUTCDay();return dow===0||dow===6?[]:[[420,780],[810,dow===5?885:990]].map(([a,b])=>[tpLocalInstant(day,a),tpLocalInstant(day,b)]);}
 function tpWorkDay(ms){const local=new Date(tpCivil(ms));return Date.UTC(local.getUTCFullYear(),local.getUTCMonth(),local.getUTCDate());}
-function tpNextWork(value){
-  if(!value)return null;const t=Date.parse(value);if(!Number.isFinite(t))return null;
-  for(let day=tpWorkDay(t);;day+=86400000)for(const [a,b] of tpWorkSlots(day))if(t<b)return new Date(Math.max(t,a)).toISOString();
+function tpDayKey(ms){return new Date(tpWorkDay(ms)).toISOString().slice(0,10);}
+function tpApplicableAdjustment(ms,stage){return tpAdjustments.filter(a=>Date.parse(a.inicio)<=ms&&Date.parse(a.fin)>ms&&(a.etapa==null||Number(a.etapa)===Number(stage))).sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at))||Number(a.orden||0)-Number(b.orden||0)||String(a.id).localeCompare(String(b.id))).at(-1);}
+function tpIsWorking(ms,stage){
+  const adjustment=tpApplicableAdjustment(ms,stage);if(adjustment)return adjustment.tipo==='tiempo_extra';
+  if(tpHolidays.some(h=>h.fecha===tpDayKey(ms)))return false;
+  return tpWorkSlots(tpWorkDay(ms)).some(([a,b])=>ms>=a&&ms<b);
 }
-function tpWorkMinutes(start,end){
+function tpNextWork(value,stage){
+  if(!value)return null;const t=Date.parse(value);if(!Number.isFinite(t))return null;
+  if(tpIsWorking(t,stage))return new Date(t).toISOString();
+  for(let day=tpWorkDay(t),limit=0;limit<370;day+=86400000,limit++){
+    const localStart=tpLocalInstant(day,0),localEnd=tpLocalInstant(day+86400000,0);
+    const candidates=tpWorkSlots(day).flatMap(([a,b])=>[a,b]);
+    tpAdjustments.filter(a=>a.etapa==null||Number(a.etapa)===Number(stage)).forEach(a=>candidates.push(Date.parse(a.inicio),Date.parse(a.fin)));
+    for(const point of [...new Set(candidates)].filter(point=>Number.isFinite(point)&&point>=localStart&&point<localEnd).sort((a,b)=>a-b))if(point>=t&&tpIsWorking(point+1,stage))return new Date(point).toISOString();
+  }
+  return null;
+}
+function tpWorkMinutes(start,end,stage){
   if(!start||!end)return null;const a=Date.parse(start),b=Date.parse(end);if(!Number.isFinite(a)||!Number.isFinite(b)||b<a)return null;
-  let ms=0;for(let day=tpWorkDay(a),last=tpWorkDay(b);day<=last;day+=86400000)for(const [open,close] of tpWorkSlots(day))ms+=Math.max(0,Math.min(b,close)-Math.max(a,open));
+  const points=[a,b];for(let day=tpWorkDay(a),last=tpWorkDay(b);day<=last;day+=86400000)tpWorkSlots(day).forEach(slot=>points.push(...slot));
+  tpAdjustments.filter(x=>(x.etapa==null||Number(x.etapa)===Number(stage))&&Date.parse(x.fin)>a&&Date.parse(x.inicio)<b).forEach(x=>points.push(Date.parse(x.inicio),Date.parse(x.fin)));
+  const ordered=[...new Set(points.filter(p=>p>=a&&p<=b))].sort((x,y)=>x-y);let ms=0;
+  for(let i=0;i<ordered.length-1;i++)if(tpIsWorking(ordered[i]+(ordered[i+1]-ordered[i])/2,stage))ms+=ordered[i+1]-ordered[i];
   return ms/60000;
 }
-function tpMinutes(r){const n=r.duracion_laboral_minutos==null?tpWorkMinutes(r.inicio,r.finalizacion):Number(r.duracion_laboral_minutos);return n!=null&&Number.isFinite(n)&&n>=0?n:null;}
+function tpMinutes(r){const n=tpWorkMinutes(r.inicio,r.finalizacion,r.etapa);return n!=null&&Number.isFinite(n)&&n>=0?n:null;}
+function tpMetric(r){return r?.calendarTotal?Number(r.duracion_minutos):tpMinutes(r);}
 function tpValid(r){return !!r.inicio&&!!r.finalizacion&&!r.interrumpido&&Number.isFinite(Date.parse(r.inicio))&&Date.parse(r.finalizacion)>=Date.parse(r.inicio)&&tpMinutes(r)!=null;}
 function tpState(r){return r.interrumpido?'Interrumpido':!r.inicio?'Inicio desconocido':r.finalizacion?'Finalizado':'En etapa';}
 function tpFiltered(){
@@ -5297,7 +5334,7 @@ function tpFiltered(){
     from=document.getElementById('tp-from').value,to=document.getElementById('tp-to').value,state=document.getElementById('tp-state').value;
   const runs=new Map(tpRuns.map(r=>[r.id,r]));
   return tpRows.map(r=>({...r,f:runs.get(r.fabricacion_id)||{}})).filter(r=>{
-    const day=tpDay(tpNextWork(r.inicio||r.primera_observacion));
+    const day=tpDay(tpNextWork(r.inicio||r.primera_observacion,r.etapa));
     return (!product||r.f.codigo===product)&&(!q||normKey([r.f.codigo,r.f.producto,r.f.serial,r.fabricacion_id].join(' ')).includes(q))&&
       (stage===''||r.etapa===Number(stage))&&(!from||day>=from)&&(!to||day<=to)&&
       (!state||(state==='abierto'&&!r.finalizacion)||(state==='valido'&&tpValid(r))||(state==='incompleto'&&(!r.inicio||r.interrumpido)));
@@ -5317,14 +5354,14 @@ function tpRunInterval(f,limit=6){
   // No transforma huecos u observaciones solapadas en un total completo.
   if(all[0].etapa!==0||all.at(-1).etapa!==limit||all.some((r,i)=>i>0&&Date.parse(r.inicio)!==Date.parse(all[i-1].finalizacion)))return null;
   const inicio=all[0].inicio,finalizacion=all.at(-1).finalizacion;
-  return {inicio,finalizacion,duracion_minutos:tpWorkMinutes(inicio,finalizacion)};
+  return {inicio,finalizacion,duracion_minutos:all.reduce((sum,r)=>sum+tpMinutes(r),0),calendarTotal:true};
 }
 function tpBacktest(records){
   const errors=[];
   for(const record of records){
     const past=records.filter(p=>Date.parse(p.finalizacion)<Date.parse(record.inicio));
     if(past.length<3)continue;
-    errors.push(Math.abs(tpMinutes(record)-tpStatistics(past.map(tpMinutes)).median));
+    errors.push(Math.abs(tpMetric(record)-tpStatistics(past.map(tpMetric)).median));
   }
   return {n:errors.length,mae:errors.length?errors.reduce((s,e)=>s+e,0)/errors.length:null};
 }
@@ -5337,12 +5374,12 @@ function tpProductOptions(){
 function tpProductRuns(){
   const code=document.getElementById('tp-product').value,q=normKey(document.getElementById('tp-search').value),from=document.getElementById('tp-from').value,to=document.getElementById('tp-to').value;
   return tpRuns.filter(f=>{
-    const day=tpDay(tpNextWork(f.primera_observacion));
+    const day=tpDay(tpNextWork(f.primera_observacion,0));
     return (!code||f.codigo===code)&&(!q||normKey([f.codigo,f.producto,f.serial,f.id].join(' ')).includes(q))&&(!from||day>=from)&&(!to||day<=to);
   });
 }
 function tpReferenceRows(records,total){
-  const s=tpTypical(records.map(tpMinutes)),back=tpBacktest(records);
+  const s=tpTypical(records.map(tpMetric)),back=tpBacktest(records);
   return [s?tpNum(s.median):'Sin referencia',records.length+' / '+total,s?tpNum(s.mean):'—',s?.n>1?tpNum(s.q25)+' – '+tpNum(s.q75):'Muestra insuficiente',s?tpNum(s.min)+' – '+tpNum(s.max):'—',s?tpNum(s.sd):'—',s?.cv!=null?tpNum(s.cv)+'%':'—',back.n?tpNum(back.mae)+' ('+back.n+' comparaciones)':'Sin validación retrospectiva'];
 }
 function tpProductSummary(code,runs){
@@ -5372,14 +5409,14 @@ function tpRender(){
       values=codes.map(c=>{const list=runs.filter(f=>f.codigo===c),valid=list.map(f=>tpRunInterval(f)).filter(Boolean);return [c,...tpReferenceRows(valid,list.length)];});
     }
   }else if(tpView==='historial'){
-    headers=['Código','Producto','Fabricación (serial)','Etapa','Inicio laboral','Finalización laboral','Minutos laborales','Responsable','Estado','Observaciones','Reporte original de inicio','Reporte original de fin'];
-    values=rows.map(r=>[r.f.codigo||'Sin código vinculado',r.f.producto||'',r.f.serial?`#${r.f.serial}`:'Sin serial',TP_STAGES[r.etapa],tpDate(tpNextWork(r.inicio)),tpDate(tpNextWork(r.finalizacion)),tpNum(tpMinutes(r)),r.responsable||'No informado',tpState(r),r.observaciones||'',tpDate(r.inicio),tpDate(r.finalizacion)]);
+    headers=['Código','Producto','Serial','Etapa','Inicio laboral','Finalización laboral','Minutos laborales','Responsable','Estado','Observaciones','Reporte original de inicio','Reporte original de fin'];
+    values=rows.map(r=>[r.f.codigo||'Sin código vinculado',r.f.producto||'',r.f.serial?`#${r.f.serial}`:'Sin serial',TP_STAGES[r.etapa],tpDate(tpNextWork(r.inicio,r.etapa)),tpDate(tpNextWork(r.finalizacion,r.etapa)),tpNum(tpMinutes(r)),r.responsable||'No informado',tpState(r),r.observaciones||'',tpDate(r.inicio),tpDate(r.finalizacion)]);
   }else if(tpView==='indicadores'){
     headers=['Código','Etapa','Registros válidos','Promedio (min)','Mínimo','Máximo','Mediana','Desv. estándar muestral'];
     const groups=new Map();rows.filter(r=>tpValid(r)&&r.f.codigo).forEach(r=>{const k=r.f.codigo+'|'+r.etapa;if(!groups.has(k))groups.set(k,{code:r.f.codigo,stage:r.etapa,a:[]});groups.get(k).a.push(tpMinutes(r));});
     values=[...groups.values()].sort((a,b)=>a.code.localeCompare(b.code)||a.stage-b.stage).map(g=>{const s=tpStatistics(g.a);return [g.code,TP_STAGES[g.stage],s.n,tpNum(s.mean),tpNum(s.min),tpNum(s.max),tpNum(s.median),tpNum(s.sd)];});
   }else{
-    headers=['Código','Producto','Fabricación (serial)','Primera observación','Última observación','Etapas con intervalo válido','Minutos laborales válidos acumulados','Fabricación: Material → Empacar (min)','Estado','Proceso hasta Despacho (min)'];
+    headers=['Código','Producto','Serial','Primera observación','Última observación','Etapas con intervalo válido','Minutos laborales válidos acumulados','Fabricación: Material → Empacar (min)','Estado','Proceso hasta Despacho (min)'];
     values=tpProductRuns().map(f=>{
       const all=tpRows.filter(r=>r.fabricacion_id===f.id),valid=all.filter(tpValid),coverage=new Set(valid.map(r=>r.etapa));
       return [f.codigo||'Sin código vinculado',f.producto,f.serial?`#${f.serial}`:'Sin serial',tpDate(f.primera_observacion),tpDate(f.ultima_observacion),coverage.size+'/8',valid.length?tpNum(valid.reduce((s,r)=>s+tpMinutes(r),0)):'—',tpNum(tpRunInterval(f)?.duracion_minutos),f.estado==='despachada'?'Despacho observado':f.estado==='terminada_sin_despacho'?'Terminada; despacho sin observar':TP_STAGES[f.etapa_actual],tpNum(tpRunInterval(f,7)?.duracion_minutos)];
@@ -5390,15 +5427,15 @@ function tpRender(){
   document.getElementById('tp-count').textContent=`${Math.min(tpLimit,values.length)} de ${values.length} registros`;
   document.getElementById('tp-more').hidden=values.length<=tpLimit;
 }
-async function tpReadAll(table){
-  const rows=[];for(let start=0;;start+=1000){const {data,error}=await sb.from(table).select('*').order('id').range(start,start+999);if(error)throw error;rows.push(...data);if(data.length<1000)return rows;}
+async function tpReadAll(table,order='id'){
+  const rows=[];for(let start=0;;start+=1000){const {data,error}=await sb.from(table).select('*').order(order).range(start,start+999);if(error)throw error;rows.push(...data);if(data.length<1000)return rows;}
 }
 async function tpLoad(){
   if(!appIsAdmin()||tpLoading)return;tpLoading=true;const uid=appAccess.user?.id;
   try{
-    const runs=await tpReadAll('produccion_fabricaciones'),rows=await tpReadAll('produccion_tiempos');
+    const [runs,rows,holidays,adjustments]=await Promise.all([tpReadAll('produccion_fabricaciones'),tpReadAll('produccion_tiempos'),tpReadAll('produccion_festivos_colombia','fecha'),tpReadAll('produccion_calendario_ajustes','created_at')]);
     if(!appIsAdmin()||appAccess.user?.id!==uid)return;
-    tpRuns=runs;tpRows=rows;tpRender();
+    tpRuns=runs;tpRows=rows;tpHolidays=holidays;tpAdjustments=adjustments;tpRender();
   }catch(e){tpStatus='Histórico conservado; lectura pendiente';if(!tpLast)document.getElementById('tp-status').textContent=tpStatus;}
   finally{tpLoading=false;}
 }
@@ -5421,7 +5458,32 @@ function tpStart(){if(tpTimer)return;void tpTick();tpTimer=setInterval(()=>void 
 function tpCsv(rows){
   const header=['Fecha laboral','Código','Producto','Orden/lote','Etapa','Inicio laboral','Finalización laboral','Duración en minutos laborales','Responsable','Estado','Observaciones','Serial','Válido para indicadores','Método','Reporte original de inicio','Reporte original de fin','Minutos transcurridos originales'];
   const cell=v=>{let s=String(v??'');if(/^[\s]*[=+@-]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
-  return '\uFEFF'+[header,...rows.map(r=>[tpDay(tpNextWork(r.inicio||r.primera_observacion)),r.f.codigo||'',r.f.producto||'','',TP_STAGES[r.etapa],tpNextWork(r.inicio)||'',tpNextWork(r.finalizacion)||'',tpMinutes(r)??'',r.responsable||'',tpState(r),r.observaciones||'',r.f.serial||'',tpValid(r)?'Sí':'No','Laboral observado por sincronización; America/Bogota; fechas ISO con zona',r.inicio||'',r.finalizacion||'',r.duracion_minutos??''])].map(row=>row.map(cell).join(',')).join('\r\n');
+  return '\uFEFF'+[header,...rows.map(r=>[tpDay(tpNextWork(r.inicio||r.primera_observacion,r.etapa)),r.f.codigo||'',r.f.producto||'','',TP_STAGES[r.etapa],tpNextWork(r.inicio,r.etapa)||'',tpNextWork(r.finalizacion,r.etapa)||'',tpMinutes(r)??'',r.responsable||'',tpState(r),r.observaciones||'',r.f.serial||'',tpValid(r)?'Sí':'No','Laboral observado por sincronización; America/Bogota; calendario administrable',r.inicio||'',r.finalizacion||'',r.duracion_minutos??''])].map(row=>row.map(cell).join(',')).join('\r\n');
+}
+function tpDateParts(date,time){const [y,m,d]=date.split('-').map(Number),[hh,mm]=time.split(':').map(Number);return tpLocalInstant(Date.UTC(y,m-1,d),hh*60+mm);}
+async function tpCalendarOpen(){
+  if(!appIsAdmin())return;if(!tpHolidays.length&&!tpLoading)await tpLoad();
+  document.getElementById('tp-adjust-date').value=tpDay(new Date().toISOString());
+  const years=[...new Set(tpHolidays.map(h=>h.fecha.slice(0,4)))],current=String(new Date().toLocaleString('en-US',{timeZone:'America/Bogota',year:'numeric'}));
+  document.getElementById('tp-calendar-year').innerHTML=years.filter(y=>Math.abs(Number(y)-Number(current))<=2).map(y=>`<option ${y===current?'selected':''}>${y}</option>`).join('');
+  tpCalendarRender();document.getElementById('tp-calendar-dialog').showModal();
+}
+function tpCalendarRender(){
+  const year=document.getElementById('tp-calendar-year').value,events=[
+    ...tpHolidays.filter(h=>h.fecha.startsWith(year)).map(h=>({date:h.fecha,type:'Festivo nacional',scope:'Toda la planta',description:h.nombre+' · '+h.fuente,locked:true,sort:h.fecha})),
+    ...tpAdjustments.filter(a=>tpDay(a.inicio).startsWith(year)).map(a=>({date:tpDay(a.inicio),type:a.tipo==='tiempo_extra'?'Tiempo extra':'Permiso / cierre',scope:a.etapa==null?'Toda la planta':TP_STAGES[a.etapa],description:a.descripcion,time:new Date(a.inicio).toLocaleTimeString('es-CO',{timeZone:'America/Bogota',hour:'2-digit',minute:'2-digit'})+'–'+new Date(a.fin).toLocaleTimeString('es-CO',{timeZone:'America/Bogota',hour:'2-digit',minute:'2-digit'}),id:a.id,sort:a.inicio}))
+  ].sort((a,b)=>String(a.sort).localeCompare(String(b.sort)));
+  document.getElementById('tp-calendar-list').innerHTML=`<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Horario</th><th>Alcance</th><th>Motivo</th><th></th></tr></thead><tbody>${events.map(e=>`<tr><td>${tpEscape(e.date)}</td><td>${tpEscape(e.type)}</td><td>${tpEscape(e.time||'Todo el día')}</td><td>${tpEscape(e.scope)}</td><td>${tpEscape(e.description)}</td><td>${e.locked?'':`<button class="btn btn-ghost" onclick="tpCalendarRemove('${e.id}')" aria-label="Eliminar ajuste" title="Eliminar"><i class="ti ti-trash"></i></button>`}</td></tr>`).join('')||'<tr><td colspan="6">Sin eventos para este año.</td></tr>'}</tbody></table>`;
+}
+async function tpCalendarSave(event){
+  event.preventDefault();const date=document.getElementById('tp-adjust-date').value,start=document.getElementById('tp-adjust-start').value,end=document.getElementById('tp-adjust-end').value;
+  const inicio=tpDateParts(date,start),fin=tpDateParts(date,end);if(!Number.isFinite(inicio)||!Number.isFinite(fin)||fin<=inicio){showToast('La hora final debe ser posterior a la inicial','yellow');return;}
+  const row={tipo:document.getElementById('tp-adjust-type').value,inicio:new Date(inicio).toISOString(),fin:new Date(fin).toISOString(),etapa:document.getElementById('tp-adjust-stage').value===''?null:Number(document.getElementById('tp-adjust-stage').value),descripcion:document.getElementById('tp-adjust-description').value.trim(),created_by:appAccess.user.id};
+  try{const {data,error}=await sb.from('produccion_calendario_ajustes').insert(row).select().single();if(error)throw error;tpAdjustments.push(data);event.target.reset();document.getElementById('tp-adjust-date').value=date;document.getElementById('tp-adjust-start').value='07:00';document.getElementById('tp-adjust-end').value='16:30';tpCalendarRender();tpRender();showToast('Calendario actualizado','green');}catch(e){showToast('No se pudo guardar el ajuste: '+e.message,'yellow');}
+}
+async function tpCalendarRemove(id){
+  if(!appIsAdmin()||!confirm('¿Eliminar este ajuste del calendario? El histórico se recalculará.'))return;
+  try{const {error}=await sb.from('produccion_calendario_ajustes').delete().eq('id',id);if(error)throw error;tpAdjustments=tpAdjustments.filter(a=>a.id!==id);tpCalendarRender();tpRender();showToast('Ajuste eliminado','green');}catch(e){showToast('No se pudo eliminar el ajuste: '+e.message,'yellow');}
 }
 function tpExport(){
   if(!appIsAdmin())return;const url=URL.createObjectURL(new Blob([tpCsv(tpFiltered())],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');
