@@ -457,6 +457,7 @@ body[data-worker] .app-section:not(#sec-calidad){display:none!important}
     <div class="mtab" data-sec="garantias" onclick="switchSection('garantias')"><i class="ti ti-tools"></i> <span class="mtab-lbl">Garantías</span></div>
     <div class="mtab" data-sec="estadisticas" onclick="switchSection('estadisticas');renderEstadisticas()"><i class="ti ti-chart-dots"></i> <span class="mtab-lbl">Estadísticas</span></div>
     <button class="mtab" data-sec="tiempos" onclick="switchSection('tiempos')" title="Tiempos de producción"><i class="ti ti-clock"></i> <span class="mtab-lbl">Tiempos de producción</span></button>
+    <button class="mtab" data-sec="gestion" onclick="switchSection('gestion')" title="Gestión de tiempo"><i class="ti ti-calendar-time"></i> <span class="mtab-lbl">Gestión de tiempo</span></button>
     <button class="mtab" data-sec="ajustes" onclick="qmOpen()" aria-label="Ajustes" title="Ajustes"><i class="ti ti-settings"></i> <span class="mtab-lbl">Ajustes</span></button>
   </div>
 
@@ -1282,6 +1283,7 @@ function switchSection(sec){
   try{ localStorage.setItem('xtensor_app_lastsection', sec); }catch(e){}
   if(sec==='ajustes'){qmRender();void qmSync();}
   if(sec==='tiempos'){tpRender();void tpLoad();}
+  if(sec==='gestion'){gtRender();void gtLoad();}
 }
 </script>
 
@@ -3042,7 +3044,8 @@ const CAL_PEOPLE=[
   ['Ariel Valencia M',['pulido']],['Cristian C Rodriguez G',['material']],
   ['Daniel Garcia Zaray',['ensamble']],['Daniel R Duque Z',['empacado']],
   ['Germán A Villada',['armado','resoldado']],['Jose Fernando Gaviria',['armado']],
-  ['Juan Felipe Martinez A',['armado','resoldado']],['Luis Alfonso Betancurth O',['pintado']]
+  ['Juan Felipe Martinez A',['armado','resoldado']],['Luis Alfonso Betancurth O',['pintado']],
+  ['Cesar D Rendon C',[]]
 ];
 function calDefaultPerson(section){return CAL_PEOPLE.find(([,sections])=>sections.includes(section))?.[0]||'';}
 function calPeopleFields(stage,d){
@@ -5489,6 +5492,261 @@ function tpExport(){
   if(!appIsAdmin())return;const url=URL.createObjectURL(new Blob([tpCsv(tpFiltered())],{type:'text/csv;charset=utf-8;'})),a=document.createElement('a');
   a.href=url;a.download='tiempos_produccion_'+tpDay(new Date().toISOString())+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+</script>
+
+<style>
+#sec-gestion{min-width:0;overflow:auto;padding:14px;gap:12px}
+#sec-gestion.active{display:flex;flex-direction:column}
+.gt-head,.gt-tabs,.gt-filters,.gt-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gt-head h2{font-size:18px;margin-right:auto}.gt-tabs{border-bottom:1px solid var(--border);padding-bottom:8px}
+.gt-tabs button[aria-selected=true]{color:var(--yellow);border-color:var(--yellow)}
+.gt-filters{background:var(--bg2);border:1px solid var(--border);padding:9px}
+.gt-filters input,.gt-filters select{height:34px;min-width:130px}.gt-filters input[type=search]{min-width:210px;flex:1}
+.gt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.gt-card{border:1px solid var(--border);background:var(--bg2);padding:12px;min-width:0}
+.gt-card dt{font-size:11px;color:var(--muted);text-transform:uppercase}.gt-card dd{font-size:21px;font-weight:700;margin-top:5px}
+.gt-panel{border:1px solid var(--border);background:var(--bg2);min-width:0}
+.gt-panel-head{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}.gt-panel-head h3{font-size:14px;margin-right:auto}
+.gt-table-wrap{overflow:auto;max-height:58vh}.gt-table{border-collapse:collapse;width:100%;min-width:900px;font-size:12px}
+.gt-table th,.gt-table td{padding:8px 9px;border-bottom:1px solid var(--border);text-align:left}.gt-table th{position:sticky;top:0;background:var(--bg2);z-index:2}
+.gt-state{display:inline-flex;border:1px solid var(--border);padding:2px 6px;font-size:11px}.gt-state.over{color:var(--red);border-color:var(--red-border)}.gt-state.busy{color:var(--yellow);border-color:var(--yellow-border)}.gt-state.free{color:var(--green);border-color:var(--green-border)}
+.gt-gantt{overflow:auto;border:1px solid var(--border);background:var(--bg2)}.gt-gantt-inner{min-width:1050px}
+.gt-axis,.gt-lane{display:grid;grid-template-columns:190px minmax(850px,1fr)}.gt-axis{position:sticky;top:0;z-index:4;background:var(--bg2);border-bottom:1px solid var(--border)}
+.gt-axis-name,.gt-worker{padding:9px;border-right:1px solid var(--border);font-weight:600}.gt-axis-track{display:flex;min-height:38px}.gt-tick{flex:1;border-right:1px solid var(--border);padding:6px;font-size:10px;color:var(--muted);text-align:center}
+.gt-lane{min-height:54px;border-bottom:1px solid var(--border)}.gt-worker small{display:block;color:var(--muted);font-weight:400;margin-top:3px}
+.gt-track{position:relative;background-image:linear-gradient(to right,var(--border) 1px,transparent 1px);background-size:calc(100% / var(--gt-cols)) 100%}
+.gt-bar{position:absolute;top:8px;height:36px;min-width:8px;border:1px solid var(--yellow-border);background:var(--yellow-bg);color:var(--text);padding:4px 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:10px;cursor:grab}
+.gt-bar.done{border-color:var(--green-border);background:var(--green-bg)}.gt-bar.cancel{opacity:.45}.gt-bar.conflict{border-color:var(--red-border);background:var(--red-bg)}
+.gt-empty{padding:28px;text-align:center;color:var(--muted)}.gt-note{font-size:11px;color:var(--muted);line-height:1.45}.gt-warn{color:var(--red)}
+.gt-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-width:min(650px,84vw)}.gt-form label{display:grid;gap:5px;font-size:11px;color:var(--muted)}.gt-form .full{grid-column:1/-1}.gt-form input,.gt-form select,.gt-form textarea{width:100%}
+#gt-assignment-dialog,#gt-novelty-dialog,#gt-overtime-dialog{max-width:760px}
+@media(max-width:700px){#sec-gestion{padding:8px}.gt-form{grid-template-columns:1fr;min-width:78vw}.gt-form .full{grid-column:auto}.gt-head h2{flex-basis:100%}.gt-filters>*{width:100%}}
+</style>
+<section id="sec-gestion" class="app-section" aria-label="Gestión de tiempo">
+  <header class="gt-head"><h2>Gestión de tiempo</h2><span id="gt-status" class="gt-note"></span><button class="btn" onclick="gtLoad(true)" title="Actualizar"><i class="ti ti-refresh"></i></button><button class="btn primary" onclick="gtOpenAssignment()"><i class="ti ti-plus"></i> Asignación</button></header>
+  <nav class="gt-tabs" role="tablist">
+    <button class="btn" role="tab" data-gt-view="dashboard" onclick="gtSetView('dashboard')">Dashboard</button>
+    <button class="btn" role="tab" data-gt-view="gantt" onclick="gtSetView('gantt')">Gantt</button>
+    <button class="btn" role="tab" data-gt-view="operarios" onclick="gtSetView('operarios')">Operarios</button>
+    <button class="btn" role="tab" data-gt-view="tiempos" onclick="gtSetView('tiempos')">Tiempos de producción</button>
+    <button class="btn" role="tab" data-gt-view="novedades" onclick="gtSetView('novedades')">Novedades</button>
+    <button class="btn" role="tab" data-gt-view="extras" onclick="gtSetView('extras')">Horas extras</button>
+    <button class="btn" role="tab" data-gt-view="indicadores" onclick="gtSetView('indicadores')">Indicadores</button>
+  </nav>
+  <div class="gt-filters">
+    <input id="gt-search" type="search" placeholder="Operario, serial, código o producto" oninput="gtRender()">
+    <input id="gt-date" type="date" onchange="gtRender()">
+    <select id="gt-range" onchange="gtRender()"><option value="day">Día</option><option value="week" selected>Semana</option><option value="month">Mes</option></select>
+    <select id="gt-worker-filter" onchange="gtRender()"><option value="">Todos los operarios</option></select>
+    <select id="gt-role-filter" onchange="gtRender()"><option value="">Todos los cargos</option></select>
+    <select id="gt-stage-filter" onchange="gtRender()"><option value="">Todas las etapas</option></select>
+    <select id="gt-machine-filter" onchange="gtRender()"><option value="">Todas las máquinas</option></select>
+    <select id="gt-state-filter" onchange="gtRender()"><option value="">Todos los estados</option><option>programada</option><option>en_progreso</option><option>completada</option><option>cancelada</option></select>
+  </div>
+  <div id="gt-content"></div>
+</section>
+<dialog id="gt-assignment-dialog"><form class="gt-form" onsubmit="gtSaveAssignment(event)">
+  <input id="gt-a-id" type="hidden"><h2 class="full" style="font-size:18px">Asignación de producción</h2>
+  <label class="full">Máquina / producto<select id="gt-a-machine" required></select></label>
+  <label>Etapa<select id="gt-a-stage" required></select></label><label>Operario<select id="gt-a-worker" required></select></label>
+  <label>Inicio<input id="gt-a-start" type="datetime-local" required></label><label>Finalización<input id="gt-a-end" type="datetime-local" required></label>
+  <label>Estado<select id="gt-a-state"><option value="programada">Programada</option><option value="en_progreso">En progreso</option><option value="completada">Completada</option><option value="cancelada">Cancelada</option></select></label>
+  <label class="full">Observaciones<textarea id="gt-a-notes" rows="2"></textarea></label><p id="gt-a-warning" class="gt-note gt-warn full"></p>
+  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button id="gt-a-cancel" type="button" class="btn" onclick="gtCancelAssignment()">Cancelar actividad</button><button class="btn primary" type="submit">Guardar</button></footer>
+</form></dialog>
+<dialog id="gt-novelty-dialog"><form class="gt-form" onsubmit="gtSaveNovelty(event)">
+  <input id="gt-n-id" type="hidden"><h2 class="full" style="font-size:18px">Novedad del operario</h2>
+  <label>Operario<select id="gt-n-worker" required></select></label><label>Tipo<select id="gt-n-type" required></select></label>
+  <label>Inicio<input id="gt-n-start" type="datetime-local" required></label><label>Finalización<input id="gt-n-end" type="datetime-local" required></label>
+  <label>Estado<select id="gt-n-state"><option>Pendiente</option><option>Aprobado</option><option>Rechazado</option></select></label><label>Aprobador<input id="gt-n-approver"></label>
+  <label class="full">Observación<textarea id="gt-n-notes" rows="2"></textarea></label>
+  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button class="btn primary" type="submit">Guardar</button></footer>
+</form></dialog>
+<dialog id="gt-overtime-dialog"><form class="gt-form" onsubmit="gtSaveOvertime(event)">
+  <input id="gt-o-id" type="hidden"><h2 class="full" style="font-size:18px">Horas extras</h2>
+  <label>Operario<select id="gt-o-worker" required></select></label><label>Estado<select id="gt-o-state"><option>Pendiente</option><option>Aprobado</option><option>Rechazado</option></select></label>
+  <label>Inicio<input id="gt-o-start" type="datetime-local" required></label><label>Finalización<input id="gt-o-end" type="datetime-local" required></label>
+  <label class="full">Motivo<input id="gt-o-reason" required></label><label>Aprobador<input id="gt-o-approver"></label>
+  <label class="full">Observación<textarea id="gt-o-notes" rows="2"></textarea></label>
+  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button class="btn primary" type="submit">Guardar</button></footer>
+</form></dialog>
+
+<script>
+// ══════════════ GESTIÓN DE TIEMPO ══════════════
+const GT_STAGES=['Material','Armar','Resoldar','Pulir','Pintar','Ensamblar','Empacar','Despacho'];
+const GT_NOVELTIES=['Permiso','Incapacidad','Vacaciones','Ausencia','Día no laborado','Capacitación','Reunión','Trabajo administrativo','Mantenimiento','Otra actividad','Otro'];
+let gtView='dashboard',gtLoading=false,gtLoaded=false,gtWorkers=[],gtAssignments=[],gtNovelties=[],gtOvertime=[],gtStandards=[],gtRuns=[],gtTimes=[];
+document.getElementById('app-body').appendChild(document.getElementById('sec-gestion'));
+function gtIsoLocal(value){return value?new Date(value+':00-05:00').toISOString():null;}
+function gtInputDate(value){
+  if(!value)return '';const p=Object.fromEntries(TP_BOGOTA.formatToParts(new Date(value)).map(x=>[x.type,x.value]));
+  return p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute;
+}
+function gtFmt(value,opts){return value?new Intl.DateTimeFormat('es-CO',Object.assign({timeZone:'America/Bogota',dateStyle:'short',timeStyle:'short'},opts||{})).format(new Date(value)):'—';}
+function gtHours(minutes){return (Math.max(0,Number(minutes)||0)/60).toLocaleString('es-CO',{maximumFractionDigits:1})+' h';}
+function gtOverlap(a,b,from,to){const x=Math.max(Date.parse(a),from),y=Math.min(Date.parse(b),to);return y>x?[x,y]:null;}
+function gtMergedIntervals(records,range){
+  const intervals=records.map(x=>gtOverlap(x.inicio,x.fin,range.from,range.to)).filter(Boolean).sort((a,b)=>a[0]-b[0]),merged=[];
+  intervals.forEach(x=>{const last=merged.at(-1);if(last&&x[0]<=last[1])last[1]=Math.max(last[1],x[1]);else merged.push(x.slice());});return merged;
+}
+function gtRange(){
+  const input=document.getElementById('gt-date'),mode=document.getElementById('gt-range').value,date=input.value||tpDay(new Date().toISOString());
+  let day=new Date(date+'T00:00:00Z'),start;
+  if(mode==='week'){const dow=day.getUTCDay()||7;day=new Date(day.getTime()-(dow-1)*86400000);}
+  if(mode==='month')day=new Date(Date.UTC(day.getUTCFullYear(),day.getUTCMonth(),1));
+  start=Date.parse(day.toISOString().slice(0,10)+'T00:00:00-05:00');
+  const days=mode==='day'?1:mode==='week'?7:new Date(Date.UTC(day.getUTCFullYear(),day.getUTCMonth()+1,0)).getUTCDate();
+  return {from:start,to:Date.parse(new Date(day.getTime()+days*86400000).toISOString().slice(0,10)+'T00:00:00-05:00'),days,mode,date:day.toISOString().slice(0,10)};
+}
+function gtWorker(id){return gtWorkers.find(w=>w.id===id)||{};}
+function gtRun(id){return gtRuns.find(f=>f.id===id)||{};}
+function gtPlanMinutes(a,range){
+  const o=gtOverlap(a.inicio,a.fin,range.from,range.to);if(!o)return 0;
+  let total=tpWorkMinutes(new Date(o[0]).toISOString(),new Date(o[1]).toISOString(),a.etapa)||0;
+  gtOvertime.filter(x=>x.operario_id===a.operario_id&&x.estado==='Aprobado').forEach(x=>{
+    const e=gtOverlap(x.inicio,x.fin,o[0],o[1]);if(e)total+=Math.max(0,(e[1]-e[0])/60000-(tpWorkMinutes(new Date(e[0]).toISOString(),new Date(e[1]).toISOString(),a.etapa)||0));
+  });
+  return total;
+}
+function gtMetrics(worker,range){
+  const start=new Date(range.from).toISOString(),end=new Date(range.to).toISOString();
+  const jornada=tpWorkMinutes(start,end)||0;
+  const lost=gtMergedIntervals(gtNovelties.filter(n=>n.operario_id===worker.id&&n.estado==='Aprobado'),range).reduce((sum,o)=>sum+(tpWorkMinutes(new Date(o[0]).toISOString(),new Date(o[1]).toISOString())||0),0);
+  const extra=gtMergedIntervals(gtOvertime.filter(x=>x.operario_id===worker.id&&x.estado==='Aprobado'),range).reduce((sum,o)=>sum+Math.max(0,(o[1]-o[0])/60000-(tpWorkMinutes(new Date(o[0]).toISOString(),new Date(o[1]).toISOString())||0)),0);
+  const load=gtAssignments.filter(a=>a.operario_id===worker.id&&a.estado!=='cancelada').reduce((sum,a)=>sum+gtPlanMinutes(a,range),0);
+  const available=Math.max(0,jornada-lost),remaining=available+extra-load,util=available+extra>0?load/(available+extra)*100:load?100:0;
+  return {jornada,lost,extra,load,available,remaining,util,over:Math.max(0,-remaining)};
+}
+function gtFilteredWorkers(){
+  const id=document.getElementById('gt-worker-filter').value,role=document.getElementById('gt-role-filter').value,q=normKey(document.getElementById('gt-search').value);
+  return gtWorkers.filter(w=>w.activo&&(!id||w.id===id)&&(!role||w.cargo===role)&&(!q||normKey(w.nombre+' '+w.cargo).includes(q)||gtAssignments.some(a=>a.operario_id===w.id&&normKey(gtMachineLabel(a)).includes(q))));
+}
+function gtFilteredAssignments(range){
+  const stage=document.getElementById('gt-stage-filter').value,machine=document.getElementById('gt-machine-filter').value,state=document.getElementById('gt-state-filter').value,q=normKey(document.getElementById('gt-search').value);
+  return gtAssignments.filter(a=>a.inicio<new Date(range.to).toISOString()&&a.fin>new Date(range.from).toISOString()&&(!stage||Number(stage)===a.etapa)&&(!machine||machine===a.fabricacion_id)&&(!state||state===a.estado)&&(!q||normKey(gtWorker(a.operario_id).nombre+' '+gtMachineLabel(a)).includes(q)));
+}
+function gtMachineLabel(a){const f=gtRun(a.fabricacion_id);return '#'+(f.serial||'—')+' · '+(f.codigo||'Sin código')+' · '+(f.producto||'Producto');}
+function gtState(m){return m.over>0?['Sobrecargado','over']:m.util>=80?['Alta ocupación','busy']:['Disponible','free'];}
+function gtSetView(view){gtView=view;gtRender();}
+function gtCard(label,value,detail){return '<dl class="gt-card"><dt>'+tpEscape(label)+'</dt><dd>'+tpEscape(value)+'</dd>'+(detail?'<small class="gt-note">'+tpEscape(detail)+'</small>':'')+'</dl>';}
+function gtTable(headers,rows){
+  return '<div class="gt-table-wrap"><table class="gt-table"><thead><tr>'+headers.map(h=>'<th>'+tpEscape(h)+'</th>').join('')+'</tr></thead><tbody>'+(rows.length?rows.join(''):'<tr><td colspan="'+headers.length+'" class="gt-empty">Sin registros para los filtros seleccionados</td></tr>')+'</tbody></table></div>';
+}
+function gtRenderDashboard(range,workers){
+  const metrics=workers.map(w=>gtMetrics(w,range)),sum=k=>metrics.reduce((s,m)=>s+m[k],0);
+  const cards=gtCard('Operarios',String(workers.length))+gtCard('Horas disponibles',gtHours(sum('available')))+gtCard('Horas programadas',gtHours(sum('load')))+gtCard('Horas libres',gtHours(metrics.reduce((s,m)=>s+Math.max(0,m.remaining),0)))+gtCard('Horas extras',gtHours(sum('extra')))+gtCard('Permisos / ausencias',gtHours(sum('lost')))+gtCard('Sobrecargados',String(metrics.filter(m=>m.over>0).length))+gtCard('Utilización promedio',(metrics.length?metrics.reduce((s,m)=>s+m.util,0)/metrics.length:0).toLocaleString('es-CO',{maximumFractionDigits:1})+'%');
+  const rows=workers.map((w,i)=>{const m=metrics[i],state=gtState(m);return '<tr><td><button class="link-btn" onclick="gtFocusWorker(\''+w.id+'\')">'+tpEscape(w.nombre)+'</button></td><td>'+tpEscape(w.cargo)+'</td><td>'+gtHours(m.available)+'</td><td>'+gtHours(m.load)+'</td><td>'+gtHours(m.extra)+'</td><td>'+gtHours(Math.max(0,m.remaining))+'</td><td>'+m.util.toLocaleString('es-CO',{maximumFractionDigits:1})+'%</td><td><span class="gt-state '+state[1]+'">'+state[0]+'</span></td></tr>';});
+  return '<div class="gt-grid">'+cards+'</div><section class="gt-panel"><div class="gt-panel-head"><h3>Capacidad del período</h3></div>'+gtTable(['Operario','Cargo','Disponible','Programado','Extra','Libre','Utilización','Estado'],rows)+'</section>';
+}
+function gtTicks(range){
+  const ticks=[];if(range.mode==='day'){for(let h=0;h<24;h+=3)ticks.push(String(h).padStart(2,'0')+':00');}
+  else for(let i=0;i<range.days;i++){const d=new Date(Date.UTC(+range.date.slice(0,4),+range.date.slice(5,7)-1,+range.date.slice(8,10)+i));ticks.push(new Intl.DateTimeFormat('es-CO',{weekday:'short',day:'2-digit',month:'short',timeZone:'UTC'}).format(d));}
+  return ticks;
+}
+function gtRenderGantt(range,workers){
+  const assignments=gtFilteredAssignments(range),ticks=gtTicks(range),span=range.to-range.from;
+  const axis='<div class="gt-axis"><div class="gt-axis-name">Operario</div><div class="gt-axis-track">'+ticks.map(t=>'<div class="gt-tick">'+tpEscape(t)+'</div>').join('')+'</div></div>';
+  const lanes=workers.map(w=>{const m=gtMetrics(w,range),bars=assignments.filter(a=>a.operario_id===w.id).map(a=>{const left=Math.max(0,(Date.parse(a.inicio)-range.from)/span*100),right=Math.min(100,(Date.parse(a.fin)-range.from)/span*100),conf=gtAssignments.some(b=>b.id!==a.id&&b.operario_id===a.operario_id&&b.estado!=='cancelada'&&b.inicio<a.fin&&b.fin>a.inicio);return '<button class="gt-bar '+(a.estado==='completada'?'done ':a.estado==='cancelada'?'cancel ':'')+(conf?'conflict':'')+'" style="left:'+left+'%;width:'+Math.max(.5,right-left)+'%" draggable="true" ondragstart="gtDrag(event,\''+a.id+'\')" onclick="gtOpenAssignment(\''+a.id+'\')" title="'+tpEscape(gtMachineLabel(a)+' · '+GT_STAGES[a.etapa]+' · '+gtFmt(a.inicio)+' - '+gtFmt(a.fin))+'">'+tpEscape((gtRun(a.fabricacion_id).codigo||'')+' '+GT_STAGES[a.etapa])+'</button>';}).join('');return '<div class="gt-lane"><div class="gt-worker">'+tpEscape(w.nombre)+'<small>'+tpEscape(w.cargo)+' · '+gtHours(Math.max(0,m.remaining))+' libres</small></div><div class="gt-track" style="--gt-cols:'+ticks.length+'" ondragover="event.preventDefault()" ondrop="gtDrop(event,\''+w.id+'\')">'+bars+'</div></div>';}).join('');
+  return '<section class="gt-gantt"><div class="gt-gantt-inner">'+axis+lanes+'</div></section><p class="gt-note">Arrastra una actividad a otra posición u operario. La duración se conserva y el sistema vuelve a comprobar conflictos. Haz clic para editar fechas, etapa, máquina o duración.</p>';
+}
+function gtRenderWorkers(range,workers){
+  const rows=workers.map(w=>{const m=gtMetrics(w,range),state=gtState(m),linked=w.worker_id?'Vinculado':'Pendiente de vincular';return '<tr><td>'+tpEscape(w.nombre)+'</td><td>'+tpEscape(w.cargo)+'</td><td>'+linked+'</td><td>'+gtHours(m.jornada)+'</td><td>'+gtHours(m.lost)+'</td><td>'+gtHours(m.load)+'</td><td>'+gtHours(m.extra)+'</td><td>'+gtHours(Math.max(0,m.remaining))+'</td><td><span class="gt-state '+state[1]+'">'+state[0]+'</span></td><td><button class="btn" onclick="gtFocusWorker(\''+w.id+'\')">Ver agenda</button></td></tr>';});
+  return '<section class="gt-panel"><div class="gt-panel-head"><h3>Operarios</h3></div>'+gtTable(['Nombre','Cargo','Fuente','Jornada','Novedades','Producción','Extra','Libre','Estado',''],rows)+'</section>';
+}
+function gtRenderTimes(){
+  const runMap=new Map(gtRuns.map(f=>[f.id,f])),groups=new Map(),stageFilter=document.getElementById('gt-stage-filter').value,machineFilter=document.getElementById('gt-machine-filter').value,workerFilter=document.getElementById('gt-worker-filter').value,q=normKey(document.getElementById('gt-search').value);
+  const allow=(id,stage)=>{const f=runMap.get(id);return f&&(!stageFilter||Number(stageFilter)===stage)&&(!machineFilter||machineFilter===id)&&(!q||normKey([f.codigo,f.producto,f.serial].join(' ')).includes(q));};
+  gtTimes.filter(tpValid).filter(t=>allow(t.fabricacion_id,t.etapa)).forEach(t=>{const f=runMap.get(t.fabricacion_id);if(!f?.codigo)return;const key=f.codigo+'|'+t.etapa,g=groups.get(key)||{code:f.codigo,product:f.producto,stage:t.etapa,real:[],assigned:[]};g.real.push(tpMinutes(t));groups.set(key,g);});
+  gtAssignments.filter(a=>a.estado!=='cancelada'&&(!workerFilter||a.operario_id===workerFilter)&&allow(a.fabricacion_id,a.etapa)).forEach(a=>{const f=runMap.get(a.fabricacion_id);if(!f?.codigo)return;const key=f.codigo+'|'+a.etapa,g=groups.get(key)||{code:f.codigo,product:f.producto,stage:a.etapa,real:[],assigned:[]};g.assigned.push(a);groups.set(key,g);});
+  const standard=new Map(gtStandards.map(s=>[s.codigo+'|'+s.etapa,s]));
+  const rows=[...groups.values()].sort((a,b)=>a.code.localeCompare(b.code)||a.stage-b.stage).map(g=>{const st=standard.get(g.code+'|'+g.stage),stats=tpStatistics(g.real),planned=g.assigned.reduce((sum,a)=>sum+gtPlanMinutes(a,{from:Date.parse(a.inicio),to:Date.parse(a.fin)}),0),real=stats?.median??null,diff=st&&real!=null?real-st.minutos:null,pct=diff!=null?diff/st.minutos*100:null,state=!st?'Sin estándar':real==null?'Sin tiempo real':Math.abs(pct)<=10?'Dentro de referencia':diff>0?'Desviación positiva':'Por debajo del estándar',responsibles=[...new Set(g.assigned.map(a=>gtWorker(a.operario_id).nombre).filter(Boolean))].join(', ');return '<tr><td>'+tpEscape(g.code)+'</td><td>'+tpEscape(g.product)+'</td><td>'+GT_STAGES[g.stage]+'</td><td>'+(st?gtHours(st.minutos):'Sin definir')+'</td><td>'+(real!=null?gtHours(real)+' · '+stats.n+' obs.':'Sin datos')+'</td><td>'+gtHours(planned)+'</td><td>'+tpEscape(responsibles||'Sin asignar')+'</td><td>'+(diff==null?'—':(diff>0?'+':diff<0?'−':'')+gtHours(Math.abs(diff))+' · '+(pct>0?'+':'')+pct.toLocaleString('es-CO',{maximumFractionDigits:1})+'%')+'</td><td>'+state+'</td><td><button class="btn" onclick="gtSetStandard(\''+tpEscape(g.code)+'\','+g.stage+','+(st?.minutos||'null')+')"><i class="ti ti-edit"></i></button></td></tr>';});
+  return '<section class="gt-panel"><div class="gt-panel-head"><h3>Estándar, programación y tiempo real</h3></div>'+gtTable(['Código','Producto','Etapa','Estándar','Real típico','Programado','Responsable','Desviación real','Estado',''],rows)+'</section><p class="gt-note">El tiempo real típico es la mediana de observaciones válidas. No se convierte automáticamente en tiempo estándar; el estándar solo existe cuando admin lo define.</p>';
+}
+function gtRenderNovelties(){
+  const rows=gtNovelties.slice().sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(n=>'<tr><td>'+tpEscape(gtWorker(n.operario_id).nombre)+'</td><td>'+tpEscape(n.tipo)+'</td><td>'+gtFmt(n.inicio)+'</td><td>'+gtFmt(n.fin)+'</td><td>'+gtHours((Date.parse(n.fin)-Date.parse(n.inicio))/60000)+'</td><td>'+tpEscape(n.estado)+'</td><td>'+tpEscape(n.aprobador||'—')+'</td><td>'+tpEscape(n.observacion||'')+'</td><td><button class="btn" onclick="gtOpenNovelty(\''+n.id+'\')"><i class="ti ti-edit"></i></button></td></tr>');
+  return '<section class="gt-panel"><div class="gt-panel-head"><h3>Novedades</h3><button class="btn primary" onclick="gtOpenNovelty()"><i class="ti ti-plus"></i> Nueva</button></div>'+gtTable(['Operario','Tipo','Inicio','Fin','Duración','Estado','Aprobador','Observación',''],rows)+'</section>';
+}
+function gtRenderOvertime(){
+  const rows=gtOvertime.slice().sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(x=>'<tr><td>'+tpEscape(gtWorker(x.operario_id).nombre)+'</td><td>'+gtFmt(x.inicio)+'</td><td>'+gtFmt(x.fin)+'</td><td>'+gtHours((Date.parse(x.fin)-Date.parse(x.inicio))/60000)+'</td><td>'+tpEscape(x.motivo)+'</td><td>'+tpEscape(x.estado)+'</td><td>'+tpEscape(x.aprobador||'—')+'</td><td><button class="btn" onclick="gtOpenOvertime(\''+x.id+'\')"><i class="ti ti-edit"></i></button></td></tr>');
+  return '<section class="gt-panel"><div class="gt-panel-head"><h3>Horas extras</h3><button class="btn primary" onclick="gtOpenOvertime()"><i class="ti ti-plus"></i> Registrar</button></div>'+gtTable(['Operario','Inicio','Fin','Duración','Motivo','Estado','Aprobador',''],rows)+'</section><p class="gt-note">Las horas extras se muestran separadas de la jornada normal y solo aumentan la capacidad efectiva cuando están aprobadas.</p>';
+}
+function gtRenderIndicators(range,workers){
+  const rows=workers.map(w=>{const m=gtMetrics(w,range);return '<tr><td>'+tpEscape(w.nombre)+'</td><td>'+tpEscape(w.cargo)+'</td><td>'+gtHours(m.available)+'</td><td>'+gtHours(m.load)+'</td><td>'+gtHours(Math.max(0,m.remaining))+'</td><td>'+gtHours(m.extra)+'</td><td>'+gtHours(m.lost)+'</td><td>'+m.util.toLocaleString('es-CO',{maximumFractionDigits:1})+'%</td><td>'+gtHours(m.over)+'</td></tr>';});
+  const stageRows=GT_STAGES.map((name,i)=>{const mins=gtAssignments.filter(a=>a.etapa===i&&a.estado!=='cancelada').reduce((s,a)=>s+gtPlanMinutes(a,range),0);return '<tr><td>'+name+'</td><td>'+gtHours(mins)+'</td><td>'+gtAssignments.filter(a=>a.etapa===i&&a.estado!=='cancelada').length+'</td></tr>';});
+  return '<div class="gt-grid">'+gtCard('Capacidad futura',gtHours(workers.reduce((s,w)=>s+Math.max(0,gtMetrics(w,range).remaining),0)),'Disponible en el período')+gtCard('Carga total',gtHours(workers.reduce((s,w)=>s+gtMetrics(w,range).load,0)))+gtCard('Pérdida por novedades',gtHours(workers.reduce((s,w)=>s+gtMetrics(w,range).lost,0)))+'</div><section class="gt-panel"><div class="gt-panel-head"><h3>Indicadores por operario</h3></div>'+gtTable(['Operario','Cargo','Disponible','Asignado','Libre','Extra','Novedades','Utilización','Sobrecarga'],rows)+'</section><section class="gt-panel"><div class="gt-panel-head"><h3>Carga por etapa</h3></div>'+gtTable(['Etapa','Horas programadas','Asignaciones'],stageRows)+'</section>';
+}
+function gtRender(){
+  if(!appIsAdmin())return;const content=document.getElementById('gt-content');if(!content)return;
+  document.querySelectorAll('[data-gt-view]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.gtView===gtView)));
+  if(!gtLoaded){content.innerHTML='<div class="gt-empty">Cargando gestión de tiempo…</div>';return;}
+  gtFillFilters();const range=gtRange(),workers=gtFilteredWorkers();
+  content.innerHTML=gtView==='dashboard'?gtRenderDashboard(range,workers):gtView==='gantt'?gtRenderGantt(range,workers):gtView==='operarios'?gtRenderWorkers(range,workers):gtView==='tiempos'?gtRenderTimes():gtView==='novedades'?gtRenderNovelties():gtView==='extras'?gtRenderOvertime():gtRenderIndicators(range,workers);
+}
+function gtFillSelect(id,rows,label){
+  const el=document.getElementById(id),value=el.value,first=el.options[0]?.outerHTML||'';
+  el.innerHTML=first+rows.map(r=>'<option value="'+tpEscape(r.id)+'">'+tpEscape(label(r))+'</option>').join('');if([...el.options].some(o=>o.value===value))el.value=value;
+}
+function gtFillFilters(){
+  gtFillSelect('gt-worker-filter',gtWorkers,w=>w.nombre);
+  const role=document.getElementById('gt-role-filter'),rv=role.value;role.innerHTML='<option value="">Todos los cargos</option>'+[...new Set(gtWorkers.map(w=>w.cargo))].sort().map(x=>'<option>'+tpEscape(x)+'</option>').join('');role.value=rv;
+  const stage=document.getElementById('gt-stage-filter'),sv=stage.value;stage.innerHTML='<option value="">Todas las etapas</option>'+GT_STAGES.map((x,i)=>'<option value="'+i+'">'+x+'</option>').join('');stage.value=sv;
+  const machine=document.getElementById('gt-machine-filter'),mv=machine.value;machine.innerHTML='<option value="">Todas las máquinas</option>'+gtRuns.slice().sort((a,b)=>String(a.serial).localeCompare(String(b.serial),undefined,{numeric:true})).map(f=>'<option value="'+f.id+'">'+tpEscape('#'+(f.serial||'—')+' · '+(f.codigo||'Sin código')+' · '+f.producto)+'</option>').join('');machine.value=mv;
+}
+async function gtLoad(manual){
+  if(!appIsAdmin()||gtLoading)return;gtLoading=true;document.getElementById('gt-status').textContent='Sincronizando…';
+  try{
+    const data=await Promise.all([tpReadAll('gestion_operarios','nombre'),tpReadAll('gestion_asignaciones','inicio'),tpReadAll('gestion_novedades','inicio'),tpReadAll('gestion_horas_extra','inicio'),tpReadAll('gestion_tiempos_estandar','codigo'),tpReadAll('produccion_fabricaciones','primera_observacion'),tpReadAll('produccion_tiempos','primera_observacion')]);
+    [gtWorkers,gtAssignments,gtNovelties,gtOvertime,gtStandards,gtRuns,gtTimes]=data;gtLoaded=true;document.getElementById('gt-status').textContent='Actualizado '+new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});gtRender();if(manual)showToast('Gestión de tiempo actualizada','green');
+  }catch(e){document.getElementById('gt-status').textContent='Pendiente de sincronizar';if(manual)showToast(e.message,'yellow');}finally{gtLoading=false;}
+}
+function gtFocusWorker(id){document.getElementById('gt-worker-filter').value=id;gtView='gantt';gtRender();}
+function gtDialogOptions(){
+  const workers=gtWorkers.filter(w=>w.activo).map(w=>'<option value="'+w.id+'">'+tpEscape(w.nombre+' · '+w.cargo)+'</option>').join('');
+  ['gt-a-worker','gt-n-worker','gt-o-worker'].forEach(id=>document.getElementById(id).innerHTML=workers);
+  document.getElementById('gt-a-stage').innerHTML=GT_STAGES.map((x,i)=>'<option value="'+i+'">'+x+'</option>').join('');
+  document.getElementById('gt-a-machine').innerHTML=gtRuns.map(f=>'<option value="'+f.id+'">'+tpEscape('#'+(f.serial||'—')+' · '+(f.codigo||'Sin código')+' · '+f.producto)+'</option>').join('');
+  document.getElementById('gt-n-type').innerHTML=GT_NOVELTIES.map(x=>'<option>'+tpEscape(x)+'</option>').join('');
+}
+function gtOpenAssignment(id){
+  gtDialogOptions();const a=typeof id==='string'?gtAssignments.find(x=>x.id===id):null,range=gtRange(),now=Date.now(),firstShift=range.from+7*3600000,start=new Date(now>=range.from&&now<range.to?Math.max(now,firstShift):firstShift);start.setMinutes(Math.ceil(start.getMinutes()/15)*15,0,0);const end=new Date(start.getTime()+3600000);
+  document.getElementById('gt-a-id').value=a?.id||'';document.getElementById('gt-a-machine').value=a?.fabricacion_id||gtRuns[0]?.id||'';document.getElementById('gt-a-stage').value=a?.etapa??0;document.getElementById('gt-a-worker').value=a?.operario_id||gtWorkers[0]?.id||'';document.getElementById('gt-a-start').value=gtInputDate(a?.inicio||start);document.getElementById('gt-a-end').value=gtInputDate(a?.fin||end);document.getElementById('gt-a-state').value=a?.estado||'programada';document.getElementById('gt-a-notes').value=a?.observaciones||'';document.getElementById('gt-a-warning').textContent='';document.getElementById('gt-a-cancel').hidden=!a||a.estado==='cancelada';document.getElementById('gt-assignment-dialog').showModal();
+}
+function gtConflicts(row,id){
+  return gtAssignments.filter(a=>a.id!==id&&a.operario_id===row.operario_id&&a.estado!=='cancelada'&&a.inicio<row.fin&&a.fin>row.inicio).map(a=>'Actividad: '+gtMachineLabel(a)+' ('+gtFmt(a.inicio)+' - '+gtFmt(a.fin)+')').concat(gtNovelties.filter(n=>n.operario_id===row.operario_id&&n.estado==='Aprobado'&&n.inicio<row.fin&&n.fin>row.inicio).map(n=>'Novedad: '+n.tipo+' ('+gtFmt(n.inicio)+' - '+gtFmt(n.fin)+')'));
+}
+async function gtPersistAssignment(row,id,ask){
+  const conflicts=gtConflicts(row,id);if(conflicts.length){if(ask&&!confirm('Se encontraron conflictos:\\n\\n'+conflicts.join('\\n')+'\\n\\n¿Continuar excepcionalmente?'))return false;row.permitir_conflicto=true;}else row.permitir_conflicto=false;
+  const query=id?sb.from('gestion_asignaciones').update(row).eq('id',id):sb.from('gestion_asignaciones').insert(row);const {error}=await query;if(error)throw error;await gtLoad();return true;
+}
+async function gtSaveAssignment(event){
+  event.preventDefault();const id=document.getElementById('gt-a-id').value,row={fabricacion_id:document.getElementById('gt-a-machine').value,etapa:Number(document.getElementById('gt-a-stage').value),operario_id:document.getElementById('gt-a-worker').value,inicio:gtIsoLocal(document.getElementById('gt-a-start').value),fin:gtIsoLocal(document.getElementById('gt-a-end').value),estado:document.getElementById('gt-a-state').value,observaciones:document.getElementById('gt-a-notes').value.trim()};
+  if(Date.parse(row.fin)<=Date.parse(row.inicio)){document.getElementById('gt-a-warning').textContent='La finalización debe ser posterior al inicio.';return;}
+  try{if(await gtPersistAssignment(row,id,true)){document.getElementById('gt-assignment-dialog').close();showToast('Asignación guardada','green');}}catch(e){document.getElementById('gt-a-warning').textContent=e.message;}
+}
+async function gtCancelAssignment(){const id=document.getElementById('gt-a-id').value;if(!id||!confirm('¿Cancelar esta actividad? Permanecerá en el histórico.'))return;try{const {error}=await sb.from('gestion_asignaciones').update({estado:'cancelada'}).eq('id',id);if(error)throw error;document.getElementById('gt-assignment-dialog').close();await gtLoad();}catch(e){showToast(e.message,'yellow');}}
+function gtDrag(event,id){event.dataTransfer.setData('text/plain',id);event.dataTransfer.effectAllowed='move';}
+async function gtDrop(event,workerId){
+  event.preventDefault();const id=event.dataTransfer.getData('text/plain'),a=gtAssignments.find(x=>x.id===id);if(!a)return;const rect=event.currentTarget.getBoundingClientRect(),range=gtRange(),duration=Date.parse(a.fin)-Date.parse(a.inicio),raw=range.from+Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width))*(range.to-range.from),start=Math.round(raw/900000)*900000,row={operario_id:workerId,inicio:new Date(start).toISOString(),fin:new Date(start+duration).toISOString()};
+  try{if(await gtPersistAssignment(row,id,true))showToast('Actividad movida','green');}catch(e){showToast(e.message,'yellow');}
+}
+function gtOpenNovelty(id){
+  gtDialogOptions();const n=id?gtNovelties.find(x=>x.id===id):null,start=new Date(),end=new Date(start.getTime()+3600000);
+  document.getElementById('gt-n-id').value=n?.id||'';document.getElementById('gt-n-worker').value=n?.operario_id||gtWorkers[0]?.id||'';document.getElementById('gt-n-type').value=n?.tipo||'Permiso';document.getElementById('gt-n-start').value=gtInputDate(n?.inicio||start);document.getElementById('gt-n-end').value=gtInputDate(n?.fin||end);document.getElementById('gt-n-state').value=n?.estado||'Pendiente';document.getElementById('gt-n-approver').value=n?.aprobador||'';document.getElementById('gt-n-notes').value=n?.observacion||'';document.getElementById('gt-novelty-dialog').showModal();
+}
+async function gtSaveNovelty(event){
+  event.preventDefault();const id=document.getElementById('gt-n-id').value,row={operario_id:document.getElementById('gt-n-worker').value,tipo:document.getElementById('gt-n-type').value,inicio:gtIsoLocal(document.getElementById('gt-n-start').value),fin:gtIsoLocal(document.getElementById('gt-n-end').value),estado:document.getElementById('gt-n-state').value,aprobador:document.getElementById('gt-n-approver').value.trim(),observacion:document.getElementById('gt-n-notes').value.trim()};if(Date.parse(row.fin)<=Date.parse(row.inicio))return showToast('Horario inválido','yellow');try{const {error}=await(id?sb.from('gestion_novedades').update(row).eq('id',id):sb.from('gestion_novedades').insert(row));if(error)throw error;document.getElementById('gt-novelty-dialog').close();await gtLoad();showToast('Novedad guardada','green');}catch(e){showToast(e.message,'yellow');}
+}
+function gtOpenOvertime(id){
+  gtDialogOptions();const x=id?gtOvertime.find(v=>v.id===id):null,start=new Date(),end=new Date(start.getTime()+3600000);
+  document.getElementById('gt-o-id').value=x?.id||'';document.getElementById('gt-o-worker').value=x?.operario_id||gtWorkers[0]?.id||'';document.getElementById('gt-o-start').value=gtInputDate(x?.inicio||start);document.getElementById('gt-o-end').value=gtInputDate(x?.fin||end);document.getElementById('gt-o-state').value=x?.estado||'Pendiente';document.getElementById('gt-o-reason').value=x?.motivo||'';document.getElementById('gt-o-approver').value=x?.aprobador||'';document.getElementById('gt-o-notes').value=x?.observacion||'';document.getElementById('gt-overtime-dialog').showModal();
+}
+async function gtSaveOvertime(event){
+  event.preventDefault();const id=document.getElementById('gt-o-id').value,row={operario_id:document.getElementById('gt-o-worker').value,inicio:gtIsoLocal(document.getElementById('gt-o-start').value),fin:gtIsoLocal(document.getElementById('gt-o-end').value),estado:document.getElementById('gt-o-state').value,motivo:document.getElementById('gt-o-reason').value.trim(),aprobador:document.getElementById('gt-o-approver').value.trim(),observacion:document.getElementById('gt-o-notes').value.trim()};if(Date.parse(row.fin)<=Date.parse(row.inicio))return showToast('Horario inválido','yellow');try{const {error}=await(id?sb.from('gestion_horas_extra').update(row).eq('id',id):sb.from('gestion_horas_extra').insert(row));if(error)throw error;document.getElementById('gt-overtime-dialog').close();await gtLoad();showToast('Horas extra guardadas','green');}catch(e){showToast(e.message,'yellow');}
+}
+async function gtSetStandard(code,stage,current){
+  const value=prompt('Tiempo estándar en horas para '+code+' · '+GT_STAGES[stage],current?String(current/60):'');if(value==null)return;const hours=Number(String(value).replace(',','.'));if(!Number.isFinite(hours)||hours<=0)return showToast('Escribe una cantidad de horas válida','yellow');try{const {error}=await sb.from('gestion_tiempos_estandar').upsert({codigo:code,etapa:stage,minutos:hours*60,updated_by:appAccess.user.id},{onConflict:'codigo,etapa'});if(error)throw error;await gtLoad();showToast('Tiempo estándar actualizado','green');}catch(e){showToast(e.message,'yellow');}
+}
+document.getElementById('gt-date').value=tpDay(new Date().toISOString());
 </script>
 
 <script>

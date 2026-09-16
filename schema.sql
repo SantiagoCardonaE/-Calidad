@@ -1276,5 +1276,168 @@ begin
 end $$;
 revoke all on function public.calidad_entrar_seccion(text) from public,anon;
 grant execute on function public.calidad_entrar_seccion(text) to authenticated;
+
+-- Gestion de tiempo: planificacion de mano de obra integrada con Produccion.
+create table if not exists public.gestion_operarios (
+  id uuid primary key default gen_random_uuid(),
+  worker_id uuid unique,
+  nombre text not null unique,
+  cargo text not null,
+  activo boolean not null default true,
+  fuente text not null default 'xtensor',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+insert into public.gestion_operarios(worker_id,nombre,cargo,fuente) values
+ ('ddf7ee59-0cea-45af-8b37-390d709b41cc','Ariel Valencia M','Varios','Produccion XTENSOR'),
+ ('0003953e-8ddf-412e-8bae-8f52fde8df9a','Cristian C Rodriguez G','Tornero','Produccion XTENSOR'),
+ ('88e1fae3-74cf-4612-9420-21f6af0aeca9','Daniel Garcia Zaray','Ensamblador','Produccion XTENSOR'),
+ ('3f757fe8-8d8b-460a-9fba-82cb1b3c5c90','Daniel R Duque Z','Asist. ensamble','Produccion XTENSOR'),
+ ('72390c77-3472-4907-9f29-386ceb2f3462','Germán A Villada','Armador','Produccion XTENSOR'),
+ ('fec7586b-25d6-4fa4-8a7b-93ee8965198a','Jose Fernando Gaviria','Armador','Produccion XTENSOR'),
+ ('ae02935e-37e5-46d2-9f04-fb772544bb5d','Juan Felipe Martinez A','Armador','Produccion XTENSOR'),
+ ('fad6ff72-af24-4bf2-a2a7-580d1b01e5b2','Luis Alfonso Betancurth O','Pintor','Produccion XTENSOR')
+on conflict(nombre) do update set worker_id=excluded.worker_id,cargo=excluded.cargo,fuente=excluded.fuente,updated_at=now()
+where gestion_operarios.worker_id is distinct from excluded.worker_id
+   or gestion_operarios.cargo is distinct from excluded.cargo
+   or gestion_operarios.fuente is distinct from excluded.fuente;
+insert into public.gestion_operarios(worker_id,nombre,cargo,fuente)
+values(null,'Cesar D Rendon C','Varios','Pendiente de vincular con Produccion XTENSOR')
+on conflict(nombre) do update set cargo=excluded.cargo,
+  fuente=case when gestion_operarios.worker_id is null then excluded.fuente else gestion_operarios.fuente end,updated_at=now()
+where gestion_operarios.cargo is distinct from excluded.cargo
+   or (gestion_operarios.worker_id is null and gestion_operarios.fuente is distinct from excluded.fuente);
+
+create table if not exists public.gestion_asignaciones (
+  id uuid primary key default gen_random_uuid(),
+  fabricacion_id uuid not null references public.produccion_fabricaciones(id),
+  etapa integer not null check(etapa between 0 and 7),
+  operario_id uuid not null references public.gestion_operarios(id),
+  inicio timestamptz not null,
+  fin timestamptz not null,
+  estado text not null default 'programada' check(estado in ('programada','en_progreso','completada','cancelada')),
+  observaciones text not null default '',
+  permitir_conflicto boolean not null default false,
+  created_by uuid not null default auth.uid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check(fin>inicio)
+);
+create index if not exists gestion_asignaciones_periodo on public.gestion_asignaciones(inicio,fin);
+create index if not exists gestion_asignaciones_operario on public.gestion_asignaciones(operario_id,inicio);
+create index if not exists gestion_asignaciones_fabricacion on public.gestion_asignaciones(fabricacion_id,etapa);
+
+create table if not exists public.gestion_novedades (
+  id uuid primary key default gen_random_uuid(),
+  operario_id uuid not null references public.gestion_operarios(id),
+  tipo text not null check(tipo in ('Permiso','Incapacidad','Vacaciones','Ausencia','Día no laborado','Capacitación','Reunión','Trabajo administrativo','Mantenimiento','Otra actividad','Otro')),
+  inicio timestamptz not null,
+  fin timestamptz not null,
+  observacion text not null default '',
+  aprobador text not null default '',
+  estado text not null default 'Pendiente' check(estado in ('Pendiente','Aprobado','Rechazado')),
+  created_by uuid not null default auth.uid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check(fin>inicio)
+);
+create index if not exists gestion_novedades_periodo on public.gestion_novedades(operario_id,inicio,fin);
+
+create table if not exists public.gestion_horas_extra (
+  id uuid primary key default gen_random_uuid(),
+  operario_id uuid not null references public.gestion_operarios(id),
+  inicio timestamptz not null,
+  fin timestamptz not null,
+  motivo text not null,
+  aprobador text not null default '',
+  estado text not null default 'Pendiente' check(estado in ('Pendiente','Aprobado','Rechazado')),
+  observacion text not null default '',
+  created_by uuid not null default auth.uid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check(fin>inicio)
+);
+create index if not exists gestion_extra_periodo on public.gestion_horas_extra(operario_id,inicio,fin);
+
+create table if not exists public.gestion_tiempos_estandar (
+  codigo text not null,
+  etapa integer not null check(etapa between 0 and 7),
+  minutos double precision not null check(minutos>0),
+  observacion text not null default '',
+  updated_by uuid not null default auth.uid(),
+  updated_at timestamptz not null default now(),
+  primary key(codigo,etapa)
+);
+create table if not exists public.gestion_auditoria (
+  id bigserial primary key,
+  entidad text not null,
+  registro_id text not null,
+  accion text not null,
+  anterior jsonb,
+  nuevo jsonb,
+  actor uuid,
+  fecha timestamptz not null default now()
+);
+
+create or replace function public.gestion_validar_asignacion() returns trigger
+language plpgsql set search_path='' as $$
+begin
+  new.updated_at:=now();
+  if new.estado<>'cancelada' and not new.permitir_conflicto then
+    if exists(select 1 from public.gestion_asignaciones a where a.operario_id=new.operario_id
+      and a.id<>new.id and a.estado<>'cancelada' and a.inicio<new.fin and a.fin>new.inicio) then
+      raise exception 'CONFLICTO: el operario ya tiene una actividad en ese periodo';
+    end if;
+    if exists(select 1 from public.gestion_novedades n where n.operario_id=new.operario_id
+      and n.estado='Aprobado' and n.inicio<new.fin and n.fin>new.inicio) then
+      raise exception 'CONFLICTO: el operario tiene una novedad aprobada en ese periodo';
+    end if;
+  end if;
+  return new;
+end $$;
+drop trigger if exists gestion_asignacion_validar on public.gestion_asignaciones;
+create trigger gestion_asignacion_validar before insert or update on public.gestion_asignaciones
+for each row execute function public.gestion_validar_asignacion();
+
+create or replace function public.gestion_auditar() returns trigger
+language plpgsql security definer set search_path='' as $$
+declare rid text;registro jsonb;
+begin
+  registro:=case when tg_op='DELETE' then to_jsonb(old) else to_jsonb(new) end;
+  rid:=coalesce(registro->>'id',(registro->>'codigo')||':'||(registro->>'etapa'),'');
+  insert into public.gestion_auditoria(entidad,registro_id,accion,anterior,nuevo,actor)
+  values(tg_table_name,rid,tg_op,case when tg_op='INSERT' then null else to_jsonb(old) end,
+    case when tg_op='DELETE' then null else to_jsonb(new) end,auth.uid());
+  return case when tg_op='DELETE' then old else new end;
+end $$;
+create or replace function public.gestion_actualizar_fecha() returns trigger
+language plpgsql set search_path='' as $$ begin new.updated_at:=now();return new;end $$;
+do $$ declare t text; begin
+  foreach t in array array['gestion_operarios','gestion_asignaciones','gestion_novedades','gestion_horas_extra','gestion_tiempos_estandar'] loop
+    execute format('drop trigger if exists gestion_auditar_cambios on public.%I',t);
+    execute format('create trigger gestion_auditar_cambios after insert or update or delete on public.%I for each row execute function public.gestion_auditar()',t);
+  end loop;
+end $$;
+do $$ declare t text; begin
+  foreach t in array array['gestion_operarios','gestion_novedades','gestion_horas_extra','gestion_tiempos_estandar'] loop
+    execute format('drop trigger if exists gestion_fecha_actualizada on public.%I',t);
+    execute format('create trigger gestion_fecha_actualizada before update on public.%I for each row execute function public.gestion_actualizar_fecha()',t);
+  end loop;
+end $$;
+
+do $$ declare t text;p record; begin
+  foreach t in array array['gestion_operarios','gestion_asignaciones','gestion_novedades','gestion_horas_extra','gestion_tiempos_estandar','gestion_auditoria'] loop
+    execute format('alter table public.%I enable row level security',t);
+    for p in select policyname from pg_policies where schemaname='public' and tablename=t loop
+      execute format('drop policy %I on public.%I',p.policyname,t);
+    end loop;
+    execute format('revoke all on public.%I from public,anon,authenticated',t);
+    execute format('grant select,insert,update,delete on public.%I to authenticated',t);
+    execute format('create policy gestion_admin on public.%I for all to authenticated using ((select public.calidad_rol())=''admin'') with check ((select public.calidad_rol())=''admin'')',t);
+  end loop;
+end $$;
+revoke insert,update,delete on public.gestion_auditoria from authenticated;
+grant usage,select on sequence public.gestion_auditoria_id_seq to authenticated;
+grant usage,select on all sequences in schema public to authenticated;
 NOTIFY pgrst, 'reload schema';
 commit;
