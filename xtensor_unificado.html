@@ -29,12 +29,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
 .t-brand img{width:18px;height:18px}
 .t-brand i{color:var(--yellow);font-size:16px}
 .db-status{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text3);padding-right:12px;border-right:1px solid var(--border);margin-right:2px;flex-shrink:0}
-#main-tabs{display:flex;gap:1px;flex-shrink:0}
+#main-tabs{display:flex;gap:1px;min-width:0;flex:1 1 auto;overflow:hidden}
 .mtab{display:flex;align-items:center;gap:6px;color:var(--text3);text-decoration:none;font-size:12.5px;font-weight:500;padding:6px 12px;border-radius:99px;white-space:nowrap;cursor:pointer;transition:color .12s,background .12s;background:transparent;border:1px solid transparent}
 .mtab:hover{color:var(--text2);background:var(--surface)}
 .mtab.active{color:var(--yellow);background:var(--yellow-bg);border-color:var(--yellow-border)}
-.t-right{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0}
-.tbr-variant{display:none;align-items:center;gap:8px}
+.t-right{display:flex;align-items:center;gap:5px;margin-left:auto;flex-shrink:0}
+.tbr-variant{display:none;align-items:center;gap:5px}
 .tbr-variant.show{display:flex}
 .sdot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
 .sdot.stale{background:var(--yellow)}
@@ -87,7 +87,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
 #cal-not-sync{padding:7px 12px;border-top:1px solid var(--border);color:var(--text2);font-size:11px;flex-shrink:0}
 .cal-not-more{width:100%;border:0;background:var(--surface);color:var(--yellow);padding:10px;cursor:pointer}
 .cal-not-sr{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
-@media(max-width:700px){#cal-notifications{top:50px;right:8px;max-width:calc(100vw - 16px)}#topbar{gap:4px;padding:0 8px}#main-tabs{min-width:0;flex-shrink:1;overflow-x:auto}.t-brand{font-size:0;padding:0;border:0;gap:0}.db-status,#t-updated,#t-countdown{display:none}.mtab{padding:6px 8px}.mtab-lbl{display:none}.t-right{gap:4px}.tbr-variant{gap:2px}.tbr-variant .btn{width:28px;height:30px;padding:0;justify-content:center}#btn-refresh{font-size:0;gap:0}#btn-refresh i{font-size:14px}.stat-chip{font-size:0;padding:4px 6px;gap:0}}
+@media(max-width:1450px){#topbar{padding:0 6px;gap:4px}.t-brand{padding-right:7px;margin-right:0}.db-status{padding-right:7px;margin-right:0}.mtab{padding:6px 8px;gap:4px;font-size:12px}.t-right,.tbr-variant{gap:3px}#btn-refresh{width:32px;height:30px;padding:0;justify-content:center;font-size:0;gap:0}#btn-refresh i{font-size:14px}.t-right>.btn,.tbr-variant>.btn:not(#btn-refresh){width:30px;height:30px;padding:0;justify-content:center}}
+@media(max-width:1180px){#db-status-txt{display:none}.db-status{border:0;padding:0}.mtab{padding:6px}.t-brand{font-size:0;padding:0;border:0;gap:0}}
+@media(max-width:900px){#main-tabs .mtab-lbl{display:none}.mtab{padding:6px 8px}}
+@media(max-width:700px){#cal-notifications{top:50px;right:8px;max-width:calc(100vw - 16px)}#topbar{gap:4px;padding:0 8px}.t-brand{font-size:0;padding:0;border:0;gap:0}.db-status,#t-updated,#t-countdown{display:none}.mtab{padding:6px 8px}.mtab-lbl{display:none}.t-right{gap:4px}.tbr-variant{gap:2px}.tbr-variant .btn{width:28px;height:30px;padding:0;justify-content:center}#btn-refresh{font-size:0;gap:0}#btn-refresh i{font-size:14px}.stat-chip{font-size:0;padding:4px 6px;gap:0}}
 
 /* ── APP SECTIONS ── */
 #app-body{flex:1;display:flex;min-height:0;overflow:hidden}
@@ -452,12 +455,12 @@ body[data-worker] .app-section:not(#sec-calidad){display:none!important}
     <span id="db-status-txt">Conectando…</span>
   </div>
   <div id="main-tabs">
-    <div class="mtab active" data-sec="recepcion" onclick="switchSection('recepcion')"><i class="ti ti-truck-delivery"></i> <span class="mtab-lbl">Recepción</span></div>
-    <div class="mtab" data-sec="calidad" onclick="switchSection('calidad')"><i class="ti ti-clipboard-check"></i> <span class="mtab-lbl">Calidad</span></div>
-    <div class="mtab" data-sec="garantias" onclick="switchSection('garantias')"><i class="ti ti-tools"></i> <span class="mtab-lbl">Garantías</span></div>
-    <div class="mtab" data-sec="estadisticas" onclick="switchSection('estadisticas');renderEstadisticas()"><i class="ti ti-chart-dots"></i> <span class="mtab-lbl">Estadísticas</span></div>
-    <button class="mtab" data-sec="tiempos" onclick="switchSection('tiempos')" title="Tiempos de producción"><i class="ti ti-clock"></i> <span class="mtab-lbl">Tiempos de producción</span></button>
-    <button class="mtab" data-sec="gestion" onclick="switchSection('gestion')" title="Gestión de tiempo"><i class="ti ti-calendar-time"></i> <span class="mtab-lbl">Gestión de tiempo</span></button>
+    <div class="mtab active" data-sec="recepcion" onclick="switchSection('recepcion')" title="Recepción"><i class="ti ti-truck-delivery"></i> <span class="mtab-lbl">Recepción</span></div>
+    <div class="mtab" data-sec="calidad" onclick="switchSection('calidad')" title="Calidad"><i class="ti ti-clipboard-check"></i> <span class="mtab-lbl">Calidad</span></div>
+    <div class="mtab" data-sec="garantias" onclick="switchSection('garantias')" title="Garantías"><i class="ti ti-tools"></i> <span class="mtab-lbl">Garantías</span></div>
+    <div class="mtab" data-sec="estadisticas" onclick="switchSection('estadisticas');renderEstadisticas()" title="Estadísticas"><i class="ti ti-chart-dots"></i> <span class="mtab-lbl">Estadísticas</span></div>
+    <button class="mtab" data-sec="tiempos" onclick="switchSection('tiempos')" title="Tiempos de producción"><i class="ti ti-clock"></i> <span class="mtab-lbl">Tiempos</span></button>
+    <button class="mtab" data-sec="gestion" onclick="switchSection('gestion')" title="Gestión de tiempo"><i class="ti ti-calendar-time"></i> <span class="mtab-lbl">Gestión</span></button>
     <button class="mtab" data-sec="ajustes" onclick="qmOpen()" aria-label="Ajustes" title="Ajustes"><i class="ti ti-settings"></i> <span class="mtab-lbl">Ajustes</span></button>
   </div>
 
@@ -5235,7 +5238,7 @@ tpSection.id='sec-tiempos';tpSection.className='app-section';tpSection.setAttrib
 tpSection.innerHTML=`<style>
 #sec-tiempos{min-width:0;overflow:auto;padding:16px;gap:14px}
 #sec-tiempos.active{display:flex;flex-direction:column}
-#main-tabs{min-width:0;flex-shrink:1;overflow-x:auto}
+#main-tabs{min-width:0;flex:1 1 auto;overflow:hidden}
 .tp-toolbar,.tp-filters{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 .tp-toolbar h2{font-size:18px;margin:0;flex:1;min-width:180px}
 .tp-filters input,.tp-filters select{min-height:36px;min-width:0;max-width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 9px}
@@ -5517,12 +5520,13 @@ function tpExport(){
 .gt-bar{position:absolute;top:8px;height:36px;min-width:8px;border:1px solid var(--yellow-border);background:var(--yellow-bg);color:var(--text);padding:4px 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:10px;cursor:grab}
 .gt-bar.done{border-color:var(--green-border);background:var(--green-bg)}.gt-bar.cancel{opacity:.45}.gt-bar.conflict,.gt-bar.overrun{border-color:var(--red-border);background:var(--red-bg)}
 .gt-empty{padding:28px;text-align:center;color:var(--muted)}.gt-note{font-size:11px;color:var(--muted);line-height:1.45}.gt-warn{color:var(--red)}
-.gt-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-width:min(650px,84vw)}.gt-form label{display:grid;gap:5px;font-size:11px;color:var(--muted)}.gt-form .full{grid-column:1/-1}.gt-form input,.gt-form select,.gt-form textarea{width:100%}
-#gt-assignment-dialog,#gt-novelty-dialog,#gt-overtime-dialog{max-width:760px}
+.gt-form{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-width:min(650px,84vw)}.gt-form label{display:grid;gap:5px;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase}.gt-form .full{grid-column:1/-1}.gt-form input,.gt-form select,.gt-form textarea{width:100%;font:inherit;text-transform:none;outline:none}.gt-form input:focus,.gt-form select:focus,.gt-form textarea:focus{border-color:var(--yellow);box-shadow:0 0 0 2px var(--yellow-bg)}.gt-form textarea{min-height:72px;resize:vertical}.gt-form h2{margin:0;padding-bottom:10px;border-bottom:1px solid var(--border)}.gt-form footer{justify-content:flex-end;padding-top:10px;border-top:1px solid var(--border)}
+#gt-assignment-dialog,#gt-novelty-dialog,#gt-overtime-dialog{width:min(720px,calc(100vw - 24px));max-width:720px;max-height:calc(100dvh - 24px);margin:auto;padding:18px;background:var(--bg2);color:var(--text);border:1px solid var(--border2);border-radius:6px;box-shadow:0 14px 42px #000b;overflow:auto;color-scheme:dark}
+#gt-assignment-dialog::backdrop,#gt-novelty-dialog::backdrop,#gt-overtime-dialog::backdrop{background:#0009}
 @media(max-width:700px){#sec-gestion{padding:8px}.gt-form{grid-template-columns:1fr;min-width:78vw}.gt-form .full{grid-column:auto}.gt-head h2{flex-basis:100%}.gt-filters>*{width:100%}}
 </style>
 <section id="sec-gestion" class="app-section" aria-label="Gestión de tiempo">
-  <header class="gt-head"><h2>Gestión de tiempo</h2><span id="gt-status" class="gt-note"></span><button class="btn" onclick="gtLoad(true)" title="Actualizar"><i class="ti ti-refresh"></i></button><button class="btn primary" onclick="gtOpenAssignment()"><i class="ti ti-plus"></i> Asignación</button></header>
+  <header class="gt-head"><h2>Gestión de tiempo</h2><span id="gt-status" class="gt-note"></span><button class="btn" onclick="gtLoad(true)" title="Actualizar"><i class="ti ti-refresh"></i></button><button class="btn btn-y" onclick="gtOpenAssignment()"><i class="ti ti-plus"></i> Asignación</button></header>
   <nav class="gt-tabs" role="tablist">
     <button class="btn" role="tab" data-gt-view="dashboard" onclick="gtSetView('dashboard')">Resumen</button>
     <button class="btn" role="tab" data-gt-view="gantt" onclick="gtSetView('gantt')">Gantt</button>
@@ -5552,7 +5556,7 @@ function tpExport(){
   <label>Inicio<input id="gt-a-start" type="datetime-local" required onchange="gtSuggestEnd()"></label><label>Final programado<input id="gt-a-end" type="datetime-local" required><small id="gt-a-duration-source" class="gt-note"></small></label>
   <label>Estado<select id="gt-a-state"><option value="programada">Programada</option><option value="en_progreso">En progreso</option><option value="completada">Completada</option><option value="cancelada">Cancelada</option></select></label>
   <label class="full">Observaciones<textarea id="gt-a-notes" rows="2"></textarea></label><p id="gt-a-warning" class="gt-note gt-warn full"></p>
-  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cerrar</button><button id="gt-a-delete" type="button" class="btn" onclick="gtDeleteAssignment()"><i class="ti ti-trash"></i> Eliminar</button><button id="gt-a-cancel" type="button" class="btn" onclick="gtCancelAssignment()">Marcar cancelada</button><button class="btn primary" type="submit">Guardar</button></footer>
+  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cerrar</button><button id="gt-a-delete" type="button" class="btn" onclick="gtDeleteAssignment()"><i class="ti ti-trash"></i> Eliminar</button><button id="gt-a-cancel" type="button" class="btn" onclick="gtCancelAssignment()">Marcar cancelada</button><button class="btn btn-y" type="submit">Guardar</button></footer>
 </form></dialog>
 <dialog id="gt-novelty-dialog"><form class="gt-form" onsubmit="gtSaveNovelty(event)">
   <input id="gt-n-id" type="hidden"><h2 class="full" style="font-size:18px">Novedad del operario</h2>
@@ -5560,7 +5564,7 @@ function tpExport(){
   <label>Inicio<input id="gt-n-start" type="datetime-local" required></label><label>Finalización<input id="gt-n-end" type="datetime-local" required></label>
   <label>Estado<select id="gt-n-state"><option>Pendiente</option><option>Aprobado</option><option>Rechazado</option></select></label><label>Aprobador<input id="gt-n-approver"></label>
   <label class="full">Observación<textarea id="gt-n-notes" rows="2"></textarea></label>
-  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button class="btn primary" type="submit">Guardar</button></footer>
+  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button class="btn btn-y" type="submit">Guardar</button></footer>
 </form></dialog>
 <dialog id="gt-overtime-dialog"><form class="gt-form" onsubmit="gtSaveOvertime(event)">
   <input id="gt-o-id" type="hidden"><h2 class="full" style="font-size:18px">Horas extras</h2>
@@ -5568,7 +5572,7 @@ function tpExport(){
   <label>Inicio<input id="gt-o-start" type="datetime-local" required></label><label>Finalización<input id="gt-o-end" type="datetime-local" required></label>
   <label class="full">Motivo<input id="gt-o-reason" required></label><label>Aprobador<input id="gt-o-approver"></label>
   <label class="full">Observación<textarea id="gt-o-notes" rows="2"></textarea></label>
-  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button class="btn primary" type="submit">Guardar</button></footer>
+  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button class="btn btn-y" type="submit">Guardar</button></footer>
 </form></dialog>
 
 <script>
@@ -5688,11 +5692,11 @@ function gtRenderTimes(){
 }
 function gtRenderNovelties(){
   const rows=gtNovelties.slice().sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(n=>'<tr><td>'+tpEscape(gtWorker(n.operario_id).nombre)+'</td><td>'+tpEscape(n.tipo)+'</td><td>'+gtFmt(n.inicio)+'</td><td>'+gtFmt(n.fin)+'</td><td>'+gtHours((Date.parse(n.fin)-Date.parse(n.inicio))/60000)+'</td><td>'+tpEscape(n.estado)+'</td><td>'+tpEscape(n.aprobador||'—')+'</td><td>'+tpEscape(n.observacion||'')+'</td><td><button class="btn" onclick="gtOpenNovelty(\''+n.id+'\')"><i class="ti ti-edit"></i></button></td></tr>');
-  return '<section class="gt-panel"><div class="gt-panel-head"><h3>Novedades</h3><button class="btn primary" onclick="gtOpenNovelty()"><i class="ti ti-plus"></i> Nueva</button></div>'+gtTable(['Operario','Tipo','Inicio','Fin','Duración','Estado','Aprobador','Observación',''],rows)+'</section>';
+  return '<section class="gt-panel"><div class="gt-panel-head"><h3>Novedades</h3><button class="btn btn-y" onclick="gtOpenNovelty()"><i class="ti ti-plus"></i> Nueva</button></div>'+gtTable(['Operario','Tipo','Inicio','Fin','Duración','Estado','Aprobador','Observación',''],rows)+'</section>';
 }
 function gtRenderOvertime(){
   const rows=gtOvertime.slice().sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(x=>'<tr><td>'+tpEscape(gtWorker(x.operario_id).nombre)+'</td><td>'+gtFmt(x.inicio)+'</td><td>'+gtFmt(x.fin)+'</td><td>'+gtHours((Date.parse(x.fin)-Date.parse(x.inicio))/60000)+'</td><td>'+tpEscape(x.motivo)+'</td><td>'+tpEscape(x.estado)+'</td><td>'+tpEscape(x.aprobador||'—')+'</td><td><button class="btn" onclick="gtOpenOvertime(\''+x.id+'\')"><i class="ti ti-edit"></i></button></td></tr>');
-  return '<section class="gt-panel"><div class="gt-panel-head"><h3>Horas extras</h3><button class="btn primary" onclick="gtOpenOvertime()"><i class="ti ti-plus"></i> Registrar</button></div>'+gtTable(['Operario','Inicio','Fin','Duración','Motivo','Estado','Aprobador',''],rows)+'</section><p class="gt-note">Las horas extras se muestran separadas de la jornada normal y solo aumentan la capacidad efectiva cuando están aprobadas.</p>';
+  return '<section class="gt-panel"><div class="gt-panel-head"><h3>Horas extras</h3><button class="btn btn-y" onclick="gtOpenOvertime()"><i class="ti ti-plus"></i> Registrar</button></div>'+gtTable(['Operario','Inicio','Fin','Duración','Motivo','Estado','Aprobador',''],rows)+'</section><p class="gt-note">Las horas extras se muestran separadas de la jornada normal y solo aumentan la capacidad efectiva cuando están aprobadas.</p>';
 }
 function gtRenderIndicators(range,workers){
   const rows=workers.map(w=>{const m=gtMetrics(w,range);return '<tr><td>'+tpEscape(w.nombre)+'</td><td>'+tpEscape(w.cargo)+'</td><td>'+gtHours(m.available)+'</td><td>'+gtHours(m.load)+'</td><td>'+gtHours(Math.max(0,m.remaining))+'</td><td>'+gtHours(m.extra)+'</td><td>'+gtHours(m.lost)+'</td><td>'+m.util.toLocaleString('es-CO',{maximumFractionDigits:1})+'%</td><td>'+gtHours(m.over)+'</td></tr>';});
