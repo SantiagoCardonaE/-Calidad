@@ -822,6 +822,15 @@ language sql immutable set search_path = '' as $$
     'responsables',case when d->'responsables' ? s then jsonb_build_object(s,d->'responsables'->s) else '{}'::jsonb end,
     'stageObs',jsonb_build_object(s,coalesce(d->'stageObs'->s,'""'::jsonb)),
     'resultDates',jsonb_build_object(s,coalesce(d->'resultDates'->s,'{}'::jsonb)),
+    'stageCompletedAt',jsonb_build_object(s,coalesce(d->'stageCompletedAt'->s,'null'::jsonb)),
+    'workflow',jsonb_build_object(
+      'material',coalesce(d->'stageCompletedAt'->>'material','')<>'',
+      'armado',coalesce(d->'stageCompletedAt'->>'armado','')<>'',
+      'resoldado',coalesce(d->'stageCompletedAt'->>'resoldado','')<>'',
+      'pulido',coalesce(d->'stageCompletedAt'->>'pulido','')<>'',
+      'pintado',coalesce(d->'stageCompletedAt'->>'pintado','')<>'',
+      'ensamble',coalesce(d->'stageCompletedAt'->>'ensamble','')<>'',
+      'empacado',coalesce(d->'stageCompletedAt'->>'empacado','')<>''),
     'stageRevision',coalesce(d->'stageRevisions'->s,'0'::jsonb),'currentStageIdx',0,
     'internalFindings',coalesce((select jsonb_agg(e) from jsonb_array_elements(coalesce(d->'internalFindings','[]'::jsonb)) e where e->>'stage'=s),'[]'::jsonb));
 $$;
@@ -843,6 +852,8 @@ begin
   respuestas:=p_data->'stageData'->s;
   if jsonb_typeof(respuestas) is distinct from 'object' then raise exception 'Respuestas no validas'; end if;
   if exists(select 1 from jsonb_object_keys(p_data->'stageData') k where k<>s) then raise exception 'No puede modificar otra etapa'; end if;
+  if exists(select 1 from jsonb_object_keys(coalesce(p_data->'stageCompletedAt','{}'::jsonb)) k where k<>s) then raise exception 'No puede completar otra etapa'; end if;
+  if p_data->'stageCompletedAt' ? s and jsonb_typeof(p_data->'stageCompletedAt'->s) not in ('string','null') then raise exception 'Finalizacion de etapa no valida'; end if;
   if exists(select 1 from jsonb_each_text(respuestas) x where x.value is null or x.value not in ('','ok','fail')) then raise exception 'Resultado no valido'; end if;
   perform pg_advisory_xact_lock(hashtextextended(p_serial,730215));
   select i.data into d from public.calidad_inspecciones i where i.serial=p_serial for update;
@@ -871,6 +882,7 @@ begin
   foreach campo in array array['stageData','responsables','stageObs','resultDates'] loop
     d:=jsonb_set(d,array[campo],coalesce(d->campo,'{}'::jsonb)||jsonb_build_object(s,coalesce(p_data->campo->s,case when campo in ('stageData','resultDates') then '{}'::jsonb else '""'::jsonb end)),true);
   end loop;
+  d:=jsonb_set(d,'{stageCompletedAt}',coalesce(d->'stageCompletedAt','{}'::jsonb)||jsonb_build_object(s,coalesce(p_data->'stageCompletedAt'->s,'null'::jsonb)),true);
   d:=jsonb_set(d,'{inspectors}',coalesce(d->'inspectors','{}'::jsonb)||jsonb_build_object(s,inspector),true);
   d:=jsonb_set(d,'{stageEditors}',coalesce(d->'stageEditors','{}'::jsonb)||jsonb_build_object(s,jsonb_build_object('userId',auth.uid(),'email',correo,'at',now())),true);
   d:=jsonb_set(d,'{stageRevisions}',coalesce(d->'stageRevisions','{}'::jsonb)||jsonb_build_object(s,p_revision+1),true);
@@ -1439,5 +1451,265 @@ end $$;
 revoke insert,update,delete on public.gestion_auditoria from authenticated;
 grant usage,select on sequence public.gestion_auditoria_id_seq to authenticated;
 grant usage,select on all sequences in schema public to authenticated;
+
+-- ───────────────────────────────────────────────────────────────────────
+-- RECEPCION DETALLADA DE ORDENES DE COMPRA
+-- Mantiene rec_registros para compatibilidad y agrega el modelo normalizado.
+-- ───────────────────────────────────────────────────────────────────────
+create table if not exists public.rec_ordenes (
+  id uuid primary key default gen_random_uuid(),
+  numero text not null unique,
+  proveedor text not null,
+  siigo_id text,
+  fecha_orden date,
+  estado text not null default 'Abierta' check (estado in ('Abierta','Parcial','Completa','Cerrada','Cancelada')),
+  observacion text,
+  created_by uuid default auth.uid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index if not exists rec_ordenes_siigo_id_uq on public.rec_ordenes(siigo_id) where siigo_id is not null and btrim(siigo_id)<>'';
+create index if not exists rec_ordenes_fecha_idx on public.rec_ordenes(fecha_orden desc,created_at desc);
+
+create table if not exists public.rec_orden_items (
+  id uuid primary key default gen_random_uuid(),
+  orden_id uuid not null references public.rec_ordenes(id) on delete cascade,
+  codigo text not null,
+  descripcion text not null,
+  unidad text not null default 'und',
+  cantidad_solicitada numeric(14,3) not null check (cantidad_solicitada>0),
+  siigo_item_id text,
+  created_at timestamptz not null default now()
+);
+alter table public.rec_orden_items drop constraint if exists rec_orden_items_orden_id_codigo_key;
+create index if not exists rec_orden_items_orden_idx on public.rec_orden_items(orden_id);
+create index if not exists rec_orden_items_codigo_idx on public.rec_orden_items(orden_id,codigo);
+create unique index if not exists rec_orden_items_siigo_uq on public.rec_orden_items(orden_id,siigo_item_id) where siigo_item_id is not null and btrim(siigo_item_id)<>'';
+
+create table if not exists public.rec_recepciones (
+  id uuid primary key default gen_random_uuid(),
+  orden_id uuid not null references public.rec_ordenes(id) on delete restrict,
+  fecha date not null default current_date,
+  remision text,
+  observacion text,
+  created_by uuid default auth.uid(),
+  created_at timestamptz not null default now()
+);
+create index if not exists rec_recepciones_orden_idx on public.rec_recepciones(orden_id,fecha,created_at);
+
+create table if not exists public.rec_recepcion_items (
+  id uuid primary key default gen_random_uuid(),
+  recepcion_id uuid not null references public.rec_recepciones(id) on delete cascade,
+  orden_item_id uuid not null references public.rec_orden_items(id) on delete restrict,
+  cantidad_recibida numeric(14,3) not null check (cantidad_recibida>0),
+  created_at timestamptz not null default now(),
+  unique(recepcion_id,orden_item_id)
+);
+create index if not exists rec_recepcion_items_orden_item_idx on public.rec_recepcion_items(orden_item_id);
+
+create table if not exists public.rec_distribuciones (
+  id uuid primary key default gen_random_uuid(),
+  recepcion_item_id uuid not null references public.rec_recepcion_items(id) on delete cascade,
+  client_key uuid not null default gen_random_uuid() unique,
+  cantidad numeric(14,3) not null check (cantidad>0),
+  resultado text not null check (resultado in ('Aceptado','Aceptado con condicion','Pendiente de calidad','Rechazado')),
+  observacion text,
+  created_at timestamptz not null default now()
+);
+create index if not exists rec_distribuciones_item_idx on public.rec_distribuciones(recepcion_item_id);
+create index if not exists rec_distribuciones_resultado_idx on public.rec_distribuciones(resultado);
+
+create table if not exists public.rec_defecto_catalogo (
+  id uuid primary key default gen_random_uuid(),
+  codigo text not null unique,
+  nombre text not null,
+  activo boolean not null default true,
+  es_otro boolean not null default false,
+  created_by uuid default auth.uid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.rec_distribucion_defectos (
+  distribucion_id uuid not null references public.rec_distribuciones(id) on delete cascade,
+  defecto_id uuid not null references public.rec_defecto_catalogo(id) on delete restrict,
+  descripcion_otro text,
+  created_at timestamptz not null default now(),
+  primary key(distribucion_id,defecto_id)
+);
+create index if not exists rec_distribucion_defectos_defecto_idx on public.rec_distribucion_defectos(defecto_id);
+
+create table if not exists public.rec_evidencias (
+  id uuid primary key default gen_random_uuid(),
+  distribucion_id uuid not null references public.rec_distribuciones(id) on delete cascade,
+  nombre text not null,
+  mime_type text,
+  tamano bigint check (tamano is null or tamano>=0),
+  object_path text not null unique,
+  created_by uuid default auth.uid(),
+  created_at timestamptz not null default now()
+);
+create index if not exists rec_evidencias_distribucion_idx on public.rec_evidencias(distribucion_id);
+
+create table if not exists public.rec_no_conformidades (
+  id uuid primary key default gen_random_uuid(),
+  distribucion_id uuid not null unique references public.rec_distribuciones(id) on delete cascade,
+  estado text not null default 'Pendiente' check (estado in ('Pendiente','En seguimiento','Cerrada')),
+  accion text,
+  seguimiento text,
+  cierre text,
+  fecha_cierre timestamptz,
+  created_by uuid default auth.uid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists rec_no_conformidades_estado_idx on public.rec_no_conformidades(estado,created_at desc);
+
+drop trigger if exists trg_rec_ordenes_updated on public.rec_ordenes;
+create trigger trg_rec_ordenes_updated before update on public.rec_ordenes for each row execute function public.set_updated_at();
+drop trigger if exists trg_rec_defecto_catalogo_updated on public.rec_defecto_catalogo;
+create trigger trg_rec_defecto_catalogo_updated before update on public.rec_defecto_catalogo for each row execute function public.set_updated_at();
+drop trigger if exists trg_rec_no_conformidades_updated on public.rec_no_conformidades;
+create trigger trg_rec_no_conformidades_updated before update on public.rec_no_conformidades for each row execute function public.set_updated_at();
+
+insert into public.rec_defecto_catalogo(codigo,nombre,es_otro) values
+ ('DIMENSION','Dimensión fuera de especificación',false),('MATERIAL','Material incorrecto',false),
+ ('REFERENCIA','Referencia incorrecta',false),('CANTIDAD','Cantidad incorrecta',false),
+ ('OXIDACION','Oxidación',false),('DEFORMACION','Deformación',false),
+ ('GOLPE','Golpe / daño físico',false),('FISURA','Fisura',false),
+ ('SOLDADURA','Soldadura defectuosa',false),('ACABADO','Acabado defectuoso',false),
+ ('COLOR','Color incorrecto',false),('CONTAMINACION','Contaminación',false),
+ ('EMPAQUE','Empaque deteriorado',false),('DOCUMENTACION','Documentación / certificado faltante',false),
+ ('ESPECIFICACION','Incumplimiento de especificaciones',false),('OTRO','Otro',true)
+on conflict(codigo) do nothing;
+
+create or replace function public.rec_validar_acumulado() returns trigger
+language plpgsql set search_path='' as $$
+declare solicitado numeric; acumulado numeric;
+begin
+  select cantidad_solicitada into solicitado from public.rec_orden_items where id=new.orden_item_id for update;
+  if solicitado is null then raise exception 'Item de orden inexistente'; end if;
+  select coalesce(sum(cantidad_recibida),0) into acumulado from public.rec_recepcion_items
+    where orden_item_id=new.orden_item_id and id<>new.id;
+  if acumulado+new.cantidad_recibida>solicitado then
+    raise exception 'La cantidad acumulada (%) supera la cantidad solicitada (%)',acumulado+new.cantidad_recibida,solicitado;
+  end if;
+  return new;
+end $$;
+drop trigger if exists trg_rec_validar_acumulado on public.rec_recepcion_items;
+create trigger trg_rec_validar_acumulado before insert or update on public.rec_recepcion_items
+for each row execute function public.rec_validar_acumulado();
+
+create or replace function public.rec_validar_distribucion_total() returns trigger
+language plpgsql set search_path='' as $$
+declare item_id uuid; recibido numeric; distribuido numeric;
+begin
+  item_id:=coalesce(new.recepcion_item_id,old.recepcion_item_id);
+  select cantidad_recibida into recibido from public.rec_recepcion_items where id=item_id;
+  if recibido is null then return null; end if;
+  select coalesce(sum(cantidad),0) into distribuido from public.rec_distribuciones where recepcion_item_id=item_id;
+  if distribuido<>recibido then raise exception 'La distribucion (%) debe ser igual a la cantidad recibida (%)',distribuido,recibido; end if;
+  return null;
+end $$;
+drop trigger if exists trg_rec_distribucion_total on public.rec_distribuciones;
+create constraint trigger trg_rec_distribucion_total after insert or update or delete on public.rec_distribuciones
+deferrable initially deferred for each row execute function public.rec_validar_distribucion_total();
+create or replace function public.rec_validar_item_distribucion_total() returns trigger
+language plpgsql set search_path='' as $$
+declare recibido numeric; distribuido numeric;
+begin
+  recibido:=new.cantidad_recibida;
+  select coalesce(sum(cantidad),0) into distribuido from public.rec_distribuciones where recepcion_item_id=new.id;
+  if distribuido<>recibido then raise exception 'La distribucion (%) debe ser igual a la cantidad recibida (%)',distribuido,recibido; end if;
+  return null;
+end $$;
+drop trigger if exists trg_rec_item_distribucion_total on public.rec_recepcion_items;
+create constraint trigger trg_rec_item_distribucion_total after insert or update on public.rec_recepcion_items
+deferrable initially deferred for each row execute function public.rec_validar_item_distribucion_total();
+
+create or replace function public.rec_guardar_orden(p_numero text,p_proveedor text,p_fecha date,p_siigo_id text,p_observacion text,p_items jsonb)
+returns uuid language plpgsql set search_path='' as $$
+declare oid uuid; item jsonb;
+begin
+  if public.calidad_rol() is distinct from 'admin' then raise exception 'Solo admin'; end if;
+  if nullif(btrim(p_numero),'') is null or nullif(btrim(p_proveedor),'') is null then raise exception 'Orden y proveedor son obligatorios'; end if;
+  if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'Agrega al menos un material'; end if;
+  insert into public.rec_ordenes(numero,proveedor,fecha_orden,siigo_id,observacion,created_by)
+  values(btrim(p_numero),btrim(p_proveedor),p_fecha,nullif(btrim(p_siigo_id),''),nullif(btrim(p_observacion),''),auth.uid()) returning id into oid;
+  for item in select value from jsonb_array_elements(p_items) loop
+    if nullif(btrim(item->>'codigo'),'') is null or nullif(btrim(item->>'descripcion'),'') is null or coalesce((item->>'cantidad')::numeric,0)<=0 then raise exception 'Cada material requiere codigo, descripcion y cantidad positiva'; end if;
+    insert into public.rec_orden_items(orden_id,codigo,descripcion,unidad,cantidad_solicitada,siigo_item_id)
+    values(oid,btrim(item->>'codigo'),btrim(item->>'descripcion'),coalesce(nullif(btrim(item->>'unidad'),''),'und'),(item->>'cantidad')::numeric,nullif(btrim(item->>'siigo_item_id'),''));
+  end loop;
+  return oid;
+end $$;
+
+create or replace function public.rec_guardar_recepcion(p_orden_id uuid,p_fecha date,p_remision text,p_observacion text,p_items jsonb)
+returns jsonb language plpgsql set search_path='' as $$
+declare rid uuid; item jsonb; grp jsonb; riid uuid; did uuid; defect jsonb; total numeric; result jsonb='[]'::jsonb; otro boolean;
+begin
+  if public.calidad_rol() is distinct from 'admin' then raise exception 'Solo admin'; end if;
+  perform 1 from public.rec_ordenes where id=p_orden_id and estado not in ('Cerrada','Cancelada') for update;
+  if not found then raise exception 'Orden inexistente o cerrada'; end if;
+  if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'No hay cantidades para recibir'; end if;
+  insert into public.rec_recepciones(orden_id,fecha,remision,observacion,created_by)
+    values(p_orden_id,coalesce(p_fecha,current_date),nullif(btrim(p_remision),''),nullif(btrim(p_observacion),''),auth.uid()) returning id into rid;
+  for item in select value from jsonb_array_elements(p_items) loop
+    perform 1 from public.rec_orden_items where id=(item->>'orden_item_id')::uuid and orden_id=p_orden_id for update;
+    if not found then raise exception 'Material no pertenece a la orden'; end if;
+    select coalesce(sum((g->>'cantidad')::numeric),0) into total from jsonb_array_elements(item->'grupos') g;
+    if total<=0 then raise exception 'Cada material incluido requiere cantidad positiva'; end if;
+    insert into public.rec_recepcion_items(recepcion_id,orden_item_id,cantidad_recibida)
+      values(rid,(item->>'orden_item_id')::uuid,total) returning id into riid;
+    for grp in select value from jsonb_array_elements(item->'grupos') loop
+      if coalesce((grp->>'cantidad')::numeric,0)<=0 or grp->>'resultado' not in ('Aceptado','Aceptado con condicion','Pendiente de calidad','Rechazado') then raise exception 'Distribucion de cantidad invalida'; end if;
+      if grp->>'resultado'='Rechazado' and coalesce(jsonb_array_length(grp->'defectos'),0)=0 then raise exception 'Una cantidad rechazada requiere al menos un defecto'; end if;
+      insert into public.rec_distribuciones(recepcion_item_id,client_key,cantidad,resultado,observacion)
+        values(riid,(grp->>'client_key')::uuid,(grp->>'cantidad')::numeric,grp->>'resultado',nullif(btrim(grp->>'observacion'),'')) returning id into did;
+      for defect in select value from jsonb_array_elements(coalesce(grp->'defectos','[]'::jsonb)) loop
+        select es_otro into otro from public.rec_defecto_catalogo where id=(defect->>'id')::uuid and activo;
+        if not found then raise exception 'Defecto inexistente o inactivo'; end if;
+        if otro and nullif(btrim(defect->>'descripcion_otro'),'') is null then raise exception 'Describe el defecto Otro'; end if;
+        insert into public.rec_distribucion_defectos(distribucion_id,defecto_id,descripcion_otro)
+          values(did,(defect->>'id')::uuid,case when otro then btrim(defect->>'descripcion_otro') else null end);
+      end loop;
+      if grp->>'resultado'='Rechazado' and coalesce((grp->>'generar_nc')::boolean,true) then
+        insert into public.rec_no_conformidades(distribucion_id,estado,accion,created_by)
+          values(did,'Pendiente','Pendiente de definir',auth.uid()) on conflict(distribucion_id) do nothing;
+      end if;
+      result:=result||jsonb_build_array(jsonb_build_object('client_key',grp->>'client_key','distribucion_id',did));
+    end loop;
+  end loop;
+  update public.rec_ordenes o set estado=case when exists(
+      select 1 from public.rec_orden_items oi left join lateral(select coalesce(sum(ri.cantidad_recibida),0) total from public.rec_recepcion_items ri where ri.orden_item_id=oi.id) x on true
+      where oi.orden_id=o.id and x.total<oi.cantidad_solicitada) then 'Parcial' else 'Completa' end
+    where o.id=p_orden_id;
+  return jsonb_build_object('recepcion_id',rid,'grupos',result);
+end $$;
+
+do $$ declare t text; p record; begin
+  foreach t in array array['rec_ordenes','rec_orden_items','rec_recepciones','rec_recepcion_items','rec_distribuciones','rec_defecto_catalogo','rec_distribucion_defectos','rec_evidencias','rec_no_conformidades'] loop
+    execute format('alter table public.%I enable row level security',t);
+    for p in select policyname from pg_policies where schemaname='public' and tablename=t loop execute format('drop policy %I on public.%I',p.policyname,t); end loop;
+    execute format('revoke all on public.%I from public,anon,authenticated',t);
+    execute format('grant select,insert,update,delete on public.%I to authenticated',t);
+    execute format('create policy recepcion_admin on public.%I for all to authenticated using ((select public.calidad_rol())=''admin'') with check ((select public.calidad_rol())=''admin'')',t);
+  end loop;
+end $$;
+revoke all on function public.rec_guardar_orden(text,text,date,text,text,jsonb),public.rec_guardar_recepcion(uuid,date,text,text,jsonb) from public,anon;
+grant execute on function public.rec_guardar_orden(text,text,date,text,text,jsonb),public.rec_guardar_recepcion(uuid,date,text,text,jsonb) to authenticated;
+
+do $$ begin
+  if to_regclass('storage.buckets') is not null and to_regclass('storage.objects') is not null then
+    execute $sql$insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+      values('recepcion-evidencias','recepcion-evidencias',false,10485760,array['image/jpeg','image/png','image/webp','application/pdf','text/plain','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
+      on conflict(id) do update set public=false,file_size_limit=excluded.file_size_limit,allowed_mime_types=excluded.allowed_mime_types$sql$;
+    execute 'drop policy if exists recepcion_evidencias_admin on storage.objects';
+    execute $sql$create policy recepcion_evidencias_admin on storage.objects for all to authenticated
+      using(bucket_id='recepcion-evidencias' and (select public.calidad_rol())='admin')
+      with check(bucket_id='recepcion-evidencias' and (select public.calidad_rol())='admin')$sql$;
+  end if;
+end $$;
+
 NOTIFY pgrst, 'reload schema';
 commit;

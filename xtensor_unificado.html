@@ -201,6 +201,27 @@ td.obs{white-space:normal;max-width:240px;color:var(--text3)}
 #rec-content::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 .rec-panel{display:none;max-width:1200px;margin:0 auto}
 .rec-panel.active{display:block}
+.rec-order-view{max-width:1400px;margin:0 auto;display:grid;gap:10px}
+.rec-order-toolbar,.rec-order-head,.rec-material-head,.rec-inline-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rec-order-toolbar input{flex:1;min-width:220px;max-width:420px;padding:8px 10px;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:4px}
+.rec-order-layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:10px;min-height:480px}
+.rec-order-list{border:1px solid var(--border);background:var(--bg2);overflow:auto;max-height:calc(100dvh - 190px)}
+.rec-order-row{display:block;width:100%;padding:11px;text-align:left;background:transparent;color:var(--text);border:0;border-bottom:1px solid var(--border);cursor:pointer}
+.rec-order-row:hover,.rec-order-row.active{background:var(--surface)}.rec-order-row.active{box-shadow:inset 3px 0 var(--yellow)}
+.rec-order-row strong,.rec-order-row span{display:block}.rec-order-row span{font-size:11px;color:var(--text2);margin-top:3px}
+.rec-order-detail{min-width:0}.rec-order-head{padding:12px;border:1px solid var(--border);background:var(--bg2)}.rec-order-head>div:first-child{margin-right:auto;min-width:0}.rec-order-head h2{font-size:17px}.rec-order-head p{font-size:12px;color:var(--text2);margin-top:4px}
+.rec-materials{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:8px;margin-top:8px}
+.rec-material-card{border:1px solid var(--border);background:var(--bg2);padding:11px;min-width:0}.rec-material-head>div{margin-right:auto;min-width:0}.rec-material-head h3{font-size:14px;overflow-wrap:anywhere}.rec-material-head small{color:var(--text2)}
+.rec-qty-grid{display:grid;grid-template-columns:repeat(6,minmax(72px,1fr));gap:5px;margin-top:10px}.rec-qty-grid div{background:var(--surface);padding:7px;border:1px solid var(--border)}.rec-qty-grid span,.rec-detail-label{display:block;color:var(--text3);font-size:9px;text-transform:uppercase}.rec-qty-grid b{display:block;margin-top:3px;font-size:13px}.rec-qty-grid .bad b{color:var(--red)}.rec-qty-grid .ok b{color:var(--green)}
+.rec-material-detail{margin-top:9px;border-top:1px solid var(--border);padding-top:8px}.rec-delivery{padding:8px 0;border-bottom:1px solid var(--border)}.rec-delivery:last-child{border-bottom:0}.rec-dist-row{display:grid;grid-template-columns:80px 150px minmax(0,1fr) auto;gap:8px;align-items:start;padding:6px 0;font-size:11px}.rec-defect-tags{display:flex;gap:4px;flex-wrap:wrap}.rec-defect-tag{padding:2px 5px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);border-radius:3px}
+.rec-order-empty{padding:45px 20px;text-align:center;color:var(--text3);border:1px solid var(--border)}
+#rec-order-dialog{width:min(900px,calc(100vw - 24px))}#rec-receipt-dialog{width:min(1120px,calc(100vw - 24px))}#rec-defect-dialog{width:min(700px,calc(100vw - 24px))}#rec-nc-dialog{width:min(620px,calc(100vw - 24px))}
+.rec-order-items,.rec-receipt-materials{display:grid;gap:8px}.rec-draft-item,.rec-receipt-material{border:1px solid var(--border);background:var(--bg2);padding:10px}.rec-draft-item{display:grid;grid-template-columns:130px minmax(180px,1fr) 90px 120px 34px;gap:7px;align-items:end}.rec-draft-item input,.rec-group input,.rec-group select,.rec-group textarea{width:100%;min-width:0;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:4px;padding:7px;font:inherit}
+.rec-group textarea{min-height:42px;resize:vertical}.rec-group input[type=file]{padding:5px}.rec-group input[type=file]::file-selector-button{background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:4px;padding:5px 8px;margin-right:8px;cursor:pointer}.rec-check{display:flex!important;grid-template-columns:none!important;align-items:center;gap:7px!important;color:var(--text2);font-size:11px}.rec-check input{width:16px!important;min-width:16px!important;min-height:16px;margin:0}
+.rec-receipt-material header{display:flex;gap:8px;align-items:start}.rec-receipt-material header>div{margin-right:auto}.rec-groups{display:grid;gap:6px;margin-top:8px}.rec-group{display:grid;grid-template-columns:95px 190px minmax(160px,1fr) 34px;gap:7px;padding:8px;background:var(--surface);border:1px solid var(--border);align-items:start}.rec-group-extra{grid-column:1/-1;display:grid;gap:7px}.rec-group-defects{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.rec-group-defects select{width:auto;min-width:220px}.rec-file-list{font-size:11px;color:var(--text2)}
+.rec-catalog-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;align-items:center;padding:7px;border-bottom:1px solid var(--border)}
+@media(max-width:900px){.rec-order-layout{grid-template-columns:1fr}.rec-order-list{max-height:220px}.rec-materials{grid-template-columns:1fr}.rec-qty-grid{grid-template-columns:repeat(3,1fr)}.rec-dist-row{grid-template-columns:70px 130px minmax(0,1fr)}.rec-dist-row>:last-child{grid-column:1/-1}.rec-draft-item,.rec-group{grid-template-columns:1fr 1fr}.rec-draft-item>:nth-child(2),.rec-group-extra{grid-column:1/-1}}
+@media(max-width:560px){.rec-qty-grid{grid-template-columns:repeat(2,1fr)}.rec-draft-item,.rec-group{grid-template-columns:1fr}.rec-draft-item>*{grid-column:auto!important}.rec-dist-row{grid-template-columns:1fr}}
 
 /* ══════════════ CALIDAD ══════════════ */
 .cal-group-badge{font-size:10px;font-weight:600;padding:2px 6px;border-radius:99px;border:1px solid var(--border2);color:var(--text2);background:var(--surface2);white-space:nowrap}
@@ -528,6 +549,10 @@ body[data-worker] .app-section:not(#sec-calidad){display:none!important}
     <div class="view-tabs" id="rec-view-tabs"></div>
     <div id="rec-content"></div>
   </div>
+  <dialog id="rec-order-dialog" class="workflow-dialog"><form id="rec-order-form" onsubmit="recSaveOrder(event)"><h2>Nueva orden de compra</h2><div class="form-grid"><div class="field"><label>Número de orden</label><input id="rec-order-number" required></div><div class="field"><label>Proveedor</label><input id="rec-order-provider" required></div><div class="field"><label>Fecha</label><input id="rec-order-date" type="date"></div><div class="field"><label>ID de Siigo</label><input id="rec-order-siigo" placeholder="Opcional"></div><div class="field full"><label>Observación</label><textarea id="rec-order-notes" rows="2"></textarea></div></div><div class="card-hdr"><div class="card-title">Materiales solicitados</div><button type="button" class="btn" onclick="recAddOrderItem()"><i class="ti ti-plus"></i> Material</button></div><div id="rec-order-items" class="rec-order-items"></div><footer><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button class="btn btn-y" type="submit">Guardar orden</button></footer></form></dialog>
+  <dialog id="rec-receipt-dialog" class="workflow-dialog"><form id="rec-receipt-form" onsubmit="recSaveReceipt(event)"><h2 id="rec-receipt-title">Registrar recepción</h2><div class="form-grid"><div class="field"><label>Fecha</label><input id="rec-receipt-date" type="date" required></div><div class="field"><label>Remisión</label><input id="rec-receipt-remission"></div><div class="field full"><label>Observación general</label><textarea id="rec-receipt-notes" rows="2"></textarea></div></div><div id="rec-receipt-materials" class="rec-receipt-materials"></div><p id="rec-receipt-error" class="gt-note gt-warn"></p><footer><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button class="btn btn-y" type="submit">Guardar recepción</button></footer></form></dialog>
+  <dialog id="rec-defect-dialog" class="workflow-dialog"><h2>Catálogo de defectos</h2><form onsubmit="recAddDefect(event)" style="display:flex;grid-template-columns:1fr auto;align-items:end"><label>Nuevo tipo<input id="rec-defect-new" required maxlength="120"></label><button class="btn btn-y" type="submit"><i class="ti ti-plus"></i> Agregar</button></form><div id="rec-defect-list"></div><footer><button class="btn" onclick="this.closest('dialog').close()">Cerrar</button></footer></dialog>
+  <dialog id="rec-nc-dialog" class="workflow-dialog"><form onsubmit="recSaveNC(event)"><input id="rec-nc-id" type="hidden"><h2>No conformidad</h2><div id="rec-nc-context" class="gt-note"></div><label>Estado<select id="rec-nc-state"><option>Pendiente</option><option>En seguimiento</option><option>Cerrada</option></select></label><label>Acción<input id="rec-nc-action"></label><label>Seguimiento<textarea id="rec-nc-follow" rows="3"></textarea></label><label>Cierre<textarea id="rec-nc-close" rows="2"></textarea></label><footer><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button class="btn btn-y" type="submit">Guardar</button></footer></form></dialog>
 
   <!-- ═══════════════ SECCIÓN CALIDAD ═══════════════ -->
   <div id="sec-calidad" class="app-section">
@@ -1066,6 +1091,7 @@ function appWatchClient(client){
 }
 function appIsAdmin(){return appAccess.ready&&appAccess.role==='admin';}
 function appStage(){return ({armado:'material',resoldado:'armado',pulido:'resoldado',pintado:'pulido',ensamble:'pintado',empacado:'ensamble'})[appAccess.role]||null;}
+const CAL_WORKFLOW_ORDER=['material','armado','resoldado','pulido','pintado','ensamble','empacado'];
 function appInspectionRead(){return appIsAdmin()?sb.from('calidad_inspecciones').select('*'):sb.rpc('calidad_leer_mi_etapa');}
 function appLock(message){
   appAccess.ready=false;document.body.removeAttribute('data-access');
@@ -1358,9 +1384,105 @@ const REC_COL_LABELS = {
 
 // RecData[cat.key] = array de registros, cada uno con { id, fecha, resultado, ...campos } — más reciente primero.
 let RecData = {}; REC_CATS.forEach(c=>RecData[c.key]=[]);
-let recActiveCat = REC_CATS[0].key;
+let recActiveCat = 'ordenes';
 let recActiveFilter = {}; // por categoría, filtro de resultado
 let recLoaded = false;
+let recDetailedAvailable=false,recDetailedError='',recOrders=[],recOrderItems=[],recReceipts=[],recReceiptItems=[],recDistributions=[],recDefectCatalog=[],recDistributionDefects=[],recEvidence=[],recNonconformities=[],recSelectedOrderId=null,recOrderDraft=[],recReceiptDraft=[],recReceiptOrderId=null,recReloadTimer=null;
+const REC_RESULTS=['Aceptado','Aceptado con condicion','Pendiente de calidad','Rechazado'];
+function recNum(value){return Number(value||0).toLocaleString('es-CO',{maximumFractionDigits:3});}
+function recResultLabel(value){return value==='Aceptado con condicion'?'Aceptado con condición':value;}
+function recUuid(){return crypto.randomUUID();}
+function recItemSummary(item){
+  const receivedItems=recReceiptItems.filter(x=>x.orden_item_id===item.id),ids=new Set(receivedItems.map(x=>x.id)),groups=recDistributions.filter(x=>ids.has(x.recepcion_item_id)),sum=result=>groups.filter(x=>x.resultado===result).reduce((s,x)=>s+Number(x.cantidad||0),0),received=receivedItems.reduce((s,x)=>s+Number(x.cantidad_recibida||0),0);
+  return {received,pending:Math.max(0,Number(item.cantidad_solicitada)-received),accepted:sum('Aceptado'),conditioned:sum('Aceptado con condicion'),qualityPending:sum('Pendiente de calidad'),rejected:sum('Rechazado'),groups,receivedItems};
+}
+function recMaterialState(s){return s.rejected>0?(s.accepted+s.conditioned>0?'Aceptado parcialmente':'Rechazado'):s.qualityPending>0?'Pendiente de calidad':s.pending>0?(s.received>0?'Recepción parcial':'Pendiente de recibir'):'Aceptado';}
+async function recFetchDetailed(){
+  try{
+    const tables=['rec_ordenes','rec_orden_items','rec_recepciones','rec_recepcion_items','rec_distribuciones','rec_defecto_catalogo','rec_distribucion_defectos','rec_evidencias','rec_no_conformidades'];
+    const data=await Promise.all(tables.map(t=>sbCall(()=>sb.from(t).select('*'))));
+    [recOrders,recOrderItems,recReceipts,recReceiptItems,recDistributions,recDefectCatalog,recDistributionDefects,recEvidence,recNonconformities]=data.map(x=>x||[]);
+    recOrders.sort((a,b)=>String(b.fecha_orden||b.created_at).localeCompare(String(a.fecha_orden||a.created_at)));recDefectCatalog.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+    if(!recSelectedOrderId||!recOrders.some(o=>o.id===recSelectedOrderId))recSelectedOrderId=recOrders[0]?.id||null;
+    recDetailedAvailable=true;recDetailedError='';
+  }catch(e){recDetailedAvailable=false;recDetailedError=e.message||String(e);}
+}
+function recOrderStatusBadge(value){const cls=value==='Completa'?'b-ok':value==='Cancelada'?'b-no':'b-cond';return '<span class="badge '+cls+'">'+escapeHtml(value)+'</span>';}
+function recRenderOrders(){
+  if(!recDetailedAvailable)return '<div class="rec-order-view"><div class="rec-order-empty"><i class="ti ti-database-off" style="font-size:28px"></i><p style="margin-top:8px">Activa la recepción detallada ejecutando el <b>schema.sql</b> actualizado.</p><small>'+escapeHtml(recDetailedError)+'</small></div></div>';
+  const q=normKey(document.getElementById('rec-order-search')?.value||''),orders=recOrders.filter(o=>!q||normKey(o.numero+' '+o.proveedor+' '+(o.siigo_id||'')).includes(q)),selected=recOrders.find(o=>o.id===recSelectedOrderId);
+  const list=orders.map(o=>{const items=recOrderItems.filter(i=>i.orden_id===o.id),pending=items.reduce((s,i)=>s+recItemSummary(i).pending,0);return '<button class="rec-order-row '+(o.id===recSelectedOrderId?'active':'')+'" onclick="recSelectOrder(\''+o.id+'\')"><strong>'+escapeHtml(o.numero)+'</strong><span>'+escapeHtml(o.proveedor)+'</span><span>'+items.length+' materiales · '+recNum(pending)+' pendientes</span></button>';}).join('')||'<div class="rec-order-empty">Sin órdenes</div>';
+  return '<div class="rec-order-view"><div class="rec-order-toolbar"><input id="rec-order-search" type="search" placeholder="Buscar orden, proveedor o ID de Siigo" value="'+escapeHtml(document.getElementById('rec-order-search')?.value||'')+'" oninput="recRenderContent()"><button class="btn" onclick="recOpenDefects()"><i class="ti ti-list-details"></i> Defectos</button><button class="btn btn-y" onclick="recOpenOrder()"><i class="ti ti-plus"></i> Orden</button></div><div class="rec-order-layout"><aside class="rec-order-list">'+list+'</aside><main class="rec-order-detail">'+(selected?recRenderOrderDetail(selected):'<div class="rec-order-empty">Selecciona o crea una orden de compra.</div>')+'</main></div></div>';
+}
+function recRenderOrderDetail(order){
+  const items=recOrderItems.filter(i=>i.orden_id===order.id),canReceive=items.some(i=>recItemSummary(i).pending>0)&&!['Cerrada','Cancelada'].includes(order.estado);
+  return '<div class="rec-order-head"><div><h2>'+escapeHtml(order.numero)+' · '+escapeHtml(order.proveedor)+'</h2><p>'+(order.fecha_orden?escapeHtml(order.fecha_orden)+' · ':'')+(order.siigo_id?'Siigo '+escapeHtml(order.siigo_id)+' · ':'')+items.length+' materiales</p></div>'+recOrderStatusBadge(order.estado)+(canReceive?'<button class="btn btn-y" onclick="recOpenReceipt(\''+order.id+'\')"><i class="ti ti-package-import"></i> Recibir</button>':'')+'</div><div class="rec-materials">'+items.map(recRenderMaterial).join('')+'</div>';
+}
+function recRenderMaterial(item){
+  const s=recItemSummary(item),open=window.recExpandedItems?.has(item.id),state=recMaterialState(s);
+  return '<article class="rec-material-card"><div class="rec-material-head"><div><h3>'+escapeHtml(item.codigo)+' · '+escapeHtml(item.descripcion)+'</h3><small>'+escapeHtml(item.unidad)+' · '+escapeHtml(state)+'</small></div><button class="btn btn-ghost" onclick="recToggleMaterial(\''+item.id+'\')">'+(open?'Ocultar':'Ver detalle')+'</button></div><div class="rec-qty-grid"><div><span>Solicitado</span><b>'+recNum(item.cantidad_solicitada)+'</b></div><div><span>Recibido</span><b>'+recNum(s.received)+'</b></div><div><span>Pendiente</span><b>'+recNum(s.pending)+'</b></div><div class="ok"><span>Aceptado</span><b>'+recNum(s.accepted)+'</b></div><div><span>Condicionado</span><b>'+recNum(s.conditioned)+'</b></div><div><span>Pendiente calidad</span><b>'+recNum(s.qualityPending)+'</b></div><div class="bad"><span>Rechazado</span><b>'+recNum(s.rejected)+'</b></div></div>'+(open?recRenderMaterialHistory(item,s):'')+'</article>';
+}
+window.recExpandedItems=new Set();
+function recToggleMaterial(id){window.recExpandedItems.has(id)?window.recExpandedItems.delete(id):window.recExpandedItems.add(id);recRenderContent();}
+function recRenderMaterialHistory(item,s){
+  if(!s.receivedItems.length)return '<div class="rec-material-detail gt-note">Sin recepciones todavía.</div>';
+  return '<div class="rec-material-detail">'+s.receivedItems.map(ri=>{const receipt=recReceipts.find(r=>r.id===ri.recepcion_id)||{},groups=recDistributions.filter(d=>d.recepcion_item_id===ri.id);return '<section class="rec-delivery"><b>'+escapeHtml(receipt.fecha||'')+(receipt.remision?' · '+escapeHtml(receipt.remision):'')+'</b>'+groups.map(g=>recRenderDistribution(g)).join('')+'</section>';}).join('')+'</div>';
+}
+function recRenderDistribution(group){
+  const links=recDistributionDefects.filter(x=>x.distribucion_id===group.id),defects=links.map(x=>{const d=recDefectCatalog.find(v=>v.id===x.defecto_id);return d?(d.es_otro&&x.descripcion_otro?x.descripcion_otro:d.nombre):'';}).filter(Boolean),files=recEvidence.filter(e=>e.distribucion_id===group.id),nc=recNonconformities.find(n=>n.distribucion_id===group.id);
+  return '<div class="rec-dist-row"><b>'+recNum(group.cantidad)+'</b><span>'+escapeHtml(recResultLabel(group.resultado))+'</span><div><div class="rec-defect-tags">'+(defects.length?defects.map(x=>'<span class="rec-defect-tag">'+escapeHtml(x)+'</span>').join(''):'<span class="gt-note">Sin defectos</span>')+'</div>'+(group.observacion?'<div class="gt-note">'+escapeHtml(group.observacion)+'</div>':'')+(files.length?'<div class="rec-inline-actions">'+files.map(f=>'<button class="link-btn" onclick="recOpenEvidence(\''+f.object_path+'\')">'+escapeHtml(f.nombre)+'</button>').join('')+'</div>':'')+'</div><div class="rec-inline-actions"><button class="btn btn-ghost" onclick="recOpenNC(\''+group.id+'\')">'+(nc?escapeHtml(nc.estado):'Crear asunto')+'</button></div></div>';
+}
+function recSelectOrder(id){recSelectedOrderId=id;recRenderContent();}
+function recOpenOrder(){
+  recOrderDraft=[{codigo:'',descripcion:'',unidad:'und',cantidad:''}];document.getElementById('rec-order-form').reset();document.getElementById('rec-order-date').value=new Date().toISOString().slice(0,10);recRenderOrderDraft();document.getElementById('rec-order-dialog').showModal();
+}
+function recAddOrderItem(){recOrderDraft.push({codigo:'',descripcion:'',unidad:'und',cantidad:''});recRenderOrderDraft();}
+function recOrderItemChange(index,key,value){recOrderDraft[index][key]=value;}
+function recRemoveOrderItem(index){if(recOrderDraft.length===1)return;recOrderDraft.splice(index,1);recRenderOrderDraft();}
+function recRenderOrderDraft(){document.getElementById('rec-order-items').innerHTML=recOrderDraft.map((x,i)=>'<div class="rec-draft-item"><label>Código<input value="'+escapeHtml(x.codigo)+'" oninput="recOrderItemChange('+i+',\'codigo\',this.value)" required></label><label>Descripción<input value="'+escapeHtml(x.descripcion)+'" oninput="recOrderItemChange('+i+',\'descripcion\',this.value)" required></label><label>Unidad<input value="'+escapeHtml(x.unidad)+'" oninput="recOrderItemChange('+i+',\'unidad\',this.value)" required></label><label>Cantidad<input type="number" min="0.001" step="0.001" value="'+escapeHtml(x.cantidad)+'" oninput="recOrderItemChange('+i+',\'cantidad\',this.value)" required></label><button type="button" class="btn btn-ghost" onclick="recRemoveOrderItem('+i+')" title="Quitar"><i class="ti ti-trash"></i></button></div>').join('');}
+async function recSaveOrder(event){
+  event.preventDefault();const button=event.submitter;button.disabled=true;
+  try{const items=recOrderDraft.map(x=>({...x,cantidad:Number(x.cantidad)}));const {data,error}=await sb.rpc('rec_guardar_orden',{p_numero:document.getElementById('rec-order-number').value.trim(),p_proveedor:document.getElementById('rec-order-provider').value.trim(),p_fecha:document.getElementById('rec-order-date').value||null,p_siigo_id:document.getElementById('rec-order-siigo').value.trim(),p_observacion:document.getElementById('rec-order-notes').value.trim(),p_items:items});if(error)throw error;recSelectedOrderId=data;document.getElementById('rec-order-dialog').close();await recFetchDetailed();recRenderContent();showToast('Orden guardada','green');}catch(e){showToast(e.message,'yellow');}finally{button.disabled=false;}
+}
+function recOpenReceipt(orderId){
+  const order=recOrders.find(o=>o.id===orderId);recReceiptOrderId=orderId;recReceiptDraft=recOrderItems.filter(i=>i.orden_id===orderId&&recItemSummary(i).pending>0).map(i=>({item:i,groups:[]}));document.getElementById('rec-receipt-form').reset();document.getElementById('rec-receipt-date').value=new Date().toISOString().slice(0,10);document.getElementById('rec-receipt-title').textContent='Recibir '+order.numero;document.getElementById('rec-receipt-error').textContent='';recRenderReceiptDraft();document.getElementById('rec-receipt-dialog').showModal();
+}
+function recFindGroup(key){for(const item of recReceiptDraft){const group=item.groups.find(g=>g.client_key===key);if(group)return group;}return null;}
+function recAddGroup(itemId){const row=recReceiptDraft.find(x=>x.item.id===itemId),remaining=Math.max(0,recItemSummary(row.item).pending-row.groups.reduce((s,g)=>s+Number(g.cantidad||0),0));row.groups.push({client_key:recUuid(),cantidad:remaining||'',resultado:'Aceptado',observacion:'',defectos:[],files:[],generar_nc:true});recRenderReceiptDraft();}
+function recRemoveGroup(key){for(const row of recReceiptDraft)row.groups=row.groups.filter(g=>g.client_key!==key);recRenderReceiptDraft();}
+function recGroupChange(key,field,value){const g=recFindGroup(key);if(!g)return;g[field]=field==='cantidad'?Number(value):value;if(field==='resultado'&&value==='Aceptado')g.defectos=[];recRenderReceiptDraft();}
+function recAddGroupDefect(key){const select=document.getElementById('rec-defect-pick-'+key),g=recFindGroup(key),id=select?.value;if(!g||!id||g.defectos.some(d=>d.id===id))return;g.defectos.push({id,descripcion_otro:''});recRenderReceiptDraft();}
+function recRemoveGroupDefect(key,id){const g=recFindGroup(key);g.defectos=g.defectos.filter(d=>d.id!==id);recRenderReceiptDraft();}
+function recOtherChange(key,id,value){const d=recFindGroup(key)?.defectos.find(x=>x.id===id);if(d)d.descripcion_otro=value;}
+function recSetFiles(key,files){const g=recFindGroup(key);if(g){g.files=[...files];const el=document.getElementById('rec-files-'+key);if(el)el.textContent=g.files.map(f=>f.name).join(', ');}}
+function recRenderReceiptDraft(){
+  const catalog=recDefectCatalog.filter(d=>d.activo);
+  document.getElementById('rec-receipt-materials').innerHTML=recReceiptDraft.map(row=>{const s=recItemSummary(row.item),used=row.groups.reduce((n,g)=>n+Number(g.cantidad||0),0);return '<section class="rec-receipt-material"><header><div><b>'+escapeHtml(row.item.codigo)+' · '+escapeHtml(row.item.descripcion)+'</b><div class="gt-note">Pendiente '+recNum(s.pending)+' '+escapeHtml(row.item.unidad)+' · En esta entrega '+recNum(used)+'</div></div><button type="button" class="btn" onclick="recAddGroup(\''+row.item.id+'\')"><i class="ti ti-plus"></i> Distribución</button></header><div class="rec-groups">'+row.groups.map(g=>{const nonAccepted=g.resultado!=='Aceptado',tags=g.defectos.map(link=>{const d=catalog.find(x=>x.id===link.id)||recDefectCatalog.find(x=>x.id===link.id);return d?'<span class="rec-defect-tag">'+escapeHtml(d.nombre)+' <button type="button" class="row-del" onclick="recRemoveGroupDefect(\''+g.client_key+'\',\''+d.id+'\')">×</button></span>':'';}).join(''),others=g.defectos.map(link=>{const d=recDefectCatalog.find(x=>x.id===link.id);return d?.es_otro?'<label>Descripción de Otro<input value="'+escapeHtml(link.descripcion_otro)+'" oninput="recOtherChange(\''+g.client_key+'\',\''+link.id+'\',this.value)" required></label>':'';}).join('');return '<div class="rec-group"><label>Cantidad<input type="number" min="0.001" step="0.001" value="'+escapeHtml(g.cantidad)+'" onchange="recGroupChange(\''+g.client_key+'\',\'cantidad\',this.value)" required></label><label>Resultado<select onchange="recGroupChange(\''+g.client_key+'\',\'resultado\',this.value)">'+REC_RESULTS.map(x=>'<option '+(x===g.resultado?'selected':'')+'>'+x+'</option>').join('')+'</select></label><label>Observación<textarea rows="1" oninput="recFindGroup(\''+g.client_key+'\').observacion=this.value">'+escapeHtml(g.observacion)+'</textarea></label><button type="button" class="btn btn-ghost" onclick="recRemoveGroup(\''+g.client_key+'\')" title="Quitar"><i class="ti ti-trash"></i></button>'+(nonAccepted?'<div class="rec-group-extra"><div class="rec-group-defects">'+tags+'<select id="rec-defect-pick-'+g.client_key+'"><option value="">Seleccionar defecto</option>'+catalog.map(d=>'<option value="'+d.id+'">'+escapeHtml(d.nombre)+'</option>').join('')+'</select><button type="button" class="btn" onclick="recAddGroupDefect(\''+g.client_key+'\')">Agregar defecto</button></div>'+others+'<label>Evidencias<input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf,text/plain" onchange="recSetFiles(\''+g.client_key+'\',this.files)"></label><div id="rec-files-'+g.client_key+'" class="rec-file-list">'+g.files.map(f=>escapeHtml(f.name)).join(', ')+'</div>'+(g.resultado==='Rechazado'?'<label><input type="checkbox" '+(g.generar_nc?'checked':'')+' onchange="recFindGroup(\''+g.client_key+'\').generar_nc=this.checked"> Crear asunto pendiente</label>':'')+'</div>':'')+'</div>';}).join('')+'</div></section>';}).join('');
+  document.querySelectorAll('#rec-receipt-materials input[type="checkbox"]').forEach(input=>input.closest('label')?.classList.add('rec-check'));
+  document.querySelectorAll('#rec-receipt-materials input[type="file"]').forEach(input=>input.accept='image/jpeg,image/png,image/webp,application/pdf,text/plain,.doc,.docx,.xls,.xlsx');
+  document.querySelectorAll('#rec-receipt-materials select option').forEach(option=>{if(option.textContent==='Aceptado con condicion'){option.value='Aceptado con condicion';option.textContent='Aceptado con condición';}});
+}
+function recValidateReceipt(){
+  const included=recReceiptDraft.filter(x=>x.groups.length);if(!included.length)throw new Error('Agrega al menos una distribución de cantidad.');
+  included.forEach(row=>{const total=row.groups.reduce((s,g)=>s+Number(g.cantidad||0),0),pending=recItemSummary(row.item).pending;if(total<=0||total>pending)throw new Error(row.item.codigo+': la entrega debe ser mayor que cero y no superar '+recNum(pending)+'.');row.groups.forEach(g=>{if(Number(g.cantidad)<=0)throw new Error(row.item.codigo+': cantidad inválida.');if(g.resultado==='Rechazado'&&!g.defectos.length)throw new Error(row.item.codigo+': agrega un defecto a la cantidad rechazada.');g.defectos.forEach(x=>{const d=recDefectCatalog.find(v=>v.id===x.id);if(d?.es_otro&&!x.descripcion_otro.trim())throw new Error('Describe el defecto Otro.');});});});return included;
+}
+async function recUploadEvidence(orderId,receiptId,resultGroups){
+  const map=new Map(resultGroups.map(x=>[x.client_key,x.distribucion_id])),errors=[];
+  for(const row of recReceiptDraft)for(const g of row.groups)for(const file of g.files){const distId=map.get(g.client_key);if(!distId)continue;const safe=file.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'_'),path=orderId+'/'+receiptId+'/'+distId+'/'+Date.now()+'_'+safe;try{const upload=await sb.storage.from('recepcion-evidencias').upload(path,file,{contentType:file.type,upsert:false});if(upload.error)throw upload.error;const {error}=await sb.from('rec_evidencias').insert({distribucion_id:distId,nombre:file.name,mime_type:file.type,tamano:file.size,object_path:path});if(error)throw error;}catch(e){errors.push(file.name);}}
+  return errors;
+}
+async function recSaveReceipt(event){
+  event.preventDefault();const button=event.submitter;button.disabled=true;document.getElementById('rec-receipt-error').textContent='';
+  try{const rows=recValidateReceipt(),items=rows.map(row=>({orden_item_id:row.item.id,grupos:row.groups.map(g=>({client_key:g.client_key,cantidad:g.cantidad,resultado:g.resultado,observacion:g.observacion,defectos:g.defectos,generar_nc:g.generar_nc}))})),{data,error}=await sb.rpc('rec_guardar_recepcion',{p_orden_id:recReceiptOrderId,p_fecha:document.getElementById('rec-receipt-date').value,p_remision:document.getElementById('rec-receipt-remission').value.trim(),p_observacion:document.getElementById('rec-receipt-notes').value.trim(),p_items:items});if(error)throw error;const failed=await recUploadEvidence(recReceiptOrderId,data.recepcion_id,data.grupos||[]);document.getElementById('rec-receipt-dialog').close();await recFetchDetailed();recRenderContent();recUpdateStats();showToast(failed.length?'Recepción guardada; '+failed.length+' evidencias pendientes':'Recepción guardada',failed.length?'yellow':'green');}catch(e){document.getElementById('rec-receipt-error').textContent=e.message;}finally{button.disabled=false;}
+}
+function recOpenDefects(){recRenderDefects();document.getElementById('rec-defect-dialog').showModal();}
+function recRenderDefects(){document.getElementById('rec-defect-list').innerHTML=recDefectCatalog.map(d=>'<div class="rec-catalog-row"><span>'+escapeHtml(d.nombre)+(d.es_otro?' <small>(especial)</small>':'')+'</span><button class="btn btn-ghost" onclick="recRenameDefect(\''+d.id+'\')" title="Renombrar"><i class="ti ti-edit"></i></button><button class="btn btn-ghost" onclick="recToggleDefect(\''+d.id+'\','+(!d.activo)+')" '+(d.es_otro?'disabled':'')+'>'+(d.activo?'Activo':'Inactivo')+'</button></div>').join('');}
+async function recAddDefect(event){event.preventDefault();const input=document.getElementById('rec-defect-new'),name=input.value.trim(),code='CUSTOM_'+Date.now();try{const {error}=await sb.from('rec_defecto_catalogo').insert({codigo:code,nombre:name});if(error)throw error;input.value='';await recFetchDetailed();recRenderDefects();}catch(e){showToast(e.message,'yellow');}}
+async function recRenameDefect(id){const d=recDefectCatalog.find(x=>x.id===id),name=prompt('Nombre del defecto',d?.nombre||'');if(!name?.trim())return;const {error}=await sb.from('rec_defecto_catalogo').update({nombre:name.trim()}).eq('id',id);if(error)return showToast(error.message,'yellow');await recFetchDetailed();recRenderDefects();recRenderContent();}
+async function recToggleDefect(id,active){const {error}=await sb.from('rec_defecto_catalogo').update({activo:active}).eq('id',id);if(error)return showToast(error.message,'yellow');await recFetchDetailed();recRenderDefects();}
+async function recOpenEvidence(path){const {data,error}=await sb.storage.from('recepcion-evidencias').createSignedUrl(path,120);if(error)return showToast(error.message,'yellow');window.open(data.signedUrl,'_blank','noopener');}
+async function recOpenNC(distributionId){let nc=recNonconformities.find(x=>x.distribucion_id===distributionId);if(!nc){const {data,error}=await sb.from('rec_no_conformidades').insert({distribucion_id:distributionId,accion:'Pendiente de definir'}).select().single();if(error)return showToast(error.message,'yellow');nc=data;recNonconformities.push(nc);}const group=recDistributions.find(x=>x.id===distributionId);document.getElementById('rec-nc-id').value=nc.id;document.getElementById('rec-nc-state').value=nc.estado;document.getElementById('rec-nc-action').value=nc.accion||'';document.getElementById('rec-nc-follow').value=nc.seguimiento||'';document.getElementById('rec-nc-close').value=nc.cierre||'';document.getElementById('rec-nc-context').textContent=(group?recNum(group.cantidad)+' · '+group.resultado:'');document.getElementById('rec-nc-dialog').showModal();}
+async function recSaveNC(event){event.preventDefault();const state=document.getElementById('rec-nc-state').value,row={estado:state,accion:document.getElementById('rec-nc-action').value.trim(),seguimiento:document.getElementById('rec-nc-follow').value.trim(),cierre:document.getElementById('rec-nc-close').value.trim(),fecha_cierre:state==='Cerrada'?new Date().toISOString():null},{error}=await sb.from('rec_no_conformidades').update(row).eq('id',document.getElementById('rec-nc-id').value);if(error)return showToast(error.message,'yellow');document.getElementById('rec-nc-dialog').close();await recFetchDetailed();recRenderContent();showToast('Asunto actualizado','green');}
 
 // ── CAPA DE DATOS (Supabase) ──
 async function recFetchAll(){
@@ -1392,7 +1514,7 @@ async function recDeleteRow(catKey, id){
 // ── RENDER TABS ──
 function recRenderTabs(){
   const wrap = document.getElementById('rec-view-tabs');
-  wrap.innerHTML = REC_CATS.map(c=>`
+  wrap.innerHTML = `<div class="vtab ${recActiveCat==='ordenes'?'active':''}" onclick="recSwitchCat('ordenes')"><i class="ti ti-file-invoice"></i> Órdenes <span class="cnt">${recOrders.length}</span></div>`+REC_CATS.map(c=>`
     <div class="vtab ${c.key===recActiveCat?'active':''}" onclick="recSwitchCat('${c.key}')">
       <i class="ti ${c.icon}"></i> ${c.label} <span class="cnt">${(RecData[c.key]||[]).length}</span>
     </div>`).join('');
@@ -1406,6 +1528,7 @@ function recRenderContent(){
     wrap.innerHTML = `<div style="text-align:center;padding:60px;color:var(--text3)"><i class="ti ti-loader-2 spin" style="font-size:26px"></i><div style="margin-top:8px;font-size:13px">Cargando información…</div></div>`;
     return;
   }
+  if(recActiveCat==='ordenes'){wrap.innerHTML=recRenderOrders();recUpdateStats();return;}
   wrap.innerHTML = REC_CATS.map(c=>recRenderPanel(c)).join('');
   REC_CATS.forEach(c=>{ if(c.key===recActiveCat) recAttachFormHandlers(c); });
   recUpdateStats();
@@ -1415,6 +1538,7 @@ function recRenderContent(){
 // para no perder lo que el usuario esté escribiendo en ese momento).
 function recRefreshTablesOnly(){
   recRenderTabs();
+  if(recActiveCat==='ordenes'){recRenderContent();return;}
   REC_CATS.forEach(c=>{
     const tbody=document.getElementById(`tbody-${c.key}`);
     if(tbody) tbody.innerHTML = recRenderRows(c);
@@ -1558,6 +1682,7 @@ function recUpdateStats(){
       if(r.resultado==='Rechazado') no++;
     });
   });
+  recDistributions.forEach(r=>{const qty=Number(r.cantidad||0);total+=qty;if(r.resultado==='Aceptado'||r.resultado==='Aceptado con condicion')ok+=qty;if(r.resultado==='Rechazado')no+=qty;});
   document.getElementById('rec-st-total').textContent = total;
   document.getElementById('rec-st-ok').textContent = total? Math.round(ok/total*100)+'%' : '0%';
   document.getElementById('rec-st-no').textContent = no;
@@ -1566,12 +1691,9 @@ function recUpdateStats(){
 // ── SINCRONIZACIÓN EN VIVO — otros dispositivos ven los cambios sin recargar ──
 function recSubscribeRealtime(){
   if(!SUPABASE_CONFIGURED || !sb) return;
-  sb.channel('rec_registros_rt')
-    .on('postgres_changes', {event:'*', schema:'public', table:'rec_registros'}, async ()=>{
-      await recFetchAll();
-      recRefreshTablesOnly();
-    })
-    .subscribe();
+  const refresh=()=>{clearTimeout(recReloadTimer);recReloadTimer=setTimeout(async()=>{await Promise.allSettled([recFetchAll(),recFetchDetailed()]);recRefreshTablesOnly();},250);};
+  let channel=sb.channel('recepcion_rt').on('postgres_changes',{event:'*',schema:'public',table:'rec_registros'},refresh);
+  ['rec_ordenes','rec_orden_items','rec_recepciones','rec_recepcion_items','rec_distribuciones','rec_defecto_catalogo','rec_distribucion_defectos','rec_evidencias','rec_no_conformidades'].forEach(table=>{channel=channel.on('postgres_changes',{event:'*',schema:'public',table},refresh);});channel.subscribe();
 }
 
 // ── INIT RECEPCIÓN (llamado desde el bloque de init general) ──
@@ -1579,7 +1701,7 @@ async function recInit(){
   recRenderTabs();
   recRenderContent();
   try{
-    await recFetchAll();
+    await Promise.all([recFetchAll(),recFetchDetailed()]);
   }catch(e){ /* ya se mostró el toast */ }
   recLoaded = true;
   recRenderTabs();
@@ -2542,9 +2664,10 @@ async function calFetchAll(){
   }catch(e){ /* usa fallback local */ }
 
   const insp = await sbCall(()=>appInspectionRead());
-  inspData={};
-  (insp||[]).forEach(row=>{ inspData[row.serial]={...row.data}; });
+  inspData={};let workflowMigrated=false;
+  (insp||[]).forEach(row=>{const data={...row.data};if(appIsAdmin()&&calInferWorkflow(data,row.updated_at)){calInspPending[row.serial]={serial:row.serial,data,updated_at:new Date().toISOString()};workflowMigrated=true;}inspData[row.serial]=data;});
   calRestorePendingInspections();
+  if(workflowMigrated){calSavePendingInspections();await calFlushPendingInspections();}
 
   const hist = appIsAdmin()?await sbCall(()=>sb.from('calidad_historico').select('*').order('created_at',{ascending:false})):[];
   historico = (hist||[]).map(h=>({
@@ -2594,10 +2717,32 @@ function getInsp(serial){
   if(!d.inspectors) d.inspectors={};
   if(!d.responsables) d.responsables={};
   if(!d.stageObs) d.stageObs={};
+  if(!d.stageCompletedAt) d.stageCompletedAt={};
+  if(!d.workflow) d.workflow={};
   if(appIsAdmin())migrateWeldingStageAnswers(d);
   if(d.currentStageIdx==null) d.currentStageIdx=0;
   if(d.currentStageIdx>=STAGES.length) d.currentStageIdx=STAGES.length-1;
   return d;
+}
+
+function calRefreshStageCompletion(data,stageKey){
+  const stage=STAGES.find(s=>s.key===stageKey);if(!stage)return false;
+  const complete=stage.items.length>0&&stage.items.every(item=>['ok','fail'].includes(data.stageData?.[stageKey]?.[item.id]));
+  const was=calStageFinished(data,stageKey);
+  data.stageCompletedAt||={};data.workflow||={};
+  data.stageCompletedAt[stageKey]=complete?(data.stageCompletedAt[stageKey]||new Date().toISOString()):null;
+  data.workflow[stageKey]=complete;
+  return complete&&!was;
+}
+function calLeaveCompletedMachine(machineId){
+  if(appIsAdmin()||currentSerial!==machineId)return;
+  filterMachines(document.getElementById('sb-q').value||'');
+  const next=filteredList[0];
+  if(next){selectMachine(machineQualityId(next),true);return;}
+  currentSerial=null;document.getElementById('mhdr').className='empty';document.getElementById('mhdr').innerHTML='<i class="ti ti-check"></i> Etapa al día';
+  document.getElementById('cal-view-tabs').style.display='none';document.getElementById('view-checklist').style.display='none';document.getElementById('view-summary').style.display='none';document.getElementById('empty-state').style.display='flex';
+  document.getElementById('empty-state').querySelector('div:nth-of-type(2)').textContent='No hay máquinas pendientes para esta etapa';
+  document.getElementById('btn-next').style.display='none';document.getElementById('bb-counts').innerHTML='';document.getElementById('bb-pos').textContent='';renderList();
 }
 
 // ── SIDEBAR ──
@@ -2775,6 +2920,31 @@ function getInspDone(machineId){
   return tot>0?done===tot:'pending';
 }
 
+function calStageFinished(data,stage){return Boolean(data?.workflow?.[stage]||data?.stageCompletedAt?.[stage]);}
+function calInferWorkflow(data,updatedAt){
+  const snapshot=data?.machineSnapshot||{},stages=buildStagesForProfile(resolveProductProfile(snapshot));let changed=false;
+  data.stageCompletedAt||={};data.workflow||={};
+  stages.forEach(stage=>{
+    const answers=data.stageData?.[stage.key]||{},complete=stage.items.length>0&&stage.items.every(item=>['ok','fail'].includes(answers[item.id]));
+    if(complete&&!data.stageCompletedAt[stage.key]){data.stageCompletedAt[stage.key]=updatedAt||new Date().toISOString();changed=true;}
+    data.workflow[stage.key]=Boolean(data.stageCompletedAt[stage.key]);
+  });
+  return changed;
+}
+function calProductionReady(machine,stage){
+  const explicit=machine?._productionStages?.[stage];
+  if(typeof explicit==='boolean')return explicit;
+  if(machine?.terminated)return true;
+  const threshold={material:10,armado:20,resoldado:30,pulido:40,pintado:50,ensamble:60,empacado:70}[stage]||0;
+  return Number(machine?.pct||0)>=threshold;
+}
+function calMachineQueued(machine){
+  if(appIsAdmin())return true;
+  const stage=appStage(),index=CAL_WORKFLOW_ORDER.indexOf(stage),data=inspData[machineQualityId(machine)]||{};
+  if(!stage||index<0||!calProductionReady(machine,stage)||calStageFinished(data,stage))return false;
+  return index===0||calStageFinished(data,CAL_WORKFLOW_ORDER[index-1]);
+}
+
 function filterMachines(q){
   if(activeFilter==='historico'){
     let list=historico;
@@ -2788,7 +2958,7 @@ function filterMachines(q){
     updateSbStats();
     return;
   }
-  let list=MACHINES;
+  let list=appIsAdmin()?MACHINES:MACHINES.filter(calMachineQueued);
   if(q.trim()) list=list.filter(m=>
     m.serial.includes(q)||m.code.toLowerCase().includes(q.toLowerCase())||
     m.name.toLowerCase().includes(q.toLowerCase())||m.client.toLowerCase().includes(q.toLowerCase())
@@ -2830,7 +3000,7 @@ function renderList(){
   }
   if(!filteredList.length){
     el.innerHTML = MACHINES.length
-      ? `<div style="text-align:center;padding:20px;font-size:12px;color:var(--text3)">Sin resultados</div>`
+      ? `<div style="text-align:center;padding:20px;font-size:12px;color:var(--text3)">${appIsAdmin()?'Sin resultados':'No hay máquinas pendientes para esta etapa'}</div>`
       : `<div style="text-align:center;padding:24px 16px;font-size:12px;color:var(--text3)">
           <i class="ti ti-cloud-off" style="font-size:28px;display:block;margin-bottom:8px;opacity:.4"></i>
           Aún no se han cargado máquinas.<br>
@@ -2863,9 +3033,10 @@ function updateSbStats(){
     document.getElementById('sb-pend').textContent=historico.reduce((a,h)=>a+h.noConformes,0);
     return;
   }
-  document.getElementById('sb-total').textContent=MACHINES.length;
-  document.getElementById('sb-insp').textContent=MACHINES.filter(m=>getInspPct(machineQualityId(m))===100).length;
-  document.getElementById('sb-pend').textContent=MACHINES.filter(m=>getInspPct(machineQualityId(m))===0).length;
+  const visible=appIsAdmin()?MACHINES:MACHINES.filter(calMachineQueued);
+  document.getElementById('sb-total').textContent=visible.length;
+  document.getElementById('sb-insp').textContent=visible.filter(m=>getInspPct(machineQualityId(m))===100).length;
+  document.getElementById('sb-pend').textContent=visible.filter(m=>getInspPct(machineQualityId(m))===0).length;
 }
 
 // ── SELECT MACHINE ──
@@ -3105,6 +3276,7 @@ function toggleItem(sk,id,el){
   const next=cur===''?'ok':cur==='ok'?'fail':'';
   calRecordInternalResult(currentSerial,sk,id,next);
   d.stageData[sk][id]=next;
+  const completedNow=calRefreshStageCompletion(d,sk);
   el.className='check-circle '+next;
   el.innerHTML=next==='ok'?'<i class="ti ti-check" style="font-size:11px;color:#fff"></i>':next==='fail'?'<i class="ti ti-x" style="font-size:11px;color:#fff"></i>':'';
   el.parentElement.querySelector('.result-select').value=next;
@@ -3113,7 +3285,8 @@ function toggleItem(sk,id,el){
   updateProgress(STAGES[d.currentStageIdx],d);
   renderList();
   checkAndArchive(currentSerial);
-  calUpsertInsp(currentSerial);
+  const machineId=currentSerial;
+  void calUpsertInsp(machineId).finally(()=>{if(completedNow)calLeaveCompletedMachine(machineId);});
 }
 
 function selectResult(sk,id,val){
@@ -3121,11 +3294,13 @@ function selectResult(sk,id,val){
   const d=getInsp(currentSerial);
   calRecordInternalResult(currentSerial,sk,id,val);
   d.stageData[sk][id]=val;
+  const completedNow=calRefreshStageCompletion(d,sk);
   renderChecklist(STAGES[d.currentStageIdx],d);
   updateProgress(STAGES[d.currentStageIdx],d);
   renderList();
   checkAndArchive(currentSerial);
-  calUpsertInsp(currentSerial);
+  const machineId=currentSerial;
+  void calUpsertInsp(machineId).finally(()=>{if(completedNow)calLeaveCompletedMachine(machineId);});
 }
 
 function updateProgress(stage,d){
@@ -3155,6 +3330,7 @@ function saveCurrentStage(){
   if(fi) d.inspectors[s.key]=fi.value;
   if(fr) d.responsables[s.key]=fr.value;
   if(fo) d.stageObs[s.key]=fo.value;
+  calRefreshStageCompletion(d,s.key);
   calUpsertInsp(currentSerial);
 }
 
@@ -3309,6 +3485,10 @@ const CAL_PRODUCTION_STAGES={
   armado:{code:'ARM',label:'Armado',icon:'ti-tool'},
   pintado:{code:'PIN',label:'Pintado',icon:'ti-droplet'},
   ensamble:{code:'ENS',label:'Ensamble',icon:'ti-settings'}
+};
+const CAL_WORKFLOW_PRODUCTION_STAGES={
+  material:{code:'MAT'},armado:{code:'ARM'},resoldado:{code:'RES'},pulido:{code:'PUL'},
+  pintado:{code:'PIN'},ensamble:{code:'ENS'},empacado:{code:'EMP'}
 };
 const CAL_NOT_CACHE_KEY='xtensor_quality_notifications_v1';
 let calNotifications={events:[],states:{},queue:[],reads:{},deletes:{}};
@@ -3817,7 +3997,7 @@ function parseMachinesFromHtml(html){
   const productionColumns={};
   headerElements.forEach((cell,i)=>{
     const title=normKey(cell.querySelector('button')?.textContent||cell.textContent).replace(/[^a-z]/g,'');
-    Object.entries(CAL_PRODUCTION_STAGES).forEach(([stage,def])=>{
+    Object.entries(CAL_WORKFLOW_PRODUCTION_STAGES).forEach(([stage,def])=>{
       if(title===def.code.toLowerCase()) productionColumns[stage]=i;
     });
   });
@@ -5243,10 +5423,19 @@ tpSection.innerHTML=`<style>
 .tp-toolbar h2{font-size:18px;margin:0;flex:1;min-width:180px}
 .tp-filters input,.tp-filters select{min-height:36px;min-width:0;max-width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 9px}
 .tp-filters input[type=search]{width:240px}.tp-filters label{display:flex;align-items:center;gap:6px;font-size:12px}
-.tp-scroll{overflow:auto;min-height:160px;flex:1;border-top:1px solid var(--border)}
-#sec-tiempos table{border-collapse:collapse;width:100%;min-width:1100px;font-size:12px;white-space:nowrap}
-#sec-tiempos th,#sec-tiempos td{padding:9px 10px;border-bottom:1px solid var(--border);text-align:left;max-width:330px;white-space:normal;overflow-wrap:normal}
+.tp-scroll{overflow-y:auto;overflow-x:hidden;min-height:160px;flex:1;border-top:1px solid var(--border)}
+#sec-tiempos table{border-collapse:collapse;width:100%;min-width:0;table-layout:fixed;font-size:12px}
+#sec-tiempos th,#sec-tiempos td{padding:9px 8px;border-bottom:1px solid var(--border);text-align:left;max-width:none;white-space:normal;overflow-wrap:anywhere;vertical-align:top}
 #sec-tiempos th{position:sticky;top:0;background:var(--bg2);z-index:1;white-space:nowrap}
+#sec-tiempos table.tp-card-table{display:block;table-layout:auto}
+#sec-tiempos table.tp-card-table thead{display:none}
+#sec-tiempos table.tp-card-table tbody{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(480px,100%),1fr));gap:8px;padding:8px}
+#sec-tiempos table.tp-card-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;border:1px solid var(--border);background:var(--bg2);border-radius:4px;overflow:hidden}
+#sec-tiempos table.tp-card-table td{display:grid;grid-template-columns:minmax(108px,.75fr) minmax(0,1fr);gap:8px;border:0;border-bottom:1px solid var(--border);min-width:0}
+#sec-tiempos table.tp-card-table td::before{content:attr(data-label);color:var(--text3);font-size:10px;font-weight:600;text-transform:uppercase}
+#sec-tiempos table.tp-card-table td[data-label="Observaciones"]{grid-column:1/-1}
+#sec-tiempos table.tp-card-table td:last-child{border-bottom:0}
+#sec-tiempos table.tp-card-table .tp-empty-cell{display:block;grid-column:1/-1;text-align:center;color:var(--text2)}
 #sec-tiempos [role=tab][aria-selected=true]{color:var(--yellow);border-color:var(--yellow)}
 #sec-tiempos [hidden]{display:none!important}
 #tp-product-summary{border-block:1px solid var(--border);padding:12px 0}
@@ -5256,9 +5445,9 @@ tpSection.innerHTML=`<style>
 #tp-status,#tp-count{font-size:12px;color:var(--text2)}
 .tp-note{font-size:12px;color:var(--text2);line-height:1.5;margin:0}
 #tp-pages{display:flex;justify-content:space-between;align-items:center}
-#tp-calendar-list{max-height:330px;overflow:auto;margin-top:12px}
-#tp-calendar-list table{min-width:720px}
-@media(max-width:700px){#sec-tiempos{padding:10px}.tp-toolbar h2{flex-basis:100%}.tp-filters{align-items:stretch}.tp-filters input[type=search]{width:100%}}
+#tp-calendar-list{max-height:330px;overflow-y:auto;overflow-x:hidden;margin-top:12px}
+@media(max-width:900px){#tp-data-table{display:block;table-layout:auto}#tp-data-table thead{display:none}#tp-data-table tbody{display:grid;grid-template-columns:1fr;gap:8px;padding:8px}#tp-data-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--border);background:var(--bg2);border-radius:4px;overflow:hidden}#tp-data-table td{display:grid;grid-template-columns:minmax(100px,.75fr) minmax(0,1fr);gap:8px;border:0;border-bottom:1px solid var(--border)}#tp-data-table td::before{content:attr(data-label);color:var(--text3);font-size:10px;font-weight:600;text-transform:uppercase}#tp-data-table td:last-child{border-bottom:0}#tp-data-table .tp-empty-cell{display:block;grid-column:1/-1;text-align:center}}
+@media(max-width:700px){#sec-tiempos{padding:10px}.tp-toolbar h2{flex-basis:100%}.tp-filters{align-items:stretch}.tp-filters input[type=search]{width:100%}#sec-tiempos table.tp-card-table tr,#tp-data-table tr{grid-template-columns:1fr}}
 </style>
 <div class="tp-toolbar"><h2>Tiempos de producción</h2><span id="tp-status"></span>
 <button class="btn" onclick="tpTick(true)" title="Actualizar tiempos" aria-label="Actualizar tiempos"><i class="ti ti-refresh"></i></button>
@@ -5276,7 +5465,7 @@ tpSection.innerHTML=`<style>
 <button class="btn" role="tab" id="tp-tab-indicadores" onclick="tpSetView('indicadores')">Por código y etapa</button>
 <button class="btn" role="tab" id="tp-tab-fabricaciones" onclick="tpSetView('fabricaciones')">Fabricaciones</button></div>
 <section id="tp-product-summary" hidden aria-label="Referencia y confiabilidad por producto"></section>
-<div class="tp-scroll"><table><thead id="tp-head"></thead><tbody id="tp-body"></tbody></table></div>
+<div class="tp-scroll"><table id="tp-data-table"><thead id="tp-head"></thead><tbody id="tp-body"></tbody></table></div>
 <div id="tp-pages"><span id="tp-count"></span><button class="btn" id="tp-more" onclick="tpLimit+=100;tpRender()">Ver más</button></div>
 <dialog id="tp-calendar-dialog" class="workflow-dialog" aria-labelledby="tp-calendar-title">
  <h2 id="tp-calendar-title">Calendario laboral</h2>
@@ -5427,8 +5616,9 @@ function tpRender(){
       return [f.codigo||'Sin código vinculado',f.producto,f.serial?`#${f.serial}`:'Sin serial',tpDate(f.primera_observacion),tpDate(f.ultima_observacion),coverage.size+'/8',valid.length?tpNum(valid.reduce((s,r)=>s+tpMinutes(r),0)):'—',tpNum(tpRunInterval(f)?.duracion_minutos),f.estado==='despachada'?'Despacho observado':f.estado==='terminada_sin_despacho'?'Terminada; despacho sin observar':TP_STAGES[f.etapa_actual],tpNum(tpRunInterval(f,7)?.duracion_minutos)];
     });
   }
+  document.getElementById('tp-data-table').classList.toggle('tp-card-table',tpView==='historial'||tpView==='fabricaciones');
   document.getElementById('tp-head').innerHTML='<tr>'+headers.map(h=>'<th scope="col">'+tpEscape(h)+'</th>').join('')+'</tr>';
-  document.getElementById('tp-body').innerHTML=values.length?values.slice(0,tpLimit).map(row=>'<tr>'+row.map((v,i)=>'<td>'+(tpView==='productos'&&!document.getElementById('tp-product').value&&i===0?`<button class="btn btn-ghost" data-tp-product="${tpEscape(v)}">${tpEscape(v)}</button>`:tpEscape(v))+'</td>').join('')+'</tr>').join(''):`<tr><td colspan="${headers.length}">Sin registros para esta vista.</td></tr>`;
+  document.getElementById('tp-body').innerHTML=values.length?values.slice(0,tpLimit).map(row=>'<tr>'+row.map((v,i)=>'<td data-label="'+tpEscape(headers[i])+'">'+(tpView==='productos'&&!document.getElementById('tp-product').value&&i===0?`<button class="btn btn-ghost" data-tp-product="${tpEscape(v)}">${tpEscape(v)}</button>`:tpEscape(v))+'</td>').join('')+'</tr>').join(''):`<tr><td class="tp-empty-cell" colspan="${headers.length}">Sin registros para esta vista.</td></tr>`;
   document.getElementById('tp-count').textContent=`${Math.min(tpLimit,values.length)} de ${values.length} registros`;
   document.getElementById('tp-more').hidden=values.length<=tpLimit;
 }
@@ -5478,7 +5668,7 @@ function tpCalendarRender(){
     ...tpHolidays.filter(h=>h.fecha.startsWith(year)).map(h=>({date:h.fecha,type:'Festivo nacional',scope:'Toda la planta',description:h.nombre+' · '+h.fuente,locked:true,sort:h.fecha})),
     ...tpAdjustments.filter(a=>tpDay(a.inicio).startsWith(year)).map(a=>({date:tpDay(a.inicio),type:a.tipo==='tiempo_extra'?'Tiempo extra':'Permiso / cierre',scope:a.etapa==null?'Toda la planta':TP_STAGES[a.etapa],description:a.descripcion,time:new Date(a.inicio).toLocaleTimeString('es-CO',{timeZone:'America/Bogota',hour:'2-digit',minute:'2-digit'})+'–'+new Date(a.fin).toLocaleTimeString('es-CO',{timeZone:'America/Bogota',hour:'2-digit',minute:'2-digit'}),id:a.id,sort:a.inicio}))
   ].sort((a,b)=>String(a.sort).localeCompare(String(b.sort)));
-  document.getElementById('tp-calendar-list').innerHTML=`<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Horario</th><th>Alcance</th><th>Motivo</th><th></th></tr></thead><tbody>${events.map(e=>`<tr><td>${tpEscape(e.date)}</td><td>${tpEscape(e.type)}</td><td>${tpEscape(e.time||'Todo el día')}</td><td>${tpEscape(e.scope)}</td><td>${tpEscape(e.description)}</td><td>${e.locked?'':`<button class="btn btn-ghost" onclick="tpCalendarRemove('${e.id}')" aria-label="Eliminar ajuste" title="Eliminar"><i class="ti ti-trash"></i></button>`}</td></tr>`).join('')||'<tr><td colspan="6">Sin eventos para este año.</td></tr>'}</tbody></table>`;
+  document.getElementById('tp-calendar-list').innerHTML=`<table class="tp-card-table"><thead><tr><th>Fecha</th><th>Tipo</th><th>Horario</th><th>Alcance</th><th>Motivo</th><th></th></tr></thead><tbody>${events.map(e=>`<tr><td data-label="Fecha">${tpEscape(e.date)}</td><td data-label="Tipo">${tpEscape(e.type)}</td><td data-label="Horario">${tpEscape(e.time||'Todo el día')}</td><td data-label="Alcance">${tpEscape(e.scope)}</td><td data-label="Motivo">${tpEscape(e.description)}</td><td data-label="Acciones">${e.locked?'':`<button class="btn btn-ghost" onclick="tpCalendarRemove('${e.id}')" aria-label="Eliminar ajuste" title="Eliminar"><i class="ti ti-trash"></i></button>`}</td></tr>`).join('')||'<tr><td class="tp-empty-cell" colspan="6">Sin eventos para este año.</td></tr>'}</tbody></table>`;
 }
 async function tpCalendarSave(event){
   event.preventDefault();const date=document.getElementById('tp-adjust-date').value,start=document.getElementById('tp-adjust-start').value,end=document.getElementById('tp-adjust-end').value;
@@ -5521,6 +5711,7 @@ function tpExport(){
 .gt-bar.done{border-color:var(--green-border);background:var(--green-bg)}.gt-bar.cancel{opacity:.45}.gt-bar.conflict,.gt-bar.overrun{border-color:var(--red-border);background:var(--red-bg)}
 .gt-empty{padding:28px;text-align:center;color:var(--muted)}.gt-note{font-size:11px;color:var(--muted);line-height:1.45}.gt-warn{color:var(--red)}
 .gt-form{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-width:min(650px,84vw)}.gt-form label{display:grid;gap:5px;font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase}.gt-form .full{grid-column:1/-1}.gt-form input,.gt-form select,.gt-form textarea{width:100%;font:inherit;text-transform:none;outline:none}.gt-form input:focus,.gt-form select:focus,.gt-form textarea:focus{border-color:var(--yellow);box-shadow:0 0 0 2px var(--yellow-bg)}.gt-form textarea{min-height:72px;resize:vertical}.gt-form h2{margin:0;padding-bottom:10px;border-bottom:1px solid var(--border)}.gt-form footer{justify-content:flex-end;padding-top:10px;border-top:1px solid var(--border)}
+.gt-form [hidden]{display:none!important}
 #gt-assignment-dialog,#gt-novelty-dialog,#gt-overtime-dialog{width:min(720px,calc(100vw - 24px));max-width:720px;max-height:calc(100dvh - 24px);margin:auto;padding:18px;background:var(--bg2);color:var(--text);border:1px solid var(--border2);border-radius:6px;box-shadow:0 14px 42px #000b;overflow:auto;color-scheme:dark}
 #gt-assignment-dialog::backdrop,#gt-novelty-dialog::backdrop,#gt-overtime-dialog::backdrop{background:#0009}
 @media(max-width:700px){#sec-gestion{padding:8px}.gt-form{grid-template-columns:1fr;min-width:78vw}.gt-form .full{grid-column:auto}.gt-head h2{flex-basis:100%}.gt-filters>*{width:100%}}
@@ -5530,11 +5721,8 @@ function tpExport(){
   <nav class="gt-tabs" role="tablist">
     <button class="btn" role="tab" data-gt-view="dashboard" onclick="gtSetView('dashboard')">Resumen</button>
     <button class="btn" role="tab" data-gt-view="gantt" onclick="gtSetView('gantt')">Gantt</button>
-    <button class="btn" role="tab" data-gt-view="operarios" onclick="gtSetView('operarios')">Operarios</button>
-    <button class="btn" role="tab" data-gt-view="tiempos" onclick="gtSetView('tiempos')">Tiempos</button>
     <button class="btn" role="tab" data-gt-view="novedades" onclick="gtSetView('novedades')">Novedades</button>
     <button class="btn" role="tab" data-gt-view="extras" onclick="gtSetView('extras')">Extras</button>
-    <button class="btn" role="tab" data-gt-view="indicadores" onclick="gtSetView('indicadores')">Indicadores</button>
   </nav>
   <div class="gt-filters">
     <input id="gt-search" type="search" placeholder="Operario, serial, código o producto" oninput="gtScheduleRender()">
@@ -5564,7 +5752,7 @@ function tpExport(){
   <label>Inicio<input id="gt-n-start" type="datetime-local" required></label><label>Finalización<input id="gt-n-end" type="datetime-local" required></label>
   <label>Estado<select id="gt-n-state"><option>Pendiente</option><option>Aprobado</option><option>Rechazado</option></select></label><label>Aprobador<input id="gt-n-approver"></label>
   <label class="full">Observación<textarea id="gt-n-notes" rows="2"></textarea></label>
-  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button class="btn btn-y" type="submit">Guardar</button></footer>
+  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button id="gt-n-delete" type="button" class="btn" onclick="gtDeleteNovelty()"><i class="ti ti-trash"></i> Eliminar</button><button class="btn btn-y" type="submit">Guardar</button></footer>
 </form></dialog>
 <dialog id="gt-overtime-dialog"><form class="gt-form" onsubmit="gtSaveOvertime(event)">
   <input id="gt-o-id" type="hidden"><h2 class="full" style="font-size:18px">Horas extras</h2>
@@ -5572,7 +5760,7 @@ function tpExport(){
   <label>Inicio<input id="gt-o-start" type="datetime-local" required></label><label>Finalización<input id="gt-o-end" type="datetime-local" required></label>
   <label class="full">Motivo<input id="gt-o-reason" required></label><label>Aprobador<input id="gt-o-approver"></label>
   <label class="full">Observación<textarea id="gt-o-notes" rows="2"></textarea></label>
-  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button class="btn btn-y" type="submit">Guardar</button></footer>
+  <footer class="gt-actions full"><button type="button" class="btn" onclick="this.closest('dialog').close()">Cancelar</button><button id="gt-o-delete" type="button" class="btn" onclick="gtDeleteOvertime()"><i class="ti ti-trash"></i> Eliminar</button><button class="btn btn-y" type="submit">Guardar</button></footer>
 </form></dialog>
 
 <script>
@@ -5619,8 +5807,8 @@ function gtMetrics(worker,range){
   const lost=gtMergedIntervals(gtNovelties.filter(n=>n.operario_id===worker.id&&n.estado==='Aprobado'),range).reduce((sum,o)=>sum+(tpWorkMinutes(new Date(o[0]).toISOString(),new Date(o[1]).toISOString())||0),0);
   const extra=gtMergedIntervals(gtOvertime.filter(x=>x.operario_id===worker.id&&x.estado==='Aprobado'),range).reduce((sum,o)=>sum+Math.max(0,(o[1]-o[0])/60000-(tpWorkMinutes(new Date(o[0]).toISOString(),new Date(o[1]).toISOString())||0)),0);
   const load=gtAssignments.filter(a=>a.operario_id===worker.id&&a.estado!=='cancelada').reduce((sum,a)=>sum+gtPlanMinutes(a,range),0);
-  const available=Math.max(0,jornada-lost),remaining=available+extra-load,util=available+extra>0?load/(available+extra)*100:load?100:0;
-  const result={jornada,lost,extra,load,available,remaining,util,over:Math.max(0,-remaining)};gtMetricCache.set(cacheKey,result);return result;
+  const available=Math.max(0,jornada-lost),capacity=available+extra,remaining=capacity-load,util=capacity>0?load/capacity*100:load?100:0;
+  const result={jornada,lost,extra,load,available,capacity,remaining,util,over:Math.max(0,-remaining)};gtMetricCache.set(cacheKey,result);return result;
 }
 function gtFilteredWorkers(){
   const id=document.getElementById('gt-worker-filter').value,role=document.getElementById('gt-role-filter').value,q=normKey(document.getElementById('gt-search').value);
@@ -5640,9 +5828,9 @@ function gtTable(headers,rows){
 }
 function gtRenderDashboard(range,workers){
   const metrics=workers.map(w=>gtMetrics(w,range)),sum=k=>metrics.reduce((s,m)=>s+m[k],0);
-  const cards=gtCard('Operarios',String(workers.length))+gtCard('Horas disponibles',gtHours(sum('available')))+gtCard('Horas programadas',gtHours(sum('load')))+gtCard('Horas libres',gtHours(metrics.reduce((s,m)=>s+Math.max(0,m.remaining),0)))+gtCard('Horas extras',gtHours(sum('extra')))+gtCard('Permisos / ausencias',gtHours(sum('lost')))+gtCard('Sobrecargados',String(metrics.filter(m=>m.over>0).length))+gtCard('Utilización promedio',(metrics.length?metrics.reduce((s,m)=>s+m.util,0)/metrics.length:0).toLocaleString('es-CO',{maximumFractionDigits:1})+'%');
-  const rows=workers.map((w,i)=>{const m=metrics[i],state=gtState(m);return '<tr><td><button class="link-btn" onclick="gtFocusWorker(\''+w.id+'\')">'+tpEscape(w.nombre)+'</button></td><td>'+tpEscape(w.cargo)+'</td><td>'+gtHours(m.available)+'</td><td>'+gtHours(m.load)+'</td><td>'+gtHours(m.extra)+'</td><td>'+gtHours(Math.max(0,m.remaining))+'</td><td>'+m.util.toLocaleString('es-CO',{maximumFractionDigits:1})+'%</td><td><span class="gt-state '+state[1]+'">'+state[0]+'</span></td></tr>';});
-  return '<div class="gt-grid">'+cards+'</div><section class="gt-panel"><div class="gt-panel-head"><h3>Capacidad del período</h3></div>'+gtTable(['Operario','Cargo','Disponible','Programado','Extra','Libre','Utilización','Estado'],rows)+'</section>';
+  const cards=gtCard('Capacidad',gtHours(sum('capacity')),'Jornada útil + extras aprobadas')+gtCard('Programado',gtHours(sum('load')))+gtCard('Libre',gtHours(metrics.reduce((s,m)=>s+Math.max(0,m.remaining),0)))+gtCard('Extras',gtHours(sum('extra')))+gtCard('Novedades',gtHours(sum('lost')));
+  const rows=workers.map((w,i)=>{const m=metrics[i],state=gtState(m);return '<tr><td><button class="link-btn" onclick="gtFocusWorker(\''+w.id+'\')">'+tpEscape(w.nombre)+'</button></td><td>'+tpEscape(w.cargo)+'</td><td>'+gtHours(m.capacity)+'</td><td>'+gtHours(m.load)+'</td><td>'+gtHours(Math.max(0,m.remaining))+'</td><td>'+m.util.toLocaleString('es-CO',{maximumFractionDigits:1})+'%</td><td><span class="gt-state '+state[1]+'">'+state[0]+'</span></td></tr>';});
+  return '<div class="gt-grid">'+cards+'</div><section class="gt-panel"><div class="gt-panel-head"><h3>Capacidad por operario</h3></div>'+gtTable(['Operario','Cargo','Capacidad','Programado','Libre','Utilización','Estado'],rows)+'</section>';
 }
 function gtTicks(range){
   const ticks=[];if(range.mode==='day'){for(let h=0;h<24;h+=3)ticks.push(String(h).padStart(2,'0')+':00');}
@@ -5691,11 +5879,11 @@ function gtRenderTimes(){
   return '<section class="gt-panel"><div class="gt-panel-head"><h3>Estándar, programación y tiempo real</h3></div>'+gtTable(['Código','Producto','Etapa','Estándar','Real típico','Programado','Responsable','Desviación real','Estado',''],rows)+'</section><p class="gt-note">El tiempo real típico es la mediana de observaciones válidas. No se convierte automáticamente en tiempo estándar; el estándar solo existe cuando admin lo define.</p>';
 }
 function gtRenderNovelties(){
-  const rows=gtNovelties.slice().sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(n=>'<tr><td>'+tpEscape(gtWorker(n.operario_id).nombre)+'</td><td>'+tpEscape(n.tipo)+'</td><td>'+gtFmt(n.inicio)+'</td><td>'+gtFmt(n.fin)+'</td><td>'+gtHours((Date.parse(n.fin)-Date.parse(n.inicio))/60000)+'</td><td>'+tpEscape(n.estado)+'</td><td>'+tpEscape(n.aprobador||'—')+'</td><td>'+tpEscape(n.observacion||'')+'</td><td><button class="btn" onclick="gtOpenNovelty(\''+n.id+'\')"><i class="ti ti-edit"></i></button></td></tr>');
+  const rows=gtNovelties.slice().sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(n=>'<tr><td>'+tpEscape(gtWorker(n.operario_id).nombre)+'</td><td>'+tpEscape(n.tipo)+'</td><td>'+gtFmt(n.inicio)+'</td><td>'+gtFmt(n.fin)+'</td><td>'+gtHours((Date.parse(n.fin)-Date.parse(n.inicio))/60000)+'</td><td>'+tpEscape(n.estado)+'</td><td>'+tpEscape(n.aprobador||'—')+'</td><td>'+tpEscape(n.observacion||'')+'</td><td class="gt-actions"><button class="btn" onclick="gtOpenNovelty(\''+n.id+'\')" title="Editar"><i class="ti ti-edit"></i></button><button class="btn" onclick="gtDeleteNovelty(\''+n.id+'\')" title="Eliminar"><i class="ti ti-trash"></i></button></td></tr>');
   return '<section class="gt-panel"><div class="gt-panel-head"><h3>Novedades</h3><button class="btn btn-y" onclick="gtOpenNovelty()"><i class="ti ti-plus"></i> Nueva</button></div>'+gtTable(['Operario','Tipo','Inicio','Fin','Duración','Estado','Aprobador','Observación',''],rows)+'</section>';
 }
 function gtRenderOvertime(){
-  const rows=gtOvertime.slice().sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(x=>'<tr><td>'+tpEscape(gtWorker(x.operario_id).nombre)+'</td><td>'+gtFmt(x.inicio)+'</td><td>'+gtFmt(x.fin)+'</td><td>'+gtHours((Date.parse(x.fin)-Date.parse(x.inicio))/60000)+'</td><td>'+tpEscape(x.motivo)+'</td><td>'+tpEscape(x.estado)+'</td><td>'+tpEscape(x.aprobador||'—')+'</td><td><button class="btn" onclick="gtOpenOvertime(\''+x.id+'\')"><i class="ti ti-edit"></i></button></td></tr>');
+  const rows=gtOvertime.slice().sort((a,b)=>b.inicio.localeCompare(a.inicio)).map(x=>'<tr><td>'+tpEscape(gtWorker(x.operario_id).nombre)+'</td><td>'+gtFmt(x.inicio)+'</td><td>'+gtFmt(x.fin)+'</td><td>'+gtHours((Date.parse(x.fin)-Date.parse(x.inicio))/60000)+'</td><td>'+tpEscape(x.motivo)+'</td><td>'+tpEscape(x.estado)+'</td><td>'+tpEscape(x.aprobador||'—')+'</td><td class="gt-actions"><button class="btn" onclick="gtOpenOvertime(\''+x.id+'\')" title="Editar"><i class="ti ti-edit"></i></button><button class="btn" onclick="gtDeleteOvertime(\''+x.id+'\')" title="Eliminar"><i class="ti ti-trash"></i></button></td></tr>');
   return '<section class="gt-panel"><div class="gt-panel-head"><h3>Horas extras</h3><button class="btn btn-y" onclick="gtOpenOvertime()"><i class="ti ti-plus"></i> Registrar</button></div>'+gtTable(['Operario','Inicio','Fin','Duración','Motivo','Estado','Aprobador',''],rows)+'</section><p class="gt-note">Las horas extras se muestran separadas de la jornada normal y solo aumentan la capacidad efectiva cuando están aprobadas.</p>';
 }
 function gtRenderIndicators(range,workers){
@@ -5708,7 +5896,7 @@ function gtRender(){
   document.querySelectorAll('[data-gt-view]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.gtView===gtView)));
   if(!gtLoaded){content.innerHTML='<div class="gt-empty">Cargando gestión de tiempo…</div>';return;}
   if(!gtFiltersReady){gtFillFilters();gtFiltersReady=true;}gtMetricCache=new Map();const range=gtRange(),workers=gtFilteredWorkers();
-  content.innerHTML=gtView==='dashboard'?gtRenderDashboard(range,workers):gtView==='gantt'?gtRenderGantt(range,workers):gtView==='operarios'?gtRenderWorkers(range,workers):gtView==='tiempos'?gtRenderTimes():gtView==='novedades'?gtRenderNovelties():gtView==='extras'?gtRenderOvertime():gtRenderIndicators(range,workers);
+  content.innerHTML=gtView==='gantt'?gtRenderGantt(range,workers):gtView==='novedades'?gtRenderNovelties():gtView==='extras'?gtRenderOvertime():gtRenderDashboard(range,workers);
 }
 function gtFillSelect(id,rows,label){
   const el=document.getElementById(id),value=el.value,first=el.options[0]?.outerHTML||'';
@@ -5765,16 +5953,26 @@ async function gtDrop(event,kind,targetId){
 function gtOpenNovelty(id){
   gtDialogOptions();const n=id?gtNovelties.find(x=>x.id===id):null,start=new Date(),end=new Date(start.getTime()+3600000);
   document.getElementById('gt-n-id').value=n?.id||'';document.getElementById('gt-n-worker').value=n?.operario_id||gtWorkers[0]?.id||'';document.getElementById('gt-n-type').value=n?.tipo||'Permiso';document.getElementById('gt-n-start').value=gtInputDate(n?.inicio||start);document.getElementById('gt-n-end').value=gtInputDate(n?.fin||end);document.getElementById('gt-n-state').value=n?.estado||'Pendiente';document.getElementById('gt-n-approver').value=n?.aprobador||'';document.getElementById('gt-n-notes').value=n?.observacion||'';document.getElementById('gt-novelty-dialog').showModal();
+  document.getElementById('gt-n-delete').hidden=!n;
 }
 async function gtSaveNovelty(event){
   event.preventDefault();const id=document.getElementById('gt-n-id').value,row={operario_id:document.getElementById('gt-n-worker').value,tipo:document.getElementById('gt-n-type').value,inicio:gtIsoLocal(document.getElementById('gt-n-start').value),fin:gtIsoLocal(document.getElementById('gt-n-end').value),estado:document.getElementById('gt-n-state').value,aprobador:document.getElementById('gt-n-approver').value.trim(),observacion:document.getElementById('gt-n-notes').value.trim()};if(Date.parse(row.fin)<=Date.parse(row.inicio))return showToast('Horario inválido','yellow');try{const {error}=await(id?sb.from('gestion_novedades').update(row).eq('id',id):sb.from('gestion_novedades').insert(row));if(error)throw error;document.getElementById('gt-novelty-dialog').close();await gtLoad();showToast('Novedad guardada','green');}catch(e){showToast(e.message,'yellow');}
 }
+async function gtDeleteNovelty(selectedId){
+  const id=selectedId||document.getElementById('gt-n-id').value;if(!id||!confirm('¿Eliminar definitivamente esta novedad? La capacidad se recalculará.'))return;
+  try{const {error}=await sb.from('gestion_novedades').delete().eq('id',id);if(error)throw error;const dialog=document.getElementById('gt-novelty-dialog');if(dialog.open)dialog.close();await gtLoad();showToast('Novedad eliminada y capacidad recalculada','green');}catch(e){showToast(e.message,'yellow');}
+}
 function gtOpenOvertime(id){
   gtDialogOptions();const x=id?gtOvertime.find(v=>v.id===id):null,start=new Date(),end=new Date(start.getTime()+3600000);
   document.getElementById('gt-o-id').value=x?.id||'';document.getElementById('gt-o-worker').value=x?.operario_id||gtWorkers[0]?.id||'';document.getElementById('gt-o-start').value=gtInputDate(x?.inicio||start);document.getElementById('gt-o-end').value=gtInputDate(x?.fin||end);document.getElementById('gt-o-state').value=x?.estado||'Pendiente';document.getElementById('gt-o-reason').value=x?.motivo||'';document.getElementById('gt-o-approver').value=x?.aprobador||'';document.getElementById('gt-o-notes').value=x?.observacion||'';document.getElementById('gt-overtime-dialog').showModal();
+  document.getElementById('gt-o-delete').hidden=!x;
 }
 async function gtSaveOvertime(event){
   event.preventDefault();const id=document.getElementById('gt-o-id').value,row={operario_id:document.getElementById('gt-o-worker').value,inicio:gtIsoLocal(document.getElementById('gt-o-start').value),fin:gtIsoLocal(document.getElementById('gt-o-end').value),estado:document.getElementById('gt-o-state').value,motivo:document.getElementById('gt-o-reason').value.trim(),aprobador:document.getElementById('gt-o-approver').value.trim(),observacion:document.getElementById('gt-o-notes').value.trim()};if(Date.parse(row.fin)<=Date.parse(row.inicio))return showToast('Horario inválido','yellow');try{const {error}=await(id?sb.from('gestion_horas_extra').update(row).eq('id',id):sb.from('gestion_horas_extra').insert(row));if(error)throw error;document.getElementById('gt-overtime-dialog').close();await gtLoad();showToast('Horas extra guardadas','green');}catch(e){showToast(e.message,'yellow');}
+}
+async function gtDeleteOvertime(selectedId){
+  const id=selectedId||document.getElementById('gt-o-id').value;if(!id||!confirm('¿Eliminar definitivamente estas horas extra? La capacidad se recalculará.'))return;
+  try{const {error}=await sb.from('gestion_horas_extra').delete().eq('id',id);if(error)throw error;const dialog=document.getElementById('gt-overtime-dialog');if(dialog.open)dialog.close();await gtLoad();showToast('Horas extra eliminadas y capacidad recalculada','green');}catch(e){showToast(e.message,'yellow');}
 }
 async function gtSetStandard(code,stage,current){
   const value=prompt('Tiempo estándar en horas para '+code+' · '+GT_STAGES[stage],current?String(current/60):'');if(value==null)return;const hours=Number(String(value).replace(',','.'));if(!Number.isFinite(hours)||hours<=0)return showToast('Escribe una cantidad de horas válida','yellow');try{const {error}=await sb.from('gestion_tiempos_estandar').upsert({codigo:code,etapa:stage,minutos:hours*60,updated_by:appAccess.user.id},{onConflict:'codigo,etapa'});if(error)throw error;await gtLoad();showToast('Tiempo estándar actualizado','green');}catch(e){showToast(e.message,'yellow');}
