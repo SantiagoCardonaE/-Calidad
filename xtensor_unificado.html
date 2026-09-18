@@ -3828,9 +3828,11 @@ async function requestRefresh(silent){
 
   try{
     const cachedSources=readMachineSourcesCache();
+    let serverSources={};
+    try{serverSources=await fetchAdminServerSources();}catch(e){/* Conserva la lectura directa para instalaciones con schema anterior. */}
     const results=await Promise.all(sources.map(async source=>{
       try{
-        const html=await fetchAdminHtml(source.url);
+        const html=serverSources[source.key]||await fetchAdminHtml(source.url);
         const machines=parseMachinesFromHtml(html).map(machine=>markMachineSource(machine,source.key));
         if(!machines.length) throw new Error('No se encontraron filas en la tabla');
         saveMachineSourceCache(source.key,machines);
@@ -3869,6 +3871,16 @@ async function requestRefresh(silent){
     void calSyncNotifications();
     void calFlushPendingInspections();
   }
+}
+
+async function fetchAdminServerSources(){
+  if(!appIsAdmin())throw new Error('Solo admin puede sincronizar fuentes de Producción');
+  const {data,error}=await sb.rpc('calidad_obtener_fuentes_maquinas');
+  if(error)throw error;
+  const sources={};
+  ['admin','terminados'].forEach(key=>{if(typeof data?.[key]==='string'&&data[key].includes('<table'))sources[key]=data[key];});
+  if(!Object.keys(sources).length)throw new Error('Supabase no recibió tablas de Producción');
+  return sources;
 }
 
 // ── CARGA MANUAL (sin red) — HTML o CSV guardado del admin ──
@@ -5777,6 +5789,7 @@ function gtInputDate(value){
 function gtFmt(value,opts){return value?new Intl.DateTimeFormat('es-CO',Object.assign({timeZone:'America/Bogota',dateStyle:'short',timeStyle:'short'},opts||{})).format(new Date(value)):'—';}
 function gtHours(minutes){return (Math.max(0,Number(minutes)||0)/60).toLocaleString('es-CO',{maximumFractionDigits:1})+' h';}
 function gtOverlap(a,b,from,to){const x=Math.max(Date.parse(a),from),y=Math.min(Date.parse(b),to);return y>x?[x,y]:null;}
+function gtNoveltyBlocks(n){return n?.tipo==='Incapacidad'?n.estado!=='Rechazado':n?.estado==='Aprobado';}
 function gtMergedIntervals(records,range){
   const intervals=records.map(x=>gtOverlap(x.inicio,x.fin,range.from,range.to)).filter(Boolean).sort((a,b)=>a[0]-b[0]),merged=[];
   intervals.forEach(x=>{const last=merged.at(-1);if(last&&x[0]<=last[1])last[1]=Math.max(last[1],x[1]);else merged.push(x.slice());});return merged;
@@ -5804,11 +5817,12 @@ function gtMetrics(worker,range){
   const cacheKey=worker.id+'|'+range.from+'|'+range.to;if(gtMetricCache.has(cacheKey))return gtMetricCache.get(cacheKey);
   const start=new Date(range.from).toISOString(),end=new Date(range.to).toISOString();
   const jornada=tpWorkMinutes(start,end)||0;
-  const lost=gtMergedIntervals(gtNovelties.filter(n=>n.operario_id===worker.id&&n.estado==='Aprobado'),range).reduce((sum,o)=>sum+(tpWorkMinutes(new Date(o[0]).toISOString(),new Date(o[1]).toISOString())||0),0);
+  const blocked=gtNovelties.filter(n=>n.operario_id===worker.id&&gtNoveltyBlocks(n));
+  const lost=gtMergedIntervals(blocked,range).reduce((sum,o)=>sum+(tpWorkMinutes(new Date(o[0]).toISOString(),new Date(o[1]).toISOString())||0),0);
   const extra=gtMergedIntervals(gtOvertime.filter(x=>x.operario_id===worker.id&&x.estado==='Aprobado'),range).reduce((sum,o)=>sum+Math.max(0,(o[1]-o[0])/60000-(tpWorkMinutes(new Date(o[0]).toISOString(),new Date(o[1]).toISOString())||0)),0);
   const load=gtAssignments.filter(a=>a.operario_id===worker.id&&a.estado!=='cancelada').reduce((sum,a)=>sum+gtPlanMinutes(a,range),0);
   const available=Math.max(0,jornada-lost),capacity=available+extra,remaining=capacity-load,util=capacity>0?load/capacity*100:load?100:0;
-  const result={jornada,lost,extra,load,available,capacity,remaining,util,over:Math.max(0,-remaining)};gtMetricCache.set(cacheKey,result);return result;
+  const result={jornada,lost,extra,load,available,capacity,remaining,util,over:Math.max(0,-remaining),blocked:blocked.length};gtMetricCache.set(cacheKey,result);return result;
 }
 function gtFilteredWorkers(){
   const id=document.getElementById('gt-worker-filter').value,role=document.getElementById('gt-role-filter').value,q=normKey(document.getElementById('gt-search').value);
@@ -5819,7 +5833,7 @@ function gtFilteredAssignments(range){
   return gtAssignments.filter(a=>a.inicio<new Date(range.to).toISOString()&&a.fin>new Date(range.from).toISOString()&&(!stage||Number(stage)===a.etapa)&&(!machine||machine===a.fabricacion_id)&&(!state||state===a.estado)&&(!q||normKey(gtWorker(a.operario_id).nombre+' '+gtMachineLabel(a)).includes(q)));
 }
 function gtMachineLabel(a){const f=gtRun(a.fabricacion_id);return '#'+(f.serial||'—')+' · '+(f.codigo||'Sin código')+' · '+(f.producto||'Producto');}
-function gtState(m){return m.over>0?['Sobrecargado','over']:m.util>=80?['Alta ocupación','busy']:['Disponible','free'];}
+function gtState(m){return m.blocked&&m.capacity<=0?['No disponible','over']:m.over>0?['Sobrecargado','over']:m.util>=80?['Alta ocupación','busy']:m.blocked?['Novedad vigente','busy']:['Disponible','free'];}
 function gtScheduleRender(){cancelAnimationFrame(gtRenderFrame);gtRenderFrame=requestAnimationFrame(gtRender);}
 function gtSetView(view){if(gtView===view)return;gtView=view;gtRender();}
 function gtCard(label,value,detail){return '<dl class="gt-card"><dt>'+tpEscape(label)+'</dt><dd>'+tpEscape(value)+'</dd>'+(detail?'<small class="gt-note">'+tpEscape(detail)+'</small>':'')+'</dl>';}
@@ -5829,8 +5843,8 @@ function gtTable(headers,rows){
 function gtRenderDashboard(range,workers){
   const metrics=workers.map(w=>gtMetrics(w,range)),sum=k=>metrics.reduce((s,m)=>s+m[k],0);
   const cards=gtCard('Capacidad',gtHours(sum('capacity')),'Jornada útil + extras aprobadas')+gtCard('Programado',gtHours(sum('load')))+gtCard('Libre',gtHours(metrics.reduce((s,m)=>s+Math.max(0,m.remaining),0)))+gtCard('Extras',gtHours(sum('extra')))+gtCard('Novedades',gtHours(sum('lost')));
-  const rows=workers.map((w,i)=>{const m=metrics[i],state=gtState(m);return '<tr><td><button class="link-btn" onclick="gtFocusWorker(\''+w.id+'\')">'+tpEscape(w.nombre)+'</button></td><td>'+tpEscape(w.cargo)+'</td><td>'+gtHours(m.capacity)+'</td><td>'+gtHours(m.load)+'</td><td>'+gtHours(Math.max(0,m.remaining))+'</td><td>'+m.util.toLocaleString('es-CO',{maximumFractionDigits:1})+'%</td><td><span class="gt-state '+state[1]+'">'+state[0]+'</span></td></tr>';});
-  return '<div class="gt-grid">'+cards+'</div><section class="gt-panel"><div class="gt-panel-head"><h3>Capacidad por operario</h3></div>'+gtTable(['Operario','Cargo','Capacidad','Programado','Libre','Utilización','Estado'],rows)+'</section>';
+  const rows=workers.map((w,i)=>{const m=metrics[i],state=gtState(m),blocked=m.blocked?'<span class="gt-state over">No disponible</span>':'—';return '<tr><td><button class="link-btn" onclick="gtFocusWorker(\''+w.id+'\')">'+tpEscape(w.nombre)+'</button></td><td>'+tpEscape(w.cargo)+'</td><td>'+gtHours(m.capacity)+'</td><td>'+gtHours(m.lost)+'</td><td>'+gtHours(m.load)+'</td><td>'+gtHours(Math.max(0,m.remaining))+'</td><td>'+blocked+'</td><td><span class="gt-state '+state[1]+'">'+state[0]+'</span></td></tr>';});
+  return '<div class="gt-grid">'+cards+'</div><section class="gt-panel"><div class="gt-panel-head"><h3>Capacidad por operario</h3></div>'+gtTable(['Operario','Cargo','Capacidad','Bloqueado','Programado','Libre','Novedad','Estado'],rows)+'</section>';
 }
 function gtTicks(range){
   const ticks=[];if(range.mode==='day'){for(let h=0;h<24;h+=3)ticks.push(String(h).padStart(2,'0')+':00');}
@@ -5932,7 +5946,7 @@ function gtSuggestEnd(){
   const typical=gtTypical(machine,stage),end=gtAddWorkMinutes(start,typical.minutes,stage);if(end)document.getElementById('gt-a-end').value=gtInputDate(end);document.getElementById('gt-a-duration-source').textContent=typical.label+' · '+gtHours(typical.minutes);
 }
 function gtConflicts(row,id){
-  return gtAssignments.filter(a=>a.id!==id&&a.operario_id===row.operario_id&&a.estado!=='cancelada'&&a.inicio<row.fin&&a.fin>row.inicio).map(a=>'Actividad: '+gtMachineLabel(a)+' ('+gtFmt(a.inicio)+' - '+gtFmt(a.fin)+')').concat(gtNovelties.filter(n=>n.operario_id===row.operario_id&&n.estado==='Aprobado'&&n.inicio<row.fin&&n.fin>row.inicio).map(n=>'Novedad: '+n.tipo+' ('+gtFmt(n.inicio)+' - '+gtFmt(n.fin)+')'));
+  return gtAssignments.filter(a=>a.id!==id&&a.operario_id===row.operario_id&&a.estado!=='cancelada'&&a.inicio<row.fin&&a.fin>row.inicio).map(a=>'Actividad: '+gtMachineLabel(a)+' ('+gtFmt(a.inicio)+' - '+gtFmt(a.fin)+')').concat(gtNovelties.filter(n=>n.operario_id===row.operario_id&&gtNoveltyBlocks(n)&&n.inicio<row.fin&&n.fin>row.inicio).map(n=>'Novedad: '+n.tipo+' ('+gtFmt(n.inicio)+' - '+gtFmt(n.fin)+')'));
 }
 async function gtPersistAssignment(row,id,ask){
   const conflicts=gtConflicts(row,id);if(conflicts.length){if(ask&&!confirm('Se encontraron conflictos:\\n\\n'+conflicts.join('\\n')+'\\n\\n¿Continuar excepcionalmente?'))return false;row.permitir_conflicto=true;}else row.permitir_conflicto=false;

@@ -1711,5 +1711,30 @@ do $$ begin
   end if;
 end $$;
 
+-- Respaldo de sincronización de Calidad. El navegador no puede leer de forma
+-- fiable estas páginas por CORS; esta función las consulta desde Supabase.
+create or replace function public.calidad_obtener_fuentes_maquinas() returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare admin_r extensions.http_response; terminados_r extensions.http_response;
+  admin_html text:=null; terminados_html text:=null; admin_error text:=null; terminados_error text:=null;
+begin
+  if public.calidad_rol() is distinct from 'admin' then raise exception 'Acceso restringido'; end if;
+  perform set_config('http.curlopt_timeout_ms','12000',true);
+  perform set_config('http.curlopt_connecttimeout_ms','5000',true);
+  perform set_config('http.curlopt_followlocation','1',true);
+  begin
+    select * into admin_r from extensions.http_get('https://xtensor-one.vercel.app/admin');
+    if admin_r.status=200 and admin_r.content like '%<table%' then admin_html:=admin_r.content; else admin_error:='Fuente de producción no disponible'; end if;
+  exception when others then admin_error:='Fuente de producción no disponible'; end;
+  begin
+    select * into terminados_r from extensions.http_get('https://xtensor-one.vercel.app/admin/terminados');
+    if terminados_r.status=200 and terminados_r.content like '%<table%' then terminados_html:=terminados_r.content; else terminados_error:='Fuente de terminados no disponible'; end if;
+  exception when others then terminados_error:='Fuente de terminados no disponible'; end;
+  if admin_html is null and terminados_html is null then raise exception 'No se pudo consultar Producción'; end if;
+  return jsonb_build_object('admin',admin_html,'terminados',terminados_html,'admin_error',admin_error,'terminados_error',terminados_error);
+end $$;
+revoke all on function public.calidad_obtener_fuentes_maquinas() from public,anon;
+grant execute on function public.calidad_obtener_fuentes_maquinas() to authenticated;
+
 NOTIFY pgrst, 'reload schema';
 commit;
